@@ -41,6 +41,14 @@ import { startWorkoutTimer, dismissRestTimer, checkActiveTimerOnLoad } from './t
 import { saveMapToDB } from './db.js';
 import { initGarminRunImport, initGarminGymImport } from './garmin.js';
 
+document.addEventListener('app:storage-loaded', () => {
+  try {
+    hydrateCurrentView();
+  } catch (err) {
+    console.warn('UI Hydration pending full app initialization.', err);
+  }
+});
+
 window.analyticsContext = 'overview';
 
 export function openAnalyticsView(context) {
