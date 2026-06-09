@@ -347,6 +347,18 @@
           </article>
         </div>
 
+        <h2 class="section-header mt-4">Cardio & Metabolic Strain (Gym)</h2>
+        <div class="grid-2-col gap-2 mb-4">
+          <article class="card-dark flex-col flex-center p-2" style="border: 1px solid rgba(245,158,11,0.35);">
+            <div class="text-xs text-muted mb-1">Avg Gym HR</div>
+            <div id="allTimeGymHr" class="text-lg font-heavy text-inverse">-- bpm</div>
+          </article>
+          <article class="card-dark flex-col flex-center p-2" style="border: 1px solid rgba(16,185,129,0.35);">
+            <div class="text-xs text-muted mb-1">Gym Cals Burned</div>
+            <div id="allTimeGymCals" class="text-lg font-heavy text-inverse">0</div>
+          </article>
+        </div>
+
         <h2 class="section-header">Weekly Workload</h2>
         <article class="card-dark p-3 mb-4">
           <div class="flex-between mb-2">
@@ -410,6 +422,28 @@
             <p style="color:var(--text-muted);font-size:0.75rem;">Log runs with time to see pace trends.</p>
           </div>
         </article>
+
+        <h2 class="section-header mt-4">Heart Rate Zones (Time in Zone)</h2>
+        <article class="card-dark p-3 mb-4">
+          <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
+            <span style="color:#22d3ee;">● Z1</span>
+            <span style="color:#10b981;">● Z2</span>
+            <span style="color:#f59e0b;">● Z3</span>
+            <span style="color:#f97316;">● Z4</span>
+            <span style="color:#ef4444;">● Z5</span>
+          </div>
+          <div id="hrZonesChartContainer">
+            <p style="color:var(--text-muted);font-size:0.75rem;">Import .FIT data to view HR zones.</p>
+          </div>
+        </article>
+
+        <h2 class="section-header mt-4">Running Cadence Trend</h2>
+        <article class="card-dark p-3 mb-4">
+          <div id="cadenceChartContainer">
+            <p style="color:var(--text-muted);font-size:0.75rem;">Import .FIT data to view cadence.</p>
+          </div>
+        </article>
+
       </div>
 
       <div id="analytics-recovery" class="analytics-section">
