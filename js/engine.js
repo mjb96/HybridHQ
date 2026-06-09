@@ -1,7 +1,6 @@
 // ==========================================
 // ENGINE: DIAGNOSTICS, 1RM, PARSER
 // ==========================================
-import { getProgramById } from './state.js';
 import { CONFIG, PROGRAMS } from './constants.js';
 
 let _getState;
