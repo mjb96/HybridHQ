@@ -248,17 +248,19 @@ function openTileCustomiser() {
   });
 
   list.innerHTML = sorted.map(config => `
-    <label class="tile-picker-item${hidden.has(config.id) ? ' tile-picker-hidden' : ''}">
+    <div class="tile-picker-item${hidden.has(config.id) ? ' tile-picker-hidden' : ''}" data-tile-id="${config.id}">
       <span class="tile-picker-icon">${config.icon}</span>
       <span class="tile-picker-label">${config.label}</span>
       <input type="checkbox" class="tile-picker-check" data-tile-id="${config.id}" ${hidden.has(config.id) ? '' : 'checked'}>
       <span class="tile-picker-toggle"></span>
-    </label>
+    </div>
   `).join('');
 
-  list.querySelectorAll('.tile-picker-check').forEach(cb => {
-    cb.addEventListener('change', () => {
-      cb.closest('.tile-picker-item').classList.toggle('tile-picker-hidden', !cb.checked);
+  list.querySelectorAll('.tile-picker-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const cb = item.querySelector('.tile-picker-check');
+      cb.checked = !cb.checked;
+      item.classList.toggle('tile-picker-hidden', !cb.checked);
     });
   });
 
