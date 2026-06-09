@@ -2,7 +2,7 @@
 // PERFORMANCE MATRIX — analytics.js
 // ==========================================
 import { CONFIG, PROGRAMS } from './constants.js';
-import { getProgramById } from './state.js'; // <-- NEW IMPORT
+import { getProgramById, saveStateToLocalStorage } from './state.js'; 
 
 let _getState;
 let _getDays;
@@ -10,6 +10,41 @@ let _getDays;
 export function initAnalytics(getStateFn, getDaysFn) {
   _getState = getStateFn;
   _getDays = getDaysFn;
+}
+
+// ==========================================
+// LOCAL STATE MUTATORS (Event Targets)
+// ==========================================
+export function saveThresholdPace(val) {
+  if (!_getState) return;
+  const appState = _getState();
+  appState.thresholdPaceSeconds = parseInt(val, 10) || 0;
+  saveStateToLocalStorage(true);
+  renderAnalytics(); 
+}
+
+export function logBodyWeight() {
+  if (!_getState) return;
+  const input = document.getElementById('analyticsBwInput');
+  if (!input || !input.value) return;
+
+  const appState = _getState();
+  const weight = parseFloat(input.value);
+  if (isNaN(weight)) return;
+
+  if (!appState.bodyWeightLog) appState.bodyWeightLog = [];
+  
+  const today = new Date().toISOString().slice(0, 10);
+  const existingIdx = appState.bodyWeightLog.findIndex(l => l.date === today);
+  if (existingIdx >= 0) {
+    appState.bodyWeightLog[existingIdx].weight = weight;
+  } else {
+    appState.bodyWeightLog.push({ date: today, weight: weight });
+  }
+
+  saveStateToLocalStorage(true);
+  input.value = '';
+  renderAnalytics();
 }
 
 // ==========================================
@@ -33,10 +68,10 @@ function formatPace(secsPerKm) {
 }
 
 function rpeColour(rpe) {
-  if (rpe === 0) return '#3b82f6'; // Blue
-  if (rpe < 6)  return '#10b981'; // Green
-  if (rpe < 8)  return '#f59e0b'; // Amber
-  return '#ef4444'; // Red
+  if (rpe === 0) return '#3b82f6'; 
+  if (rpe < 6)  return '#10b981'; 
+  if (rpe < 8)  return '#f59e0b'; 
+  return '#ef4444'; 
 }
 
 function paceZoneColour(secsPerKm, thresholdSecs) {
@@ -44,10 +79,10 @@ function paceZoneColour(secsPerKm, thresholdSecs) {
   const tempo     = thresholdSecs ? thresholdSecs + 30  : (CONFIG.paceZoneTempo     || 300);
   const threshold = thresholdSecs                       || (CONFIG.paceZoneThreshold || 270);
   if (secsPerKm === 0) return '#3b82f6';
-  if (secsPerKm > easy)      return '#10b981'; // Easy — green
-  if (secsPerKm > tempo)     return '#f59e0b'; // Tempo — amber
-  if (secsPerKm > threshold) return '#ef4444'; // Threshold — red
-  return '#a855f7';                             // Race/interval — purple
+  if (secsPerKm > easy)      return '#10b981'; 
+  if (secsPerKm > tempo)     return '#f59e0b'; 
+  if (secsPerKm > threshold) return '#ef4444'; 
+  return '#a855f7';                             
 }
 
 // ==========================================
@@ -224,12 +259,12 @@ function renderBodyWeightChart(container, bwLog) {
 }
 
 // ==========================================
-// CENTRALIZED DATA COLLECTION (PHASE 6)
+// CENTRALIZED DATA COLLECTION (UPGRADED)
 // ==========================================
 function collectAnalyticsData() {
   const appState = _getState();
   const DEFAULT_DAYS = _getDays();
-  const activeProgram = getProgramById(appState.activeProgramId); // <-- UPDATED RESOLVER
+  const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek = activeProgram?.totalWeeks || 12;
 
   const data = {
@@ -239,6 +274,14 @@ function collectAnalyticsData() {
     runData: [],
     rpeData: [],
     paceData: [],
+    
+    // --- NEW GARMIN EXTRACTORS ---
+    cadenceData: [],
+    teData: [],
+    gymHrData: [],
+    gymCalsData: [],
+    hrZonesData: [], 
+    
     globalTotalDist: 0,
     globalTotalElev: 0,
     globalTotalCals: 0,
@@ -299,14 +342,23 @@ function collectAnalyticsData() {
 
     if (!wkData) {
       data.volData.push(0); data.runData.push(0); data.rpeData.push(0); data.paceData.push(0);
+      data.cadenceData.push(0); data.teData.push(0); data.gymHrData.push(0); data.gymCalsData.push(0); data.hrZonesData.push([0,0,0,0,0]);
       continue;
     }
 
     let weekVol = 0, weekDist = 0, weekElev = 0, weekCals = 0;
     let weekRpeSum = 0, weekRpeCount = 0;
     let weekRunTime = 0, weekRunDist = 0;
+    
+    // Garmin Aggregators
+    let weekCadenceSum = 0, weekCadenceCount = 0;
+    let weekTeSum = 0, weekTeCount = 0;
+    let weekGymHrSum = 0, weekGymHrCount = 0;
+    let weekGymCals = 0;
+    let weekHrZones = [0, 0, 0, 0, 0];
 
     DEFAULT_DAYS.forEach(d => {
+      // Runs
       const run = wkData.runs?.[d] || {};
       const dist = parseFloat(run.dist) || 0;
       const elev = parseFloat(run.elev) || 0;
@@ -319,9 +371,21 @@ function collectAnalyticsData() {
       const runRpe = parseFloat(run.rpe) || 0;
       if (runRpe > 0) { weekRpeSum += runRpe; weekRpeCount++; }
 
+      if (run.avgCadence) { weekCadenceSum += parseFloat(run.avgCadence); weekCadenceCount++; }
+      if (run.trainingEffect) { weekTeSum += parseFloat(run.trainingEffect); weekTeCount++; }
+      if (run.hrZones && Array.isArray(run.hrZones)) {
+        run.hrZones.forEach((z, i) => { if(i < 5) weekHrZones[i] += (parseFloat(z) || 0); });
+      }
+
+      // Gym
       const gymRpe = parseFloat(wkData.gymRpe?.[d]) || 0;
       if (gymRpe > 0) { weekRpeSum += gymRpe; weekRpeCount++; }
+      
+      const gym = wkData.gymStats?.[d] || {};
+      if (gym.avgHR) { weekGymHrSum += parseFloat(gym.avgHR); weekGymHrCount++; }
+      if (gym.cals) { weekGymCals += parseFloat(gym.cals); weekCals += parseFloat(gym.cals); }
 
+      // Lifts
       const dayLifts = wkData.lifts?.[d] || {};
       for (const lift in dayLifts) {
         if (!Array.isArray(dayLifts[lift])) continue;
@@ -345,6 +409,13 @@ function collectAnalyticsData() {
     data.runData.push(weekDist);
     data.rpeData.push(weekRpeCount > 0 ? weekRpeSum / weekRpeCount : 0);
     data.paceData.push(weekRunDist > 0 ? weekRunTime / weekRunDist : 0);
+    
+    // Garmin Pushes
+    data.cadenceData.push(weekCadenceCount > 0 ? weekCadenceSum / weekCadenceCount : 0);
+    data.teData.push(weekTeCount > 0 ? weekTeSum / weekTeCount : 0);
+    data.gymHrData.push(weekGymHrCount > 0 ? weekGymHrSum / weekGymHrCount : 0);
+    data.gymCalsData.push(weekGymCals);
+    data.hrZonesData.push(weekHrZones);
   }
 
   return data;
@@ -398,7 +469,6 @@ function renderRecoveryAnalytics(data) {
   const wk          = appState.currentWeek || '1';
   const weekData    = appState.weeks?.[wk];
 
-  // Compute this-week avg RPE
   let totalRpe = 0, rpeCount = 0;
   if (weekData) {
     defaultDays.forEach(d => {
@@ -430,7 +500,6 @@ function renderRecoveryAnalytics(data) {
   const section = document.getElementById('analytics-recovery');
   if (!section) return;
 
-  // Inject summary cards once, update on re-render
   let summaryEl = section.querySelector('.recovery-summary-cards');
   if (!summaryEl) {
     summaryEl = document.createElement('div');
@@ -452,7 +521,6 @@ function renderRecoveryAnalytics(data) {
     </article>
   `;
 
-  // Inject interpretation card once
   let interpEl = section.querySelector('.recovery-interpretation');
   if (!interpEl) {
     interpEl = document.createElement('article');
@@ -565,10 +633,8 @@ export function renderAnalytics() {
   const data = collectAnalyticsData();
   const context = window.analyticsContext || 'overview';
 
-  // Hide all sections first
   document.querySelectorAll('.analytics-section').forEach(sec => sec.classList.remove('active'));
 
-  // Route to the correct context view
   switch(context) {
     case 'strength':
       document.getElementById('analytics-strength').classList.add('active');
@@ -608,25 +674,18 @@ export function renderAnalytics() {
       renderStreakDetail(data);
       break;
     case 'goal-progress':
-      // Goal progress reuses the consistency log + injects goal detail
       document.getElementById('analytics-progress').classList.add('active');
       renderProgressAnalytics(data);
       renderGoalProgressDetail(data);
       break;
     default:
-      // Fallback: strength overview
       document.getElementById('analytics-strength').classList.add('active');
       renderStrengthAnalytics(data);
   }
 }
 
-export function updateCompoundAnalyticsBarItem(valNodeId, barNodeId, currentVal, maxVal) {
-  // Legacy function kept for safety
-}
+export function updateCompoundAnalyticsBarItem(valNodeId, barNodeId, currentVal, maxVal) {}
 
-// ==========================================
-// RECOVERY SCORE DETAIL (new tile target)
-// ==========================================
 function renderRecoveryScoreDetail(data) {
   const appState = _getState();
   const defaultDays = _getDays();
@@ -668,14 +727,10 @@ function renderRecoveryScoreDetail(data) {
   if (fatEl)   fatEl.textContent   = rpeCount > 0 ? `~${fatigueContrib}%` : '--';
   if (recEl)   recEl.textContent   = recommendation;
 
-  // Re-use the existing RPE trend chart in the detail container
   const trendEl = document.getElementById('rpeTrendContainerDetail');
   if (trendEl) renderRpeTrendChart(trendEl, data);
 }
 
-// ==========================================
-// WEEKLY VOLUME DETAIL (new tile target)
-// ==========================================
 function renderWeeklyVolumeDetail(data) {
   const appState = _getState();
   const defaultDays = _getDays();
@@ -712,7 +767,6 @@ function renderWeeklyVolumeDetail(data) {
     ? `${(totalVol / 1000).toFixed(2)}t`
     : `${Math.round(totalVol).toLocaleString()} kg`;
 
-  // Render the volume chart in the detail section
   const chartEl = document.getElementById('weekVolChartContainer');
   if (chartEl) {
     renderVolumeChart(
@@ -724,14 +778,10 @@ function renderWeeklyVolumeDetail(data) {
   }
 }
 
-// ==========================================
-// STREAK DETAIL (new tile target)
-// ==========================================
 function renderStreakDetail(data) {
   const appState = _getState();
   const defaultDays = _getDays();
 
-  // Rebuild active dates set (same logic as dashboard.js tile)
   const activeDates = new Set();
   for (const wk in appState.weeks || {}) {
     const wkData = appState.weeks[wk];
@@ -812,15 +862,11 @@ function renderStreakDetail(data) {
   }
 }
 
-// Helper: re-use RPE trend rendering for recovery detail view
 function renderRpeTrendChart(container, data) {
   if (!container) return;
-  // Delegate to existing RPE renderer by temporarily swapping containers
   const existingContainer = document.getElementById('rpeTrendContainer');
   const savedContent = existingContainer ? existingContainer.innerHTML : '';
 
-  // Call the existing recovery analytics render but target our new container
-  // We do this by temporarily re-pointing the DOM id
   if (existingContainer) existingContainer.id = '_rpeTrendContainer_swap';
   container.id = 'rpeTrendContainer';
   try {
@@ -834,15 +880,12 @@ function renderRpeTrendChart(container, data) {
   }
 }
 
-// ==========================================
-// GOAL PROGRESS DETAIL (injected into progress view)
-// ==========================================
 function renderGoalProgressDetail(data) {
   const appState = _getState();
-  const activeProgram = getProgramById(appState.activeProgramId); // <-- UPDATED RESOLVER
+  const activeProgram = getProgramById(appState.activeProgramId);
 
   const wk    = parseInt(appState.currentWeek, 10) || 1;
-  const total = activeProgram.totalWeeks || 12; // <-- UPDATED PROPERTY
+  const total = activeProgram.totalWeeks || 12; 
   const pct   = Math.round((wk / total) * 100);
 
   const goalEl = document.getElementById('analytics-goal-detail');
