@@ -2,7 +2,7 @@
 // FULLY REFACTORED HOME DASHBOARD (home.js)
 // ==========================================
 import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
-import { getProgramById } from './state.js'; // <-- NEW IMPORT ADDED HERE
+import { getProgramById } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
 import { getMapFromDB } from './db.js';
@@ -13,13 +13,13 @@ let _getState;
 let _getSelectedDay;
 let _getDays;
 
+// Private module-scoped variable to hold the map instance safely
+let activeHomeMapInstance = null;
+
 export function initHome(getStateFn, getSelectedDayFn, getDaysFn) {
   _getState = getStateFn;
   _getSelectedDay = getSelectedDayFn;
   _getDays = getDaysFn;
-
-  window.__getAppState    = getStateFn;
-  window.__getSelectedDay = getSelectedDayFn;
 }
 
 function parseTimeToMinutes(timeStr) {
@@ -78,7 +78,6 @@ function renderMetricTile(config, data) {
 function renderRingTile(config, data) {
   const ringColor = data.ringColor || 'var(--color-blue)';
   const pct = data.ringPct || 0;
-  // conic-gradient: pct% filled with ringColor, rest transparent
   const grad = `conic-gradient(${ringColor} ${pct}%, rgba(255,255,255,0.1) 0)`;
   return `
     <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
@@ -153,21 +152,19 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   const grid = document.getElementById('glanceGrid');
   if (!grid) return;
 
-  // Inject Edit button into header once
   const header = grid.previousElementSibling;
   if (header && !header.querySelector('.tile-customise-btn')) {
     const btn = document.createElement('button');
     btn.className = 'tile-customise-btn';
     btn.textContent = 'Edit';
     btn.setAttribute('aria-label', 'Customise dashboard tiles');
-    btn.addEventListener('click', openTileCustomiser);
+    btn.setAttribute('data-action', 'open-tile-customiser');
     header.appendChild(btn);
   }
 
   const savedOrder  = loadTileOrder();
   const hiddenTiles = loadHiddenTiles();
 
-  // Apply saved order if present, otherwise fall back to registry order
   const sorted = [...TILE_REGISTRY].sort((a, b) => {
     if (savedOrder) {
       const ai = savedOrder.indexOf(a.id);
@@ -181,13 +178,11 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
     const tileId = `glance-tile-${config.id}`;
     let article = document.getElementById(tileId);
 
-    // Remove from DOM if hidden
     if (hiddenTiles.has(config.id)) {
       if (article) article.remove();
       return;
     }
 
-    // Create the article element if first render
     if (!article) {
       article = document.createElement('article');
       article.id        = tileId;
@@ -197,7 +192,6 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
       article.setAttribute('aria-label', `${config.label} — tap for details`);
       grid.appendChild(article);
 
-      // Wire navigation
       const nav = resolveTileNavigation(config.navTarget);
       if (nav) {
         article.style.cursor = 'pointer';
@@ -206,7 +200,6 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
       }
     }
 
-    // Compute data and update content
     let data;
     try {
       data = config.renderData(appState, defaultDays, activeProgram, selectedDay);
@@ -217,14 +210,12 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
     article.innerHTML = renderTileContent(config, data);
   });
 
-  // Reorder DOM to match sorted order (moves existing nodes, no cloning)
   sorted.forEach(config => {
     if (hiddenTiles.has(config.id)) return;
     const el = document.getElementById(`glance-tile-${config.id}`);
     if (el) grid.appendChild(el);
   });
 
-  // Mount drag-and-drop (skips already-bound tiles via data-tileDragBound)
   mountTileDragAndDrop();
 }
 
@@ -280,7 +271,7 @@ export function closeTileCustomiser(apply) {
     saveHiddenTiles(hidden);
     sheet.classList.remove('active');
     document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
-    // Re-render to apply changes
+    
     const appState      = _getState();
     const DEFAULT_DAYS  = _getDays();
     const activeProgram = getProgramById(appState.activeProgramId);
@@ -308,7 +299,6 @@ export function renderHome() {
   const DEFAULT_DAYS = _getDays(); 
 
   const wk = appState?.currentWeek || "1";
-  // Provide an empty fallback object instead of crashing or returning
   const weekData = appState?.weeks?.[wk] || {};
 
   const indicatorEl = document.getElementById('homeWeekBlockIndicator');
@@ -316,7 +306,6 @@ export function renderHome() {
   if (indicatorEl) indicatorEl.textContent = 'Week ' + wk;
   if (labelEl) labelEl.textContent = WEEK_PHASE_NAMES[wk] || 'Active Phase';
 
-  // <-- THIS IS THE LINE THAT WAS CHANGED -->
   const activeProgram = getProgramById(appState.activeProgramId);
   const homeBlueprint = activeProgram.days?.[selectedDay] || { title: "Rest Day", badge: "Rest", color: "#6b7280", desc: "No specific template found.", runs: "Rest", lifts: [] };
 
@@ -454,13 +443,13 @@ export function renderHome() {
             if (mapEl) {
               mapEl.style.display = 'block';
               setTimeout(() => {
-                if (window.activeHomeMap) window.activeHomeMap.remove();
-                window.activeHomeMap = L.map('homeMiniMapContainer', {
+                if (activeHomeMapInstance) activeHomeMapInstance.remove();
+                activeHomeMapInstance = L.map('homeMiniMapContainer', {
                   zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false
                 });
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.activeHomeMap);
-                const route = L.polyline(coords, { color: '#f43f5e', weight: 4, opacity: 1.0 }).addTo(window.activeHomeMap);
-                window.activeHomeMap.fitBounds(route.getBounds(), { padding: [5, 5] });
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(activeHomeMapInstance);
+                const route = L.polyline(coords, { color: '#f43f5e', weight: 4, opacity: 1.0 }).addTo(activeHomeMapInstance);
+                activeHomeMapInstance.fitBounds(route.getBounds(), { padding: [5, 5] });
               }, 50);
             }
           }
@@ -485,7 +474,6 @@ export function renderHome() {
     }
   }
 
-  // --- DEVICE CAROUSEL CHARTS & METRICS CALCULATION ---
   let currentWeekGymTimeSum = 0; 
   let currentWeekRunDistSum = 0;
 
@@ -523,7 +511,6 @@ export function renderHome() {
     dailyGymTimes.push(dailyGymTime);
   });
 
-  // --- DRAW ACTIVITY BAR CHARTS ---
   const strengthHero = document.getElementById('focusStrengthHero');
   const runHero = document.getElementById('focusRunHero');
   const strengthChartContainer = document.getElementById('strengthBarChart');
@@ -581,10 +568,8 @@ export function renderHome() {
     runChartContainer.innerHTML = runHTML;
   }
 
-  // --- RENDER DYNAMIC GLANCE GRID ---
   renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay);
 
-  // --- LEGACY HIDDEN ELEMENTS (kept for backward compat with modals) ---
   const progressPercentage = (() => {
     let total = 0, done = 0;
     DEFAULT_DAYS.forEach(dKey => {
@@ -658,7 +643,6 @@ export function renderHome() {
             });
           }
         }
-        // current week volume for compare
         const cLifts = weekData.lifts?.[d] || {};
         for (const l in cLifts) {
           if (Array.isArray(cLifts[l])) {
@@ -725,7 +709,23 @@ export function renderHome() {
   }
 }
 
-export function calculateConcurrentBalanceUI(gymTSS, runTSS) {
-  // Legacy shim — stress balance is now rendered inside the tile.
-  // This remains exported so app.js doesn't break if referenced elsewhere.
-}
+export function calculateConcurrentBalanceUI(gymTSS, runTSS) {}
+
+// ==========================================
+// EVENT DELEGATION ROUTER
+// ==========================================
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.getAttribute('data-action');
+
+  if (action === 'open-tile-customiser') {
+    openTileCustomiser();
+  } else if (action === 'close-tile-customiser') {
+    const apply = target.getAttribute('data-apply') === 'true';
+    closeTileCustomiser(apply);
+  } else if (action === 'reset-tile-customiser') {
+    resetTileCustomiser();
+  }
+});
