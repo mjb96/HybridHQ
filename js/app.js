@@ -49,6 +49,14 @@ document.addEventListener('app:storage-loaded', () => {
   }
 });
 
+document.addEventListener('app:library-updated', () => {
+  try {
+    renderProgramLibrary();
+  } catch (err) {
+    console.warn('Library render failed after builder closed.', err);
+  }
+});
+
 window.analyticsContext = 'overview';
 
 export function openAnalyticsView(context) {
