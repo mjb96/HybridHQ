@@ -23,7 +23,7 @@ import {
 } from './state.js';
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
-import { initHome, renderHome } from './home.js';
+import { initHome, renderHome, closeTileCustomiser, resetTileCustomiser } from './home.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
 import { initDragDrop, resetTileOrder, exitTileEditMode } from './dragdrop.js';
 import {
@@ -388,6 +388,8 @@ window.executeDuplicateProgram = executeDuplicateProgram;
 window.openBuilder = openBuilder;
 window.resetDashboardTileOrder = () => { resetTileOrder(); exitTileEditMode(); hydrateCurrentView(); };
 window.exitTileDragMode = exitTileEditMode;
+window.closeTileCustomiser = closeTileCustomiser;
+window.resetTileCustomiser = resetTileCustomiser;
 
 const getState = () => appState;
 const getSelectedDay = () => selectedDay;
