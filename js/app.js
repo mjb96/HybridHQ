@@ -610,6 +610,13 @@ function checkForAutomaticWeekAdvance() {
   }
 }
 
+// TEMP compatibility bridge for dashboard/home modules
+
+window.openAnalyticsView = openAnalyticsView;
+window.openTodaySummaryModal = openTodaySummaryModal;
+window.switchGlobalAppTab = switchGlobalAppTab;
+window.launchActiveWorkoutCockpit = launchActiveWorkoutCockpit;
+
 async function bootstrapApp() {
   try {
     determineDefaultCalendarDay();
