@@ -258,6 +258,107 @@ function renderBodyWeightChart(container, bwLog) {
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${fill}${polyline}${dots}${valueLabels}${xAxis}</svg>`;
 }
 
+// NEW: Garmin HR Zones Stacked Bar Chart
+function renderHrZonesChart(container, weekLabels, zonesData) {
+  if (!container) return;
+  const hasData = zonesData.some(week => week.some(z => z > 0));
+  if (!hasData || weekLabels.length === 0) {
+     container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">Import .FIT data to view HR zones.</p>';
+     return;
+  }
+
+  const W = 400, H = 160, PAD_L = 40, PAD_B = 30, PAD_T = 15, PAD_R = 15;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_B - PAD_T;
+  const n = weekLabels.length;
+  const barW = Math.max(12, Math.floor(chartW / n) - 8);
+
+  const colors = ['#22d3ee', '#10b981', '#f59e0b', '#f97316', '#ef4444'];
+  let bars = '';
+
+  weekLabels.forEach((label, i) => {
+    const x = PAD_L + (i / n) * chartW + (chartW / n - barW) / 2;
+    const weekZones = zonesData[i];
+    const totalTime = weekZones.reduce((a,b)=>a+b, 0) || 1; 
+
+    let currentY = PAD_T + chartH;
+
+    weekZones.forEach((zTime, zIdx) => {
+       if(zTime <= 0) return;
+       const h = (zTime / totalTime) * chartH;
+       currentY -= h;
+       bars += `<rect x="${x.toFixed(1)}" y="${currentY.toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="${colors[zIdx]}" opacity="0.9"/>`;
+    });
+  });
+
+  let xAxis = '';
+  weekLabels.forEach((label, i) => {
+    const lx = PAD_L + (i / n) * chartW + chartW / n / 2;
+    xAxis += `<text x="${lx.toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="12" font-weight="600" fill="rgba(255,255,255,0.9)">${label}</text>`;
+  });
+
+  let yAxis = '';
+  [0, 50, 100].forEach(pct => {
+     const vy = PAD_T + chartH - (pct/100)*chartH;
+     yAxis += `<text x="${PAD_L - 8}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.6)">${pct}%</text>
+               <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${bars}${xAxis}</svg>`;
+}
+
+// NEW: Garmin Cadence Line Chart
+function renderCadenceChart(container, weekLabels, cadenceData) {
+  if (!container) return;
+  const valid = cadenceData.filter(c => c > 0);
+  if (valid.length === 0 || weekLabels.length === 0) {
+    container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">Import .FIT data to view cadence trends.</p>';
+    return;
+  }
+
+  const W = 400, H = 150, PAD_L = 40, PAD_B = 30, PAD_T = 15, PAD_R = 15;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_B - PAD_T;
+  const n = weekLabels.length;
+
+  const minC = Math.max(120, Math.min(...valid) - 5);
+  const maxC = Math.max(...valid) + 5;
+  const rangeC = Math.max(maxC - minC, 10);
+
+  const toX = i => PAD_L + (i / n) * chartW + chartW / n / 2;
+  const toY = c => PAD_T + chartH - ((c - minC) / rangeC) * chartH;
+
+  let points = '';
+  let dots = '';
+  weekLabels.forEach((label, i) => {
+    const c = cadenceData[i];
+    if (c > 0) {
+      const x = toX(i), y = toY(c);
+      points += `${x.toFixed(1)},${y.toFixed(1)} `;
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="#f59e0b" stroke="#111827" stroke-width="2"/>
+               <text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#f59e0b">${Math.round(c)}</text>`;
+    }
+  });
+
+  const line = points.trim().split(' ').length >= 2
+    ? `<polyline fill="none" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round" points="${points.trim()}"/>` : '';
+
+  let xAxis = '';
+  weekLabels.forEach((label, i) => {
+    const lx = toX(i);
+    xAxis += `<text x="${lx.toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="12" font-weight="600" fill="rgba(255,255,255,0.9)">${label}</text>`;
+  });
+
+  let yAxis = '';
+  [minC, Math.round((minC+maxC)/2), maxC].forEach(val => {
+     const vy = toY(val);
+     yAxis += `<text x="${PAD_L - 8}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.6)">${val}</text>
+               <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${line}${dots}${xAxis}</svg>`;
+}
+
 // ==========================================
 // CENTRALIZED DATA COLLECTION (UPGRADED)
 // ==========================================
@@ -287,6 +388,10 @@ function collectAnalyticsData() {
     globalTotalSets: 0,
     globalTotalVol: 0,
     absoluteMesoPeakVol: 0,
+    
+    globalTotalGymCals: 0,
+    globalAvgGymHr: 0,
+
     thresholdSecs: appState.thresholdPaceSeconds || null,
     bodyWeightLog: appState.bodyWeightLog || []
   };
@@ -410,6 +515,11 @@ function collectAnalyticsData() {
     data.hrZonesData.push(weekHrZones);
   }
 
+  // Calculate Global Gym Metrics
+  data.globalTotalGymCals = data.gymCalsData.reduce((a,b)=>a+b, 0);
+  const validGymHr = data.gymHrData.filter(h=>h>0);
+  data.globalAvgGymHr = validGymHr.length ? validGymHr.reduce((a,b)=>a+b, 0) / validGymHr.length : 0;
+
   return data;
 }
 
@@ -422,6 +532,13 @@ function renderStrengthAnalytics(data) {
   setText('allTimeTotalVol', Math.round(data.globalTotalVol).toLocaleString() + ' kg');
   setText('allTimeTotalSets', data.globalTotalSets.toLocaleString());
   setText('analyticsPeakVol', data.absoluteMesoPeakVol.toLocaleString() + ' kg peak');
+  
+  // Inject the new Gym Metrics
+  const gymHrEl = document.getElementById('allTimeGymHr');
+  const gymCalsEl = document.getElementById('allTimeGymCals');
+  if (gymHrEl) gymHrEl.textContent = data.globalAvgGymHr > 0 ? Math.round(data.globalAvgGymHr) + ' bpm' : '-- bpm';
+  if (gymCalsEl) gymCalsEl.textContent = Math.round(data.globalTotalGymCals).toLocaleString();
+
   renderVolumeChart(document.getElementById('volumeChartContainer'), data.weekLabels, data.volData, data.runData);
   
   const rmContainer = document.getElementById('allLiftsRmContainer');
@@ -453,6 +570,10 @@ function renderRunningAnalytics(data) {
       ? paceRows.join('')
       : '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;">Log runs with time to see pace trends.</p>';
   }
+
+  // Inject the new Garmin Charts
+  renderHrZonesChart(document.getElementById('hrZonesChartContainer'), data.weekLabels, data.hrZonesData);
+  renderCadenceChart(document.getElementById('cadenceChartContainer'), data.weekLabels, data.cadenceData);
 }
 
 function renderRecoveryAnalytics(data) {
