@@ -218,7 +218,10 @@
 
       </div>
 
-      <h2 class="focus-header-text mt-2">At a Glance</h2>
+      <h2 class="focus-header-text mt-2">
+        At a Glance 
+        <span class="text-accent-blue" style="font-size: 0.85rem; font-weight: 500; cursor: pointer;">See All</span>
+      </h2>
       
       <!-- Dynamic glance grid — tiles are injected by dashboard.js / home.js -->
       <div class="glance-grid mb-4" id="glanceGrid" aria-label="At a Glance metrics"></div>
@@ -778,22 +781,6 @@
         <button class="btn-action-block btn-ghost mt-0" onclick="window.closeDeloadModal()">Cancel</button>
         <button class="btn-action-block btn-amber mt-0" onclick="window.executeDeloadWeek()">Apply Deload</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Tile Customiser Bottom Sheet -->
-  <div id="tileCustomiserBackdrop" class="sheet-backdrop" onclick="window.closeTileCustomiser(false)"></div>
-  <div id="tileCustomiserSheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="tileCustomiserTitle">
-    <div class="bottom-sheet-handle"></div>
-    <div class="bottom-sheet-header">
-      <h3 id="tileCustomiserTitle" class="bottom-sheet-title">Customise Tiles</h3>
-      <button class="sheet-close-btn" onclick="window.closeTileCustomiser(false)" aria-label="Close">✕</button>
-    </div>
-    <p class="bottom-sheet-hint">Toggle tiles on or off. Drag to reorder (long-press a tile on the dashboard).</p>
-    <div id="tileCustomiserList" class="tile-picker-list"></div>
-    <div class="bottom-sheet-actions">
-      <button class="btn-action-block btn-ghost mt-0" onclick="window.resetTileCustomiser()">Reset to Default</button>
-      <button class="btn-action-block btn-blue mt-0" onclick="window.closeTileCustomiser(true)">Done</button>
     </div>
   </div>
 
