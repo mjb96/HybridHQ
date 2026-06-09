@@ -7,7 +7,6 @@ import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
-import { loadTileOrder, mountTileDragAndDrop, exitTileEditMode, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
 
 let _getState;
 let _getSelectedDay;
@@ -153,41 +152,12 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   const grid = document.getElementById('glanceGrid');
   if (!grid) return;
 
-  // Inject "Edit" button into the At a Glance header once
-  const header = grid.previousElementSibling;
-  if (header && !header.querySelector('.tile-customise-btn')) {
-    const editBtn = document.createElement('button');
-    editBtn.className = 'tile-customise-btn';
-    editBtn.textContent = 'Edit';
-    editBtn.setAttribute('aria-label', 'Customise dashboard tiles');
-    editBtn.addEventListener('click', openTileCustomiser);
-    header.appendChild(editBtn);
-  }
-
-  const savedOrder  = loadTileOrder();
-  const hiddenTiles = loadHiddenTiles();
-
-  // Sort by saved order, fall back to registry order
-  const sorted = [...TILE_REGISTRY].sort((a, b) => {
-    if (savedOrder) {
-      const ai = savedOrder.indexOf(a.id);
-      const bi = savedOrder.indexOf(b.id);
-      const ap = ai === -1 ? 9999 : ai;
-      const bp = bi === -1 ? 9999 : bi;
-      return ap - bp;
-    }
-    return a.order - b.order;
-  });
+  // Sort by order field
+  const sorted = [...TILE_REGISTRY].sort((a, b) => a.order - b.order);
 
   sorted.forEach(config => {
     const tileId = `glance-tile-${config.id}`;
     let article = document.getElementById(tileId);
-
-    // Remove tile from DOM if it's been hidden
-    if (hiddenTiles.has(config.id)) {
-      if (article) article.remove();
-      return;
-    }
 
     // Create the article element if first render
     if (!article) {
@@ -197,7 +167,6 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
       article.setAttribute('role', 'button');
       article.setAttribute('tabindex', '0');
       article.setAttribute('aria-label', `${config.label} — tap for details`);
-      article.innerHTML = renderTileLoading();
       grid.appendChild(article);
 
       // Wire navigation
@@ -209,7 +178,13 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
       }
     }
 
-    // Always compute and render data
+    // Render loading state on first paint (empty innerHTML)
+    if (!article.innerHTML) {
+      article.innerHTML = renderTileLoading();
+      return;
+    }
+
+    // Compute data and update content
     let data;
     try {
       data = config.renderData(appState, defaultDays, activeProgram, selectedDay);
@@ -219,94 +194,6 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
 
     article.innerHTML = renderTileContent(config, data);
   });
-
-  // Reorder DOM nodes to match sorted order
-  sorted.forEach(config => {
-    if (hiddenTiles.has(config.id)) return;
-    const el = document.getElementById(`glance-tile-${config.id}`);
-    if (el) grid.appendChild(el);
-  });
-
-  // Mount drag-and-drop (skips already-bound tiles)
-  mountTileDragAndDrop(null);
-}
-
-// ==========================================
-// TILE CUSTOMISER — bottom sheet
-// ==========================================
-export function openTileCustomiser() {
-  const sheet = document.getElementById('tileCustomiserSheet');
-  if (!sheet) return;
-
-  const hidden = loadHiddenTiles();
-  const savedOrder = loadTileOrder();
-  const sorted = [...TILE_REGISTRY].sort((a, b) => {
-    if (savedOrder) {
-      const ai = savedOrder.indexOf(a.id);
-      const bi = savedOrder.indexOf(b.id);
-      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
-    }
-    return a.order - b.order;
-  });
-
-  const list = sheet.querySelector('#tileCustomiserList');
-  if (list) {
-    list.innerHTML = sorted.map(config => {
-      const isHidden = hidden.has(config.id);
-      return `
-        <label class="tile-picker-item${isHidden ? ' tile-picker-hidden' : ''}">
-          <span class="tile-picker-icon">${config.icon}</span>
-          <span class="tile-picker-label">${config.label}</span>
-          <input type="checkbox" class="tile-picker-check" data-tile-id="${config.id}" ${isHidden ? '' : 'checked'}>
-          <span class="tile-picker-toggle"></span>
-        </label>
-      `;
-    }).join('');
-
-    // Wire toggle interactions for immediate visual feedback
-    list.querySelectorAll('.tile-picker-check').forEach(cb => {
-      cb.addEventListener('change', () => {
-        cb.closest('.tile-picker-item').classList.toggle('tile-picker-hidden', !cb.checked);
-      });
-    });
-  }
-
-  sheet.classList.add('active');
-  document.getElementById('tileCustomiserBackdrop')?.classList.add('active');
-}
-
-export function closeTileCustomiser(apply = false) {
-  const sheet = document.getElementById('tileCustomiserSheet');
-  if (!sheet) return;
-
-  if (apply) {
-    const hidden = new Set();
-    sheet.querySelectorAll('.tile-picker-check').forEach(cb => {
-      if (!cb.checked) hidden.add(cb.dataset.tileId);
-    });
-    saveHiddenTiles(hidden);
-  }
-
-  sheet.classList.remove('active');
-  document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
-
-  if (apply) {
-    // Re-render home to apply changes
-    const appState = _getState();
-    const DEFAULT_DAYS = _getDays();
-    const activeProgram = getProgramById(appState.activeProgramId);
-    renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
-  }
-}
-
-export function resetTileCustomiser() {
-  resetTileOrder();
-  resetHiddenTiles();
-  closeTileCustomiser(false);
-  const appState = _getState();
-  const DEFAULT_DAYS = _getDays();
-  const activeProgram = getProgramById(appState.activeProgramId);
-  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
 }
 
 export function renderHome() {
