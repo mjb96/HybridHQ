@@ -25,7 +25,7 @@ import {
 import { initEngine, shouldSuggestDeload } from './engine.js';
 import { initHome, renderHome } from './home.js';
 import { initAnalytics, renderAnalytics } from './analytics.js';
-import { initDragDrop } from './dragdrop.js';
+import { initDragDrop, resetTileOrder, exitTileEditMode } from './dragdrop.js';
 import {
   initWorkout, renderWorkout,
   updateInputState, commitWorkoutUIState, toggleGymCheckLoggingState,
@@ -386,6 +386,8 @@ window.executeCreateProgram = executeCreateProgram;
 window.executeDeleteProgram = executeDeleteProgram;
 window.executeDuplicateProgram = executeDuplicateProgram;
 window.openBuilder = openBuilder;
+window.resetDashboardTileOrder = () => { resetTileOrder(); exitTileEditMode(); hydrateCurrentView(); };
+window.exitTileDragMode = exitTileEditMode;
 
 const getState = () => appState;
 const getSelectedDay = () => selectedDay;
