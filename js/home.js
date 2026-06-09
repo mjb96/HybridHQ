@@ -7,6 +7,7 @@ import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
+import { loadTileOrder, mountTileDragAndDrop } from './dragdrop.js';
 
 let _getState;
 let _getSelectedDay;
@@ -152,8 +153,16 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   const grid = document.getElementById('glanceGrid');
   if (!grid) return;
 
-  // Sort by order field
-  const sorted = [...TILE_REGISTRY].sort((a, b) => a.order - b.order);
+  // Apply saved order if present, otherwise fall back to registry order
+  const savedOrder = loadTileOrder();
+  const sorted = [...TILE_REGISTRY].sort((a, b) => {
+    if (savedOrder) {
+      const ai = savedOrder.indexOf(a.id);
+      const bi = savedOrder.indexOf(b.id);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    }
+    return a.order - b.order;
+  });
 
   sorted.forEach(config => {
     const tileId = `glance-tile-${config.id}`;
@@ -188,6 +197,15 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
 
     article.innerHTML = renderTileContent(config, data);
   });
+
+  // Reorder DOM to match sorted order (moves existing nodes, no cloning)
+  sorted.forEach(config => {
+    const el = document.getElementById(`glance-tile-${config.id}`);
+    if (el) grid.appendChild(el);
+  });
+
+  // Mount drag-and-drop (skips already-bound tiles via data-tileDragBound)
+  mountTileDragAndDrop();
 }
 
 export function renderHome() {
