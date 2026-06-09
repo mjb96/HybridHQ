@@ -263,8 +263,10 @@ function collectAnalyticsData() {
           if (!Array.isArray(dayLifts[lift])) continue;
           
           if (!data.dynamicStats[lift]) {
-            data.dynamicStats[lift] = { allTimeMax: 0, currentEstimatedMax: 0 };
+            data.dynamicStats[lift] = { allTimeMax: 0, currentEstimatedMax: 0, previousWeekMax: 0 };
           }
+
+          const prevWeek = (parseInt(appState.currentWeek, 10) - 1).toString();
 
           dayLifts[lift].forEach(s => {
             const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
@@ -278,6 +280,9 @@ function collectAnalyticsData() {
               }
               if (wKey === appState.currentWeek && e1rm > data.dynamicStats[lift].currentEstimatedMax) {
                  data.dynamicStats[lift].currentEstimatedMax = e1rm;
+              }
+              if (wKey === prevWeek && e1rm > data.dynamicStats[lift].previousWeekMax) {
+                 data.dynamicStats[lift].previousWeekMax = e1rm;
               }
             }
           });
@@ -388,6 +393,76 @@ function renderRunningAnalytics(data) {
 }
 
 function renderRecoveryAnalytics(data) {
+  const appState    = _getState();
+  const defaultDays = _getDays();
+  const wk          = appState.currentWeek || '1';
+  const weekData    = appState.weeks?.[wk];
+
+  // Compute this-week avg RPE
+  let totalRpe = 0, rpeCount = 0;
+  if (weekData) {
+    defaultDays.forEach(d => {
+      const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
+      const gRpe = parseInt(weekData.gymRpe?.[d], 10)   || 0;
+      if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
+      if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
+    });
+  }
+
+  const avgRpe = rpeCount > 0 ? (totalRpe / rpeCount) : 0;
+  let statusLabel = '--', statusColor = 'var(--text-muted)', interpretation = 'Log workouts to see recovery status.';
+  if (rpeCount > 0) {
+    if (avgRpe < 6) {
+      statusLabel     = 'Fresh';
+      statusColor     = '#10b981';
+      interpretation  = 'Low fatigue this week. Good time to push intensity.';
+    } else if (avgRpe < 8) {
+      statusLabel     = 'Accumulating';
+      statusColor     = '#f59e0b';
+      interpretation  = 'Moderate fatigue. Stick to planned volume and prioritise sleep.';
+    } else {
+      statusLabel     = 'High Load';
+      statusColor     = '#ef4444';
+      interpretation  = 'High fatigue this week. Consider reducing volume or taking a rest day.';
+    }
+  }
+
+  const section = document.getElementById('analytics-recovery');
+  if (!section) return;
+
+  // Inject summary cards once, update on re-render
+  let summaryEl = section.querySelector('.recovery-summary-cards');
+  if (!summaryEl) {
+    summaryEl = document.createElement('div');
+    summaryEl.className = 'recovery-summary-cards grid-2-col gap-2 mb-3';
+    const chartArticle = section.querySelector('article');
+    if (chartArticle) section.insertBefore(summaryEl, chartArticle);
+    else section.appendChild(summaryEl);
+  }
+  summaryEl.innerHTML = `
+    <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(16,185,129,0.3);">
+      <div class="text-xs text-muted mb-1">Avg RPE This Week</div>
+      <div class="text-lg font-heavy" style="color:${statusColor};">${rpeCount > 0 ? avgRpe.toFixed(1) : '--'}</div>
+      <div class="text-xs font-bold mt-1" style="color:${statusColor};">${statusLabel}</div>
+    </article>
+    <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(59,130,246,0.3);">
+      <div class="text-xs text-muted mb-1">Sessions Logged</div>
+      <div class="text-lg font-heavy text-inverse">${rpeCount}</div>
+      <div class="text-xs text-muted mt-1">this week</div>
+    </article>
+  `;
+
+  // Inject interpretation card once
+  let interpEl = section.querySelector('.recovery-interpretation');
+  if (!interpEl) {
+    interpEl = document.createElement('article');
+    interpEl.className = 'recovery-interpretation card-dark p-3 mb-3';
+    const chartArticle = section.querySelector('article:not(.recovery-summary-cards article)');
+    if (chartArticle) section.insertBefore(interpEl, chartArticle);
+    else section.appendChild(interpEl);
+  }
+  interpEl.innerHTML = `<div class="text-sm text-muted" style="line-height:1.5;">${interpretation}</div>`;
+
   renderRpeChart(document.getElementById('rpeTrendContainer'), data.weekLabels, data.rpeData);
 }
 
@@ -430,26 +505,55 @@ function render1RMList(container, dynamicStats) {
 
   if (entries.length === 0) {
     container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;">Complete sets to populate lift PRs.</p>';
-  } else {
-    const maxAllTime = entries[0][1].allTimeMax; 
-    container.innerHTML = entries.map(([name, statData]) => {
-      const pct = Math.min(100, Math.max(5, Math.round((statData.allTimeMax / maxAllTime) * 100)));
-      const cur = statData.currentEstimatedMax || 0;
-      const isCurrentWeekPR = cur > 0 && Math.abs(cur - statData.allTimeMax) < 0.5;
-      const badge = isCurrentWeekPR
-        ? `<span style="font-size:0.75rem;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:2px 6px;margin-left:8px;vertical-align:middle;">PR</span>`
-        : '';
-      return `<div class="mb-4">
-        <div class="flex-between font-bold mb-2">
-          <span class="text-inverse text-sm">${name}${badge}</span>
-          <span style="color:#3b82f6;" class="text-base">${Math.round(statData.allTimeMax)} kg</span>
-        </div>
-        <div class="trend-track-bg" style="height: 10px; border-radius: 5px;">
-          <div class="trend-track-fill" style="width:${pct}%;background:#3b82f6; border-radius: 5px;"></div>
-        </div>
-      </div>`;
-    }).join('');
+    return;
   }
+
+  const prCount = entries.filter(([, v]) => {
+    const cur = v.currentEstimatedMax || 0;
+    return cur > 0 && Math.abs(cur - v.allTimeMax) < 0.5;
+  }).length;
+
+  const maxAllTime = entries[0][1].allTimeMax;
+  const rows = entries.map(([name, statData]) => {
+    const pct   = Math.min(100, Math.max(5, Math.round((statData.allTimeMax / maxAllTime) * 100)));
+    const cur   = statData.currentEstimatedMax || 0;
+    const prev  = statData.previousWeekMax || 0;
+    const isCurrentWeekPR = cur > 0 && Math.abs(cur - statData.allTimeMax) < 0.5;
+
+    const badge = isCurrentWeekPR
+      ? `<span style="font-size:0.7rem;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:2px 6px;margin-left:6px;">PR</span>`
+      : '';
+
+    let deltaHtml = '';
+    if (cur > 0 && prev > 0) {
+      const delta = cur - prev;
+      const sign  = delta >= 0 ? '+' : '';
+      const col   = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : 'var(--text-muted)';
+      deltaHtml   = `<span style="font-size:0.72rem;color:${col};margin-left:6px;">${sign}${Math.round(delta)} kg vs last wk</span>`;
+    } else if (cur > 0) {
+      deltaHtml = `<span style="font-size:0.72rem;color:var(--text-muted);margin-left:6px;">This week: ~${Math.round(cur)} kg</span>`;
+    }
+
+    return `<div class="mb-4">
+      <div class="flex-between font-bold mb-1">
+        <span class="text-inverse text-sm">${name}${badge}</span>
+        <span style="color:#3b82f6;" class="text-base">${Math.round(statData.allTimeMax)} kg</span>
+      </div>
+      ${deltaHtml ? `<div class="mb-2">${deltaHtml}</div>` : ''}
+      <div class="trend-track-bg" style="height:10px;border-radius:5px;">
+        <div class="trend-track-fill" style="width:${pct}%;background:#3b82f6;border-radius:5px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const summaryBar = prCount > 0
+    ? `<div class="flex-between mb-4 p-3 card-dark" style="border:1px solid rgba(16,185,129,0.3);">
+        <span class="text-sm text-muted">PRs set this week</span>
+        <span class="font-heavy" style="color:#10b981;">${prCount} lift${prCount !== 1 ? 's' : ''} 🏆</span>
+       </div>`
+    : '';
+
+  container.innerHTML = summaryBar + rows;
 }
 
 // ==========================================
