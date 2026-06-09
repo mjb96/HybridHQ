@@ -2,7 +2,6 @@
 // PROGRAM BUILDER LOGIC (program_builder.js)
 // ==========================================
 import { appState, saveStateToLocalStorage, getProgramById } from './state.js';
-import { renderProgramLibrary } from './app.js';
 
 let activeBuilderId = null;
 
@@ -177,5 +176,5 @@ window.removeExercise = (wIdx, dIdx, eIdx) => {
 window.closeBuilder = () => {
   document.getElementById('builderViewContainer').style.display = 'none';
   document.getElementById('progModeLibraryContainer').style.display = 'block';
-  renderProgramLibrary();
+  document.dispatchEvent(new CustomEvent('app:library-updated'));
 };
