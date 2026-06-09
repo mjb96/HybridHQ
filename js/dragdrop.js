@@ -276,3 +276,29 @@ function onTileTouchEnd() {
     commitTileOrder();
   }
 }
+
+// ==========================================
+// HIDDEN TILES PERSISTENCE
+// ==========================================
+const TILE_HIDDEN_KEY = 'dashboardTilesHidden';
+
+export function loadHiddenTiles() {
+  try {
+    const raw = localStorage.getItem(TILE_HIDDEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveHiddenTiles(hiddenSet) {
+  try {
+    localStorage.setItem(TILE_HIDDEN_KEY, JSON.stringify([...hiddenSet]));
+  } catch {}
+}
+
+export function resetHiddenTiles() {
+  try {
+    localStorage.removeItem(TILE_HIDDEN_KEY);
+  } catch {}
+}
