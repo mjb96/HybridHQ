@@ -388,6 +388,56 @@ function renderRunningAnalytics(data) {
 }
 
 function renderRecoveryAnalytics(data) {
+  // Inject summary cards above the chart if the container has a preceding sibling for stats
+  const appState = _getState();
+  const defaultDays = _getDays();
+  const wk = appState.currentWeek || '1';
+  const weekData = appState.weeks?.[wk];
+
+  let totalRpe = 0, rpeCount = 0;
+  if (weekData) {
+    defaultDays.forEach(d => {
+      const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
+      const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
+      if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
+      if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
+    });
+  }
+
+  const avgRpe  = rpeCount > 0 ? (totalRpe / rpeCount) : 0;
+  const score   = rpeCount > 0 ? Math.round(Math.max(0, Math.min(100, ((10 - avgRpe) / 9) * 100))) : 0;
+  let status = '--', statusColor = 'var(--text-secondary)';
+  if (rpeCount > 0) {
+    if (avgRpe < 6)       { status = 'Fresh';        statusColor = '#10b981'; }
+    else if (avgRpe < 8)  { status = 'Accumulating'; statusColor = '#f59e0b'; }
+    else                  { status = 'High Load';    statusColor = '#ef4444'; }
+  }
+
+  // Inject stat cards into the static recovery section header area
+  const recoverySection = document.getElementById('analytics-recovery');
+  let statsRow = recoverySection?.querySelector('.recovery-stats-row');
+  if (recoverySection && !statsRow) {
+    statsRow = document.createElement('div');
+    statsRow.className = 'recovery-stats-row grid-2-col gap-2 mb-3';
+    const chart = recoverySection.querySelector('article');
+    if (chart) recoverySection.insertBefore(statsRow, chart);
+    else recoverySection.appendChild(statsRow);
+  }
+  if (statsRow) {
+    statsRow.innerHTML = `
+      <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(16,185,129,0.3);">
+        <div class="text-xs text-muted mb-1">This Week Avg RPE</div>
+        <div class="text-lg font-heavy" style="color:${statusColor};">${rpeCount > 0 ? avgRpe.toFixed(1) : '--'}</div>
+        <div class="text-xs font-bold mt-1" style="color:${statusColor};">${status}</div>
+      </article>
+      <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(59,130,246,0.3);">
+        <div class="text-xs text-muted mb-1">Recovery Score</div>
+        <div class="text-lg font-heavy text-inverse">${rpeCount > 0 ? score + '%' : '--'}</div>
+        <div class="text-xs text-muted mt-1">${rpeCount} sessions logged</div>
+      </article>
+    `;
+  }
+
   renderRpeChart(document.getElementById('rpeTrendContainer'), data.weekLabels, data.rpeData);
 }
 
@@ -614,8 +664,8 @@ function renderWeeklyVolumeDetail(data) {
     renderVolumeChart(
       chartEl,
       data.weekLabels || [],
-      data.weeklyVolumes || [],
-      data.weeklyRunDists || []
+      data.volData || [],
+      data.runData || []
     );
   }
 }
