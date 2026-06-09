@@ -16,15 +16,15 @@ let _getDays;
 let _saveState;
 let _switchTab;
 
+// Private module-scoped map instance
+let activeWorkoutMapInstance = null;
+
 export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn, switchTabFn) {
   _getState = getStateFn;
   _getSelectedDay = getSelectedDayFn;
   _getDays = getDaysFn;
   _saveState = saveStateFn;
   _switchTab = switchTabFn;
-  
-  // Expose the one-tap action window callback context
-  window.executeOneTapQuickLog = executeOneTapQuickLog;
 }
 
 // ==========================================
@@ -193,13 +193,13 @@ export function renderWorkout() {
         if (coords && coords.length > 0) {
           runMapContainer.style.display = 'block';
           setTimeout(() => {
-            if (window.activeWorkoutMap) { window.activeWorkoutMap.remove(); window.activeWorkoutMap = null; }
+            if (activeWorkoutMapInstance) { activeWorkoutMapInstance.remove(); activeWorkoutMapInstance = null; }
             runMapContainer.innerHTML = '';
-            window.activeWorkoutMap = L.map('runMapContainer');
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.activeWorkoutMap);
-            const route = L.polyline(coords, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(window.activeWorkoutMap);
-            window.activeWorkoutMap.fitBounds(route.getBounds(), { padding: [10, 10] });
-            window.activeWorkoutMap.invalidateSize();
+            activeWorkoutMapInstance = L.map('runMapContainer');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(activeWorkoutMapInstance);
+            const route = L.polyline(coords, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(activeWorkoutMapInstance);
+            activeWorkoutMapInstance.fitBounds(route.getBounds(), { padding: [10, 10] });
+            activeWorkoutMapInstance.invalidateSize();
           }, 100);
         } else {
           runMapContainer.style.display = 'none';
@@ -232,10 +232,8 @@ export function renderWorkout() {
 
   if (runPanel && exercisesContainer) {
     if (!isRunScheduled) {
-      // Non-running day: Move Run Panel safely beneath the gym exercises
       exercisesContainer.after(runPanel);
     } else {
-      // Running day: Restore Run Panel to the top
       exercisesContainer.before(runPanel);
     }
   }
@@ -317,7 +315,6 @@ export function renderWorkout() {
       historicalLineText = 'Global PR: ' + Math.round(appState.exerciseStats[displayLiftName].allTimeMax || 0) + 'kg (Est. 1RM)';
     }
 
-    // Prepare Ghost Data Extraction profile lookup
     let historicalSetData = null;
     const pastWkNum = parseInt(wk, 10) - 1;
     if (pastWkNum >= 1 && appState.weeks) {
@@ -333,7 +330,6 @@ export function renderWorkout() {
     const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    // #2 Feature: Maps ghost target metadata matching the current row loop index down to templates
     const setsMarkup = setsArr.map((sData, sIdx) => {
       let linkedGhostSet = null;
       if (pastWkNum >= 1 && appState.weeks) {
@@ -369,7 +365,6 @@ export function renderWorkout() {
   } catch(e) { console.warn(e); }
 }
 
-// #1 & #2 Feature: Unified One-Tap execution algorithm attached to labels
 export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   if (!labelNode) return;
   const appState = _getState();
@@ -383,7 +378,6 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   const rInput = parentRow.querySelector('.input-reps-node');
   const checkbox = parentRow.querySelector('.gym-check');
 
-  // Core Ghost Autofill resolution cascade path
   let targetW = wInput.value;
   let targetR = rInput.value;
 
@@ -398,7 +392,6 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
     }
   }
 
-  // Fallback to absolute configurations if past metrics don't exist
   if (!targetW) targetW = "40";
   if (!targetR) targetR = "10";
 
@@ -406,7 +399,6 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   rInput.value = targetR;
   if (checkbox) checkbox.checked = true;
 
-  // Commit variables to internal state model layers directly
   if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
   if (!appState.weeks[wk].lifts[selectedDay][liftName]) appState.weeks[wk].lifts[selectedDay][liftName] = [];
   
@@ -458,7 +450,6 @@ export function commitWorkoutUIState() {
   const wk = appState.currentWeek;
   const weekData = appState.weeks[wk];
 
-  // --- SAVE RUN STATS ---
   const distEl = document.getElementById('runInputDist');
   const timeEl = document.getElementById('runInputTime');
   const rpeRunEl = document.getElementById('runInputRpeCockpit');
@@ -479,7 +470,6 @@ export function commitWorkoutUIState() {
     };
   }
 
-  // --- SAVE GYM STATS ---
   if (!weekData.gymStats) weekData.gymStats = {};
   const gTimeEl = document.getElementById('gymInputTime');
   const gAvgHREl = document.getElementById('gymInputAvgHR');
@@ -578,7 +568,6 @@ export function toggleGymCheckLoggingState(checkboxNode) {
   if (checkboxNode.checked) {
     if (parentRow) parentRow.classList.add('is-complete');
     
-    // #2 Feature: Handle Ghost-value fallback if checkmark is clicked while fields are raw/empty
     const wInput = parentRow ? parentRow.querySelector('.input-weight-node') : null;
     const rInput = parentRow ? parentRow.querySelector('.input-reps-node') : null;
     
@@ -859,7 +848,7 @@ export function executeResetActiveDayMetrics() {
   appState.weeks[wk].notes[selectedDay] = '';
 
   const activeProgram = PROGRAMS[appState.activeProgramId] || PROGRAMS["hybrid_engine"];
-  const blueprint = activeProgram.days?.[dayKey] || activeProgram.days?.[selectedDay];
+  const blueprint = activeProgram.days?.[selectedDay];
 
   if (blueprint && blueprint.lifts) {
     blueprint.lifts.forEach(liftName => {
@@ -949,3 +938,52 @@ export function closeFinishSessionModal() {
   
   if (_switchTab) _switchTab('home');
 }
+
+// ==========================================
+// EVENT DELEGATION ROUTER
+// ==========================================
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.getAttribute('data-action');
+  
+  // Context extractors
+  const exCard = target.closest('.cockpit-exercise');
+  const row = target.closest('.cockpit-set-row');
+  const liftName = exCard ? exCard.getAttribute('data-liftname') : target.getAttribute('data-liftname');
+  const sIdx = parseInt(target.getAttribute('data-sidx'), 10);
+
+  if (action === 'quick-log') executeOneTapQuickLog(target, liftName, sIdx);
+  else if (action === 'quick-modifier') applyQuickFillModifier(target, target.getAttribute('data-modifier'), sIdx);
+  else if (action === 'toggle-pad') toggleQuickPad(row);
+  else if (action === 'append-set') appendCustomSetRow(target, liftName);
+  else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
+  else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
+  else if (action === 'open-add-exercise') openAddExerciseModal();
+  else if (action === 'close-add-exercise') closeAddExerciseModal();
+  else if (action === 'confirm-add-exercise') confirmAddExercise();
+  else if (action === 'open-reset-modal') openConfirmResetModal();
+  else if (action === 'close-reset-modal') closeConfirmResetModal();
+  else if (action === 'execute-reset') executeResetActiveDayMetrics();
+  else if (action === 'open-finish-modal') openFinishSessionModal();
+  else if (action === 'close-finish-modal') closeFinishSessionModal();
+});
+
+document.addEventListener('change', (e) => {
+  const target = e.target;
+  if (target.classList.contains('input-weight-node') || target.classList.contains('input-reps-node')) {
+    updateInputState(target);
+  } else if (target.classList.contains('gym-check')) {
+    toggleGymCheckLoggingState(target);
+  } else if (target.id === 'newExerciseSelect') {
+    handleExerciseDropdownSelectionChange();
+  }
+});
+
+document.addEventListener('focusout', (e) => {
+  const target = e.target;
+  if (target.matches('.input-weight-node, .input-reps-node, #sessionNotesInput, #sessionGymRpeCockpit, #runInputDist, #runInputTime, #runInputRpeCockpit')) {
+    commitWorkoutUIState();
+  }
+});
