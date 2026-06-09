@@ -275,7 +275,6 @@ function collectAnalyticsData() {
     rpeData: [],
     paceData: [],
     
-    // --- NEW GARMIN EXTRACTORS ---
     cadenceData: [],
     teData: [],
     gymHrData: [],
@@ -292,7 +291,6 @@ function collectAnalyticsData() {
     bodyWeightLog: appState.bodyWeightLog || []
   };
 
-  // 1. Scan Lifts for 1RM
   if (appState.weeks) {
     Object.keys(appState.weeks).forEach(wKey => {
       const wkData = appState.weeks[wKey];
@@ -334,7 +332,6 @@ function collectAnalyticsData() {
     });
   }
 
-  // 2. Timeline Aggregation
   for (let w = 1; w <= maxWeek; w++) {
     const wKey = w.toString();
     data.weekLabels.push('W' + w);
@@ -350,7 +347,6 @@ function collectAnalyticsData() {
     let weekRpeSum = 0, weekRpeCount = 0;
     let weekRunTime = 0, weekRunDist = 0;
     
-    // Garmin Aggregators
     let weekCadenceSum = 0, weekCadenceCount = 0;
     let weekTeSum = 0, weekTeCount = 0;
     let weekGymHrSum = 0, weekGymHrCount = 0;
@@ -358,7 +354,6 @@ function collectAnalyticsData() {
     let weekHrZones = [0, 0, 0, 0, 0];
 
     DEFAULT_DAYS.forEach(d => {
-      // Runs
       const run = wkData.runs?.[d] || {};
       const dist = parseFloat(run.dist) || 0;
       const elev = parseFloat(run.elev) || 0;
@@ -377,7 +372,6 @@ function collectAnalyticsData() {
         run.hrZones.forEach((z, i) => { if(i < 5) weekHrZones[i] += (parseFloat(z) || 0); });
       }
 
-      // Gym
       const gymRpe = parseFloat(wkData.gymRpe?.[d]) || 0;
       if (gymRpe > 0) { weekRpeSum += gymRpe; weekRpeCount++; }
       
@@ -385,7 +379,6 @@ function collectAnalyticsData() {
       if (gym.avgHR) { weekGymHrSum += parseFloat(gym.avgHR); weekGymHrCount++; }
       if (gym.cals) { weekGymCals += parseFloat(gym.cals); weekCals += parseFloat(gym.cals); }
 
-      // Lifts
       const dayLifts = wkData.lifts?.[d] || {};
       for (const lift in dayLifts) {
         if (!Array.isArray(dayLifts[lift])) continue;
@@ -410,7 +403,6 @@ function collectAnalyticsData() {
     data.rpeData.push(weekRpeCount > 0 ? weekRpeSum / weekRpeCount : 0);
     data.paceData.push(weekRunDist > 0 ? weekRunTime / weekRunDist : 0);
     
-    // Garmin Pushes
     data.cadenceData.push(weekCadenceCount > 0 ? weekCadenceSum / weekCadenceCount : 0);
     data.teData.push(weekTeCount > 0 ? weekTeSum / weekTeCount : 0);
     data.gymHrData.push(weekGymHrCount > 0 ? weekGymHrSum / weekGymHrCount : 0);
