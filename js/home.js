@@ -7,7 +7,7 @@ import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
-import { loadTileOrder, mountTileDragAndDrop } from './dragdrop.js';
+import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
 
 let _getState;
 let _getSelectedDay;
@@ -153,8 +153,21 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   const grid = document.getElementById('glanceGrid');
   if (!grid) return;
 
+  // Inject Edit button into header once
+  const header = grid.previousElementSibling;
+  if (header && !header.querySelector('.tile-customise-btn')) {
+    const btn = document.createElement('button');
+    btn.className = 'tile-customise-btn';
+    btn.textContent = 'Edit';
+    btn.setAttribute('aria-label', 'Customise dashboard tiles');
+    btn.addEventListener('click', openTileCustomiser);
+    header.appendChild(btn);
+  }
+
+  const savedOrder  = loadTileOrder();
+  const hiddenTiles = loadHiddenTiles();
+
   // Apply saved order if present, otherwise fall back to registry order
-  const savedOrder = loadTileOrder();
   const sorted = [...TILE_REGISTRY].sort((a, b) => {
     if (savedOrder) {
       const ai = savedOrder.indexOf(a.id);
@@ -167,6 +180,12 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   sorted.forEach(config => {
     const tileId = `glance-tile-${config.id}`;
     let article = document.getElementById(tileId);
+
+    // Remove from DOM if hidden
+    if (hiddenTiles.has(config.id)) {
+      if (article) article.remove();
+      return;
+    }
 
     // Create the article element if first render
     if (!article) {
@@ -200,12 +219,85 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
 
   // Reorder DOM to match sorted order (moves existing nodes, no cloning)
   sorted.forEach(config => {
+    if (hiddenTiles.has(config.id)) return;
     const el = document.getElementById(`glance-tile-${config.id}`);
     if (el) grid.appendChild(el);
   });
 
   // Mount drag-and-drop (skips already-bound tiles via data-tileDragBound)
   mountTileDragAndDrop();
+}
+
+// ==========================================
+// TILE CUSTOMISER
+// ==========================================
+function openTileCustomiser() {
+  const sheet = document.getElementById('tileCustomiserSheet');
+  const list  = document.getElementById('tileCustomiserList');
+  if (!sheet || !list) return;
+
+  const hidden     = loadHiddenTiles();
+  const savedOrder = loadTileOrder();
+  const sorted = [...TILE_REGISTRY].sort((a, b) => {
+    if (savedOrder) {
+      const ai = savedOrder.indexOf(a.id);
+      const bi = savedOrder.indexOf(b.id);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    }
+    return a.order - b.order;
+  });
+
+  list.innerHTML = sorted.map(config => `
+    <label class="tile-picker-item${hidden.has(config.id) ? ' tile-picker-hidden' : ''}">
+      <span class="tile-picker-icon">${config.icon}</span>
+      <span class="tile-picker-label">${config.label}</span>
+      <input type="checkbox" class="tile-picker-check" data-tile-id="${config.id}" ${hidden.has(config.id) ? '' : 'checked'}>
+      <span class="tile-picker-toggle"></span>
+    </label>
+  `).join('');
+
+  list.querySelectorAll('.tile-picker-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('.tile-picker-item').classList.toggle('tile-picker-hidden', !cb.checked);
+    });
+  });
+
+  sheet.classList.add('active');
+  document.getElementById('tileCustomiserBackdrop')?.classList.add('active');
+}
+
+export function closeTileCustomiser(apply) {
+  const sheet = document.getElementById('tileCustomiserSheet');
+  if (!sheet) return;
+
+  if (apply) {
+    const hidden = new Set();
+    sheet.querySelectorAll('.tile-picker-check').forEach(cb => {
+      if (!cb.checked) hidden.add(cb.dataset.tileId);
+    });
+    saveHiddenTiles(hidden);
+    sheet.classList.remove('active');
+    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
+    // Re-render to apply changes
+    const appState      = _getState();
+    const DEFAULT_DAYS  = _getDays();
+    const activeProgram = getProgramById(appState.activeProgramId);
+    renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
+  } else {
+    sheet.classList.remove('active');
+    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
+  }
+}
+
+export function resetTileCustomiser() {
+  resetTileOrder();
+  resetHiddenTiles();
+  document.getElementById('tileCustomiserSheet')?.classList.remove('active');
+  document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
+  const appState      = _getState();
+  const DEFAULT_DAYS  = _getDays();
+  const activeProgram = getProgramById(appState.activeProgramId);
+  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
 }
 
 export function renderHome() {
