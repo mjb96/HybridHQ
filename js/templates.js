@@ -29,40 +29,41 @@ export function buildEmptyWorkoutCard() {
 }
 
 export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null) {
-  // #2 Feature: Extract ghost placeholders from the historical past-week data
   const ghostWeight = historicalSetData && historicalSetData.w ? historicalSetData.w : 'kg';
   const ghostReps = historicalSetData && historicalSetData.r ? historicalSetData.r : 'reps';
 
   return `<div class="cockpit-set-row ${sData.c ? 'is-complete' : ''}" data-set-index="${sIdx}">
     <div class="set-num-lbl tactile-scale" 
-         onclick="window.executeOneTapQuickLog(this, '${safeLiftName}', ${sIdx})" 
+         data-action="quick-log" 
+         data-liftname="${safeLiftName}" 
+         data-sidx="${sIdx}"
          title="One-Tap Quick Log (Uses Ghost Targets)" 
          style="cursor:pointer; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); text-align: center;">
          S${sIdx + 1}
     </div>
     <div>
-      <input type="number" class="input-weight-node" placeholder="${ghostWeight}" value="${sData.w || ''}" onchange="updateInputState(this)">
+      <input type="number" class="input-weight-node" placeholder="${ghostWeight}" value="${sData.w || ''}">
     </div>
     <div>
-      <input type="number" class="input-reps-node" placeholder="${ghostReps}" value="${sData.r || ''}" onchange="updateInputState(this)">
+      <input type="number" class="input-reps-node" placeholder="${ghostReps}" value="${sData.r || ''}">
     </div>
     <div class="gym-check-container">
       <label class="gym-check-wrap">
-        <input type="checkbox" class="gym-check" ${sData.c ? 'checked' : ''} onchange="toggleGymCheckLoggingState(this)">
+        <input type="checkbox" class="gym-check" ${sData.c ? 'checked' : ''}>
         <span class="gym-check-icon">✓</span>
       </label>
     </div>
     <div>
       <button class="btn-set-delete tactile-scale"
-        data-lift="${safeLiftName}"
-        data-setidx="${sIdx}"
-        onclick="removeCustomSetRow(this.getAttribute('data-lift'), parseInt(this.getAttribute('data-setidx'),10))">✕</button>
+        data-action="remove-set" 
+        data-liftname="${safeLiftName}" 
+        data-sidx="${sIdx}">✕</button>
     </div>
     <div class="quick-pad-row">
-      <button class="btn-pad tactile-scale" onclick="applyQuickFillModifier(this, 'match', ${sIdx})">LAST</button>
-      <button class="btn-pad tactile-scale" onclick="applyQuickFillModifier(this, 'p25')">+2.5kg</button>
-      <button class="btn-pad tactile-scale" onclick="applyQuickFillModifier(this, 'p5')">+5kg</button>
-      <button class="btn-pad tactile-scale" onclick="applyQuickFillModifier(this, 'r1')">+1 Rep</button>
+      <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="match" data-sidx="${sIdx}">LAST</button>
+      <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="p25" data-sidx="${sIdx}">+2.5kg</button>
+      <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="p5" data-sidx="${sIdx}">+5kg</button>
+      <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="r1" data-sidx="${sIdx}">+1 Rep</button>
     </div>
   </div>`;
 }
@@ -73,7 +74,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
 
   return `<div class="cockpit-header">
     <div class="drag-handle-grip">☰</div>
-    <div class="cockpit-header-clickzone" onclick="toggleAccordionManual(this.parentNode.parentNode)">
+    <div class="cockpit-header-clickzone" data-action="toggle-accordion">
       <div class="header-text-block">
         <div class="title-badge-row" style="display:flex; align-items:center;">
           <span class="cockpit-ex-name">${displaySafeName}</span>
@@ -88,7 +89,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
     <div class="local-timer-placeholder"></div>
     <span class="cockpit-history-line">⚡ ${historicalLineText}</span>
     <div class="set-rows-list">${setsMarkup}</div>
-    <button class="btn-pad-append tactile-scale" data-lift="${safeLiftName}" onclick="appendCustomSetRow(this, this.getAttribute('data-lift'))">+ Append Custom Overload Set</button>
+    <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}">+ Append Custom Overload Set</button>
   </div>`;
 }
 
@@ -123,7 +124,7 @@ export function buildProgramOverviewHTML(prog, currentWeek) {
         </div>
 
         <div class="mt-4 pt-3" style="border-top: 1px dashed var(--overlay-sm);">
-          <button class="btn-action-block btn-ghost" style="border: 1px solid var(--accent-blue); color: var(--accent-blue);" onclick="window.triggerEditActiveProgram('${prog.id}')">
+          <button class="btn-action-block btn-ghost" style="border: 1px solid var(--accent-blue); color: var(--accent-blue);" data-action="edit-program" data-program-id="${prog.id}">
             ✏️ Edit Current Plan
           </button>
           <p class="text-xs text-muted text-center mt-2">Changes apply immediately to your active workout schema.</p>
@@ -177,15 +178,15 @@ export function buildLibraryCardHTML(prog, id, isCustom, isActive) {
     ? `<span class="badge-primary" style="background:rgba(245, 158, 11, 0.1); color:var(--accent-amber); border:1px solid var(--accent-amber);">CUSTOM</span>`
     : `<span class="badge-primary" style="background:rgba(34, 211, 238, 0.1); color:var(--accent-cyan); border:1px solid var(--accent-cyan);">SYSTEM</span>`;
 
-  let actionsHTML = `<button class="btn-pad tactile-scale" style="flex:1; border-color: ${isActive ? 'var(--color-green)' : ''}; color: ${isActive ? 'var(--color-green)' : ''};" onclick="window.triggerMakeActiveProgram('${id}')">${isActive ? 'Current Plan' : 'Make Active'}</button>`;
+  let actionsHTML = `<button class="btn-pad tactile-scale" style="flex:1; border-color: ${isActive ? 'var(--color-green)' : ''}; color: ${isActive ? 'var(--color-green)' : ''};" data-action="make-active-program" data-program-id="${id}">${isActive ? 'Current Plan' : 'Make Active'}</button>`;
   
   if (isCustom) {
     actionsHTML += `
-      <button class="btn-pad tactile-scale" style="flex:1;" onclick="window.openBuilder('${id}')">Edit</button>
-      <button class="btn-pad tactile-scale" style="width:40px; background:rgba(239, 68, 68, 0.1); color:var(--accent-red); border-color:rgba(239,68,68,0.2);" onclick="window.executeDeleteProgram('${id}')">🗑️</button>
+      <button class="btn-pad tactile-scale" style="flex:1;" data-action="open-builder" data-program-id="${id}">Edit</button>
+      <button class="btn-pad tactile-scale" style="width:40px; background:rgba(239, 68, 68, 0.1); color:var(--accent-red); border-color:rgba(239,68,68,0.2);" data-action="delete-program" data-program-id="${id}">🗑️</button>
     `;
   }
-  actionsHTML += `<button class="btn-pad tactile-scale" style="width:40px;" onclick="window.executeDuplicateProgram('${id}')" title="Duplicate">📑</button>`;
+  actionsHTML += `<button class="btn-pad tactile-scale" style="width:40px;" data-action="duplicate-program" data-program-id="${id}" title="Duplicate">📑</button>`;
 
   return `
     <article class="card-dark p-3" style="${isActive ? 'border-color: var(--color-green); box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);' : ''}">
