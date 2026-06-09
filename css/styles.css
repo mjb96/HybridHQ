@@ -1399,6 +1399,7 @@ td {
   padding: 10px 8px;
   border-radius: 10px;
   cursor: pointer;
+  position: relative;
   transition: background 0.15s ease, opacity 0.15s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
