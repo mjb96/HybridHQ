@@ -442,8 +442,6 @@ document.addEventListener('click', (e) => {
   const target = e.target.closest('[data-action]');
   if (!target) return;
 
-else if (action === 'log-body-weight') logBodyWeight();
-
   const action = target.getAttribute('data-action');
   const progId = target.getAttribute('data-program-id');
 
@@ -488,18 +486,28 @@ else if (action === 'log-body-weight') logBodyWeight();
     closeTodaySummaryModal(); 
     switchGlobalAppTab('workout'); 
   }
+  
+  // Analytics
+  else if (action === 'log-body-weight') logBodyWeight();
 });
 
 document.addEventListener('change', (e) => {
-  const target = e.target.closest('[data-action]');
-  if (!target) return;
-  const action = target.getAttribute('data-action');
+  const target = e.target;
+  
+  // ID-based handlers (No data-action required)
+  if (target.id === 'analyticsThresholdPaceInput') {
+    saveThresholdPace(target.value);
+    return;
+  }
+
+  // Data-action based handlers
+  const actionTarget = target.closest('[data-action]');
+  if (!actionTarget) return;
+  const action = actionTarget.getAttribute('data-action');
 
   if (action === 'macro-week-switch') handleMacroWeekSwitch();
   else if (action === 'import-json') triggerEngineImport(e);
 });
-
-  if (target.id === 'analyticsThresholdPaceInput') saveThresholdPace(target.value);
 
 // ==========================================
 // BOOTSTRAP AND INITIALIZATION
