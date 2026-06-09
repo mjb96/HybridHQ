@@ -3,7 +3,6 @@
 // ==========================================
 import { PROGRAMS, CONFIG } from './constants.js';
 import { computeDiagnosticForLift, parseTargetFromDescription } from './engine.js';
-import { hydrateCurrentView } from './app.js'; 
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -47,6 +46,17 @@ export const DEFAULT_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 export function setActiveTab(tab) { activeTab = tab; }
 export function setSelectedDay(day) { selectedDay = day; }
 export function setAppState(newState) { appState = newState; }
+
+export function emitStorageLoadedEvent() {
+  document.dispatchEvent(
+    new CustomEvent('app:storage-loaded', {
+      detail: { 
+        week: appState.currentWeek, 
+        activeProgramId: appState.activeProgramId 
+      }
+    })
+  );
+}
 
 // ==========================================
 // UNIVERSAL PROGRAM RESOLVER
@@ -320,9 +330,9 @@ export async function pullEngineDataFromStorage() {
   verifyWeekStorageSchema(appState.currentWeek);
 
   try {
-    hydrateCurrentView();
+    emitStorageLoadedEvent();
   } catch (err) {
-    console.warn("UI Hydration pending full app initialization.");
+    console.warn('Storage loaded event dispatch failed.', err);
   }
 }
 
@@ -619,8 +629,8 @@ export async function executeResetActiveDayMetrics() {
   saveStateToLocalStorage(true);
   
   deleteMapFromDB(wk, selectedDay).then(() => {
-    hydrateCurrentView();
-  }).catch(() => hydrateCurrentView());
+    document.dispatchEvent(new CustomEvent('app:storage-loaded', { detail: { week: appState.currentWeek, activeProgramId: appState.activeProgramId } }));
+  }).catch(() => document.dispatchEvent(new CustomEvent('app:storage-loaded', { detail: { week: appState.currentWeek, activeProgramId: appState.activeProgramId } })));
   
   try {
     const { closeConfirmResetModal } = await import('./workout.js');
