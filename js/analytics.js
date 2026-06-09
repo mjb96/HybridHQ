@@ -614,8 +614,8 @@ function renderWeeklyVolumeDetail(data) {
     renderVolumeChart(
       chartEl,
       data.weekLabels || [],
-      data.weeklyVolumes || [],
-      data.weeklyRunDists || []
+      data.volData || [],
+      data.runData || []
     );
   }
 }
