@@ -47,7 +47,7 @@
       flex: 0 0 auto;
     }
 
-    /* Bar Charts - FIXED FOR MOBILE RENDER & GARMIN STYLE */
+    /* Bar Charts */
     .bar-chart-container {
       display: flex;
       justify-content: space-between;
@@ -58,7 +58,7 @@
     .bar-chart-container::before {
       content: '';
       position: absolute;
-      bottom: 18px; /* Baseline for bars */
+      bottom: 18px; 
       left: 0;
       right: 0;
       border-bottom: 1px dashed rgba(255,255,255,0.15);
@@ -108,7 +108,6 @@
       box-sizing: border-box;
     }
 
-    /* Glance cards — fixed height, override card-dark padding */
     .glance-card {
       display: flex;
       flex-direction: column;
@@ -125,7 +124,6 @@
       font-size: 0.9rem !important;
     }
 
-    /* Run card legibility overrides */
     #cockpitRunPanel {
       background: #0a1a20 !important;
       border: 1px solid rgba(6,182,212,0.4) !important;
@@ -151,16 +149,13 @@
       color: #f8fafc !important;
     }
 
-    /* Progress Rings */
     .readiness-ring-container { display: flex; justify-content: center; align-items: center; margin: 2px 0; }
     .readiness-ring { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 3px; }
     .readiness-ring.green { background: conic-gradient(var(--accent-green) 90%, rgba(255,255,255,0.1) 0); }
     .readiness-ring-inner { background-color: var(--bg-dark, #070a12); width: 100%; height: 100%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
-    /* Sub-view specific back button */
     .subview-back-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: var(--accent-blue); background: rgba(59,130,246,0.1); padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(59,130,246,0.3); margin-bottom: 20px; cursor: pointer; }
     
-    /* Analytics section hidden state */
     .analytics-section { display: none; }
     .analytics-section.active { display: block; }
   </style>
@@ -171,8 +166,8 @@
     <h2 class="text-2xl font-heavy text-main mb-4">Hybrid Engine Login</h2>
     <input type="email" id="loginEmail" placeholder="Email" class="mb-3 p-3 w-4/5 max-w-xs" style="color: black; border-radius: 8px;">
     <input type="password" id="loginPassword" placeholder="Password" class="mb-5 p-3 w-4/5 max-w-xs" style="color: black; border-radius: 8px;">
-    <button class="btn-action-block btn-blue w-4/5 max-w-xs" onclick="window.loginToSupabase()">Sign In & Sync</button>
-    <button id="offlineEscapeBtn" class="btn-action-block btn-ghost mt-3 w-4/5 max-w-xs" onclick="document.getElementById('authOverlay').style.display = 'none';">Continue Offline</button>
+    <button class="btn-action-block btn-blue w-4/5 max-w-xs" data-action="login-supabase">Sign In & Sync</button>
+    <button id="offlineEscapeBtn" class="btn-action-block btn-ghost mt-3 w-4/5 max-w-xs" data-action="close-auth">Continue Offline</button>
   </div>
   
   <div class="toast-system" id="sysToast" role="alert" aria-live="assertive">Session Saved ✓</div>
@@ -200,7 +195,7 @@
       
       <div class="in-focus-carousel">
         
-        <article class="card-dark carousel-card" onclick="window.openAnalyticsView('strength')" style="cursor: pointer;">
+        <article class="card-dark carousel-card" data-action="open-analytics" data-context="strength" style="cursor: pointer;">
           <div class="flex-between mb-2">
              <div class="card-icon-title text-accent-blue"><span>🏋️</span> Gym Time • This Week</div>
           </div>
@@ -208,7 +203,7 @@
           <div class="bar-chart-container" id="strengthBarChart"></div>
         </article>
 
-        <article class="card-dark carousel-card" onclick="window.openAnalyticsView('running')" style="cursor: pointer;">
+        <article class="card-dark carousel-card" data-action="open-analytics" data-context="running" style="cursor: pointer;">
           <div class="flex-between mb-2">
              <div class="card-icon-title text-accent-pink"><span>🏃</span> Run Distance • This Week</div>
           </div>
@@ -220,7 +215,6 @@
 
       <h2 class="focus-header-text mt-2">At a Glance</h2>
       
-      <!-- Dynamic glance grid — tiles are injected by dashboard.js / home.js -->
       <div class="glance-grid mb-4" id="glanceGrid" aria-label="At a Glance metrics"></div>
 
     </section>
@@ -228,23 +222,23 @@
     <section id="view-workout" class="view-container" aria-label="Workout Cockpit">
       
       <nav class="workout-day-selector" id="cockpitDaySelectorBar" aria-label="Day Selector">
-        <button class="day-pill active" data-day="mon" onclick="window.setCockpitActiveDay('mon')" aria-current="page">Mon (Push)</button>
-        <button class="day-pill" data-day="tue" onclick="window.setCockpitActiveDay('tue')">Tue (Pull)</button>
-        <button class="day-pill" data-day="wed" onclick="window.setCockpitActiveDay('wed')">Wed (Legs)</button>
-        <button class="day-pill" data-day="thu" onclick="window.setCockpitActiveDay('thu')">Thu (Push)</button>
-        <button class="day-pill" data-day="fri" onclick="window.setCockpitActiveDay('fri')">Fri (Pull)</button>
-        <button class="day-pill" data-day="sat" onclick="window.setCockpitActiveDay('sat')">Sat (Run)</button>
-        <button class="day-pill" data-day="sun" onclick="window.setCockpitActiveDay('sun')">Sun (Rest)</button>
+        <button class="day-pill active" data-action="set-day" data-day="mon" aria-current="page">Mon (Push)</button>
+        <button class="day-pill" data-action="set-day" data-day="tue">Tue (Pull)</button>
+        <button class="day-pill" data-action="set-day" data-day="wed">Wed (Legs)</button>
+        <button class="day-pill" data-action="set-day" data-day="thu">Thu (Push)</button>
+        <button class="day-pill" data-action="set-day" data-day="fri">Fri (Pull)</button>
+        <button class="day-pill" data-action="set-day" data-day="sat">Sat (Run)</button>
+        <button class="day-pill" data-action="set-day" data-day="sun">Sun (Rest)</button>
       </nav>
 
-      <button id="startWorkoutBtn" class="btn-action-block btn-green mb-3" onclick="window.startWorkoutTimer()">Start Workout</button>
+      <button id="startWorkoutBtn" class="btn-action-block btn-green mb-3" data-action="start-timer">Start Workout</button>
 
       <div class="session-timer-bar" id="workoutDurationBar" role="timer">
         <span class="timer-txt">⏱️ SESSION ACTIVE</span>
         <span class="timer-clock" id="workoutDurationClock">00:00</span>
       </div>
 
-      <button class="global-timer-bar" id="cockpitTimerBar" onclick="window.dismissRestTimer()" aria-label="Dismiss Rest Timer">
+      <button class="global-timer-bar" id="cockpitTimerBar" data-action="dismiss-rest" aria-label="Dismiss Rest Timer">
         <span class="timer-txt">⏸ RESTING <span class="text-xxs text-accent-blue">(TAP TO START NEXT SET)</span></span>
         <span class="timer-clock" id="cockpitTimerClock">0:00</span>
       </button>
@@ -263,32 +257,28 @@
         <p class="workout-run-desc" id="cockpitRunSpecs">Loading target distance parameters...</p>
 
         <div class="run-grid-inputs mb-2">
-          <label><span class="set-num-lbl block mb-1">Dist KM</span><input type="number" step="0.01" id="runInputDist" placeholder="0.00" onchange="window.commitWorkoutUIState()"></label>
-          <label><span class="set-num-lbl block mb-1">Time</span><input type="text" id="runInputTime" placeholder="00:00" onchange="window.commitWorkoutUIState()"></label>
-          <label><span class="set-num-lbl block mb-1">RPE</span><input type="number" id="runInputRpeCockpit" placeholder="1-10" max="10" onchange="window.commitWorkoutUIState()"></label>
+          <label><span class="set-num-lbl block mb-1">Dist KM</span><input type="number" step="0.01" id="runInputDist" placeholder="0.00"></label>
+          <label><span class="set-num-lbl block mb-1">Time</span><input type="text" id="runInputTime" placeholder="00:00"></label>
+          <label><span class="set-num-lbl block mb-1">RPE</span><input type="number" id="runInputRpeCockpit" placeholder="1-10" max="10"></label>
         </div>
 
         <div id="runExtraStats" style="display: none; padding-top: 8px; border-top: 1px dashed rgba(34,211,238,0.2);">
-          <!-- Row 1: HR, elevation, calories -->
           <div class="run-grid-inputs mb-2">
             <label><span class="set-num-lbl block mb-1 text-accent-pink">Avg HR</span><input type="text" id="runInputAvgHR" placeholder="--" readonly style="text-align:center; color:#22d3ee;"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-pink">Max HR</span><input type="text" id="runInputMaxHR" placeholder="--" readonly style="text-align:center; color:#22d3ee;"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-blue">Elev (m)</span><input type="text" id="runInputElev" placeholder="--" readonly style="text-align:center; color:#3b82f6;"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-green">Cals</span><input type="text" id="runInputCals" placeholder="--" readonly style="text-align:center; color:#10b981;"></label>
           </div>
-          <!-- Row 2: cadence, descent, training effect -->
           <div class="run-grid-inputs mb-2" style="grid-template-columns: repeat(3, 1fr);">
             <label><span class="set-num-lbl block mb-1 text-accent-amber">Cadence</span><input type="text" id="runInputCadence" placeholder="--" readonly style="text-align:center; color:#f59e0b;"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-blue">Descent (m)</span><input type="text" id="runInputDescent" placeholder="--" readonly style="text-align:center; color:#3b82f6;"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-green">Training Effect</span><input type="text" id="runInputTE" placeholder="--" readonly style="text-align:center; color:#10b981;"></label>
           </div>
-          <!-- HR Zones strip -->
           <div id="runHrZonesContainer" style="display:none; margin-bottom:8px;">
             <div class="set-num-lbl mb-1" style="color:rgba(255,255,255,0.4);">HR ZONES (time in zone)</div>
             <div id="runHrZonesBar" style="display:flex; border-radius:4px; overflow:hidden; height:8px; margin-bottom:4px;"></div>
             <div id="runHrZonesLabels" style="display:flex; justify-content:space-between; font-size:0.6rem; color:rgba(255,255,255,0.4);"></div>
           </div>
-          <!-- Km splits -->
           <div id="runSplitsContainer" style="display:none;">
             <div class="set-num-lbl mb-1" style="color:rgba(255,255,255,0.4);">KM SPLITS</div>
             <div id="runSplitsTable"></div>
@@ -299,7 +289,7 @@
 
       <div id="cockpitExercisesContainer"></div>
 
-      <button class="btn-action-block btn-dashed mt-3 mb-5" onclick="window.openAddExerciseModal()">+ Add Unplanned Exercise</button>
+      <button class="btn-action-block btn-dashed mt-3 mb-5" data-action="open-add-exercise">+ Add Unplanned Exercise</button>
 
       <article class="card-dark mt-4 p-4">
         <div class="flex-between mb-3">
@@ -321,27 +311,25 @@
             <label><span class="set-num-lbl block mb-1 text-accent-green">Training Effect</span><input type="text" id="gymInputTE" placeholder="--" readonly style="text-align: center; color:#10b981; border-color: rgba(255,255,255,0.1);"></label>
             <label><span class="set-num-lbl block mb-1 text-accent-amber">Aerobic TE</span><input type="text" id="gymInputAerobicTE" placeholder="--" readonly style="text-align: center; color:#f59e0b; border-color: rgba(255,255,255,0.1);"></label>
           </div>
-          <!-- Garmin strength set breakdown -->
           <div id="gymSetsBreakdown" style="display:none;">
             <div class="set-num-lbl mb-1" style="color:rgba(255,255,255,0.4);">SET BREAKDOWN (from .FIT)</div>
             <div id="gymSetsTable"></div>
           </div>
         </div>
-        </div>
 
         <div class="flex gap-2 mb-2">
-          <input type="number" id="sessionGymRpeCockpit" placeholder="Overall Gym RPE (1-10)" max="10" onchange="window.commitWorkoutUIState()" aria-label="Overall Gym RPE">
+          <input type="number" id="sessionGymRpeCockpit" placeholder="Overall Gym RPE (1-10)" max="10" aria-label="Overall Gym RPE">
         </div>
-        <textarea id="sessionNotesInput" placeholder="How did today feel? Sleep? Energy?" onchange="window.commitWorkoutUIState()" aria-label="Session Notes"></textarea>
+        <textarea id="sessionNotesInput" placeholder="How did today feel? Sleep? Energy?" aria-label="Session Notes"></textarea>
       </article>
 
-      <button class="btn-action-block btn-blue mt-5" onclick="window.openFinishSessionModal()">Finish Session</button>
-      <button class="btn-action-block btn-danger-ghost mt-2" onclick="window.openConfirmResetModal()">Clear Today's Log</button>
+      <button class="btn-action-block btn-blue mt-5" data-action="open-finish-modal">Finish Session</button>
+      <button class="btn-action-block btn-danger-ghost mt-2" data-action="open-reset-modal">Clear Today's Log</button>
     </section>
 
     <section id="view-analytics" class="view-container" aria-label="Performance Analytics">
       
-      <button class="subview-back-btn" onclick="window.switchGlobalAppTab('home')">
+      <button class="subview-back-btn" data-action="switch-tab" data-target="home">
         ← Back to Dashboard
       </button>
       
@@ -414,7 +402,7 @@
             <span style="color:#ef4444;">● Threshold+</span>
             <label class="flex gap-1 ml-auto" style="align-items:center;font-size:0.68rem;color:var(--text-muted);">
               Threshold:
-              <input type="number" id="analyticsThresholdPaceInput" placeholder="e.g. 300" style="width:56px;font-size:0.7rem;padding:2px 4px;" onchange="window.saveThresholdPace(this.value)" aria-label="Threshold pace seconds per km">
+              <input type="number" id="analyticsThresholdPaceInput" placeholder="e.g. 300" style="width:56px;font-size:0.7rem;padding:2px 4px;" aria-label="Threshold pace seconds per km">
               <span>s/km</span>
             </label>
           </div>
@@ -442,7 +430,7 @@
         <article class="card-dark p-3 mb-4">
           <div class="flex gap-2 mb-3" style="align-items:center;">
             <input type="number" step="0.1" id="analyticsBwInput" placeholder="Today's weight (kg)" style="flex:1;" aria-label="Body weight kg">
-            <button class="btn-action-block btn-blue mt-0" style="width:auto;padding:0 16px;" onclick="window.logBodyWeight()">Log</button>
+            <button class="btn-action-block btn-blue mt-0" style="width:auto;padding:0 16px;" data-action="log-body-weight">Log</button>
           </div>
           <div id="bwChartContainer">
             <p style="color:var(--text-muted);font-size:0.75rem;">Log body weight to see trend.</p>
@@ -468,13 +456,10 @@
             </table>
           </div>
         </article>
-        <!-- Streak detail injected here by renderStreakAnalytics -->
         <div id="analytics-streak-detail"></div>
-        <!-- Goal progress detail injected here -->
         <div id="analytics-goal-detail"></div>
       </div>
 
-      <!-- Recovery Score Detail -->
       <div id="analytics-recovery-score" class="analytics-section">
         <h2 class="section-header">Recovery Details</h2>
         <div class="grid-2-col gap-2 mb-4">
@@ -508,7 +493,6 @@
         </article>
       </div>
 
-      <!-- Weekly Volume Detail -->
       <div id="analytics-weekly-volume" class="analytics-section">
         <h2 class="section-header">Weekly Volume Details</h2>
         <div class="grid-3-col gap-2 mb-4">
@@ -531,7 +515,6 @@
         </article>
       </div>
 
-      <!-- Streak Analytics Detail -->
       <div id="analytics-streak" class="analytics-section">
         <h2 class="section-header">Streak Analytics</h2>
         <div class="grid-2-col gap-2 mb-4">
@@ -560,14 +543,14 @@
       </header>
 
       <nav class="segmented-control mb-4" aria-label="Program Management Modes">
-        <button id="btnProgModeActive" class="btn-pad active flex-1 py-2 text-sm font-heavy" onclick="window.switchProgramMode('active')" aria-current="page">ACTIVE PLAN</button>
-        <button id="btnProgModeLibrary" class="btn-pad flex-1 py-2 text-sm font-heavy" onclick="window.switchProgramMode('library')">LIBRARY & BUILDER</button>
+        <button id="btnProgModeActive" class="btn-pad active flex-1 py-2 text-sm font-heavy" data-action="switch-program-mode" data-mode="active" aria-current="page">ACTIVE PLAN</button>
+        <button id="btnProgModeLibrary" class="btn-pad flex-1 py-2 text-sm font-heavy" data-action="switch-program-mode" data-mode="library">LIBRARY & BUILDER</button>
       </nav>
 
       <div id="progModeActiveContainer">
         <article class="card-dark p-4 mb-4">
           <label for="globalWeekSelect" class="text-xs-bold block mb-1 text-muted">TARGET TIMELINE MACROCYCLE WEEK</label>
-          <select class="native-select select-dark w-full" id="globalWeekSelect" onchange="window.handleMacroWeekSwitch()">
+          <select class="native-select select-dark w-full" id="globalWeekSelect" data-action="macro-week-switch">
             <option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option>
             <option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option>
             <option value="7">Week 7</option><option value="8">Week 8</option><option value="9">Week 9</option>
@@ -576,29 +559,29 @@
         </article>
 
         <nav class="segmented-control mb-4" aria-label="Program Views">
-          <button id="btnBrowserTabOverview" class="btn-pad active flex-1 py-2 text-sm font-heavy" onclick="window.switchBrowserSectionTab('overview')" aria-current="page">OVERVIEW</button>
-          <button id="btnBrowserTabWeeks" class="btn-pad flex-1 py-2 text-sm font-heavy" onclick="window.switchBrowserSectionTab('weeks')">WAVE MATRIX</button>
-          <button id="btnBrowserTabTiers" class="btn-pad flex-1 py-2 text-sm font-heavy" onclick="window.switchBrowserSectionTab('tiers')">DAILY TIERS</button>
+          <button id="btnBrowserTabOverview" class="btn-pad active flex-1 py-2 text-sm font-heavy" data-action="switch-browser-tab" data-tab="overview" aria-current="page">OVERVIEW</button>
+          <button id="btnBrowserTabWeeks" class="btn-pad flex-1 py-2 text-sm font-heavy" data-action="switch-browser-tab" data-tab="weeks">WAVE MATRIX</button>
+          <button id="btnBrowserTabTiers" class="btn-pad flex-1 py-2 text-sm font-heavy" data-action="switch-browser-tab" data-tab="tiers">DAILY TIERS</button>
         </nav>
 
         <div id="programBrowserDetails"></div>
         <div id="programBrowserDaysDeck" class="flex-col gap-3 mb-6"></div>
 
         <h2 class="section-header">Data Backups</h2>
-        <button class="btn-action-block btn-blue mb-2 text-left text-lg" onclick="window.triggerTextSummaryExport()">📝 Copy Weekly Text Summary</button>
-        <button class="btn-action-block btn-ghost mb-2 text-left text-lg" onclick="window.triggerEngineExport()">📤 Export Backup File (JSON)</button>
-        <button class="btn-action-block btn-green-ghost mb-2 text-left text-lg" onclick="window.triggerCSVExport()">📊 Export Spreadsheet (CSV)</button>
+        <button class="btn-action-block btn-blue mb-2 text-left text-lg" data-action="export-text">📝 Copy Weekly Text Summary</button>
+        <button class="btn-action-block btn-ghost mb-2 text-left text-lg" data-action="export-json">📤 Export Backup File (JSON)</button>
+        <button class="btn-action-block btn-green-ghost mb-2 text-left text-lg" data-action="export-csv">📊 Export Spreadsheet (CSV)</button>
 
         <label class="btn-action-block btn-ghost block text-left text-lg cursor-pointer" tabindex="0">
           📥 Import Backup File
-          <input type="file" id="programFileImporter" accept=".json" onchange="window.triggerEngineImport(event)" class="hidden-input">
+          <input type="file" id="programFileImporter" accept=".json" data-action="import-json" class="hidden-input">
         </label>
       </div>
 
       <div id="progModeLibraryContainer" style="display: none;">
         <div class="flex-between mb-4 mt-2">
           <h2 class="section-header m-0" style="margin-bottom: 0;">Your Programs</h2>
-          <button class="btn-action-block btn-blue m-0" style="width: auto; padding: 8px 16px; font-size: 0.8rem;" onclick="window.openCreateProgramModal()">+ Create New</button>
+          <button class="btn-action-block btn-blue m-0" style="width: auto; padding: 8px 16px; font-size: 0.8rem;" data-action="open-create-program">+ Create New</button>
         </div>
         
         <div id="libraryGridCustom" class="flex-col gap-3 mb-5"></div>
@@ -607,7 +590,6 @@
         <div id="libraryGridSystem" class="flex-col gap-3 mb-6"></div>
       </div>
 
-      <!-- Program Builder — shown when editing a custom program -->
       <div id="builderViewContainer" style="display: none;"></div>
     </section>
 
@@ -660,16 +642,16 @@
       <p id="todaySummaryEmpty" class="text-sm text-muted mb-4" style="display:none;">No data logged yet for today.</p>
 
       <div class="flex gap-2 mt-2">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.closeTodaySummaryModal()">Close</button>
-        <button class="btn-action-block btn-blue mt-0" onclick="window.closeTodaySummaryModal(); window.switchGlobalAppTab('workout');">Go to Workout</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-today-summary">Close</button>
+        <button class="btn-action-block btn-blue mt-0" data-action="close-today-summary-nav">Go to Workout</button>
       </div>
     </div>
   </div>
 
   <nav class="bottom-nav" aria-label="Main Navigation">
-    <button class="nav-item active" data-target="home" onclick="window.switchGlobalAppTab('home')" aria-current="page"><span class="icon" aria-hidden="true">🏠</span><span>Home</span></button>
-    <button class="nav-item" data-target="workout" onclick="window.switchGlobalAppTab('workout')"><span class="icon" aria-hidden="true">🏋️</span><span>Workout</span></button>
-    <button class="nav-item" data-target="program" onclick="window.switchGlobalAppTab('program')"><span class="icon" aria-hidden="true">📋</span><span>Program</span></button>
+    <button class="nav-item active" data-target="home" data-action="switch-tab" aria-current="page"><span class="icon" aria-hidden="true">🏠</span><span>Home</span></button>
+    <button class="nav-item" data-target="workout" data-action="switch-tab"><span class="icon" aria-hidden="true">🏋️</span><span>Workout</span></button>
+    <button class="nav-item" data-target="program" data-action="switch-tab"><span class="icon" aria-hidden="true">📋</span><span>Program</span></button>
   </nav>
 
   <div class="modal-overlay" id="summaryModal" role="dialog" aria-modal="true" aria-labelledby="summaryModalTitle">
@@ -690,7 +672,7 @@
         <label for="summaryRunRPE" class="text-xs-bold block mb-1 text-muted">Confirm Run RPE (1-10)</label>
         <input type="number" id="summaryRunRPE" min="1" max="10" placeholder="e.g. 6" class="mb-4">
       </div>
-      <button class="btn-action-block btn-blue" onclick="window.closeFinishSessionModal()">Save & Return Home</button>
+      <button class="btn-action-block btn-blue" data-action="close-finish-modal">Save & Return Home</button>
     </div>
   </div>
 
@@ -698,14 +680,14 @@
     <div class="modal-content">
       <h2 id="addExerciseModalTitle" class="text-2xl font-heavy text-inverse mb-1">Add Exercise</h2>
       <p class="text-lg text-muted mb-5">Throw in an extra movement for today's session.</p>
-      <select id="newExerciseSelect" class="native-select mb-4 w-full" onchange="window.handleExerciseDropdownSelectionChange()"></select>
+      <select id="newExerciseSelect" class="native-select mb-4 w-full"></select>
       <div id="customExerciseTextInputContainer" class="mb-5" style="display: none;">
         <label for="customExerciseTextInput" class="text-xs-bold block mb-1 text-muted">ENTER CUSTOM EXERCISE NAME</label>
         <input type="text" id="customExerciseTextInput" placeholder="e.g. Weighted Chin-Up" style="width: 100%;" autocomplete="off">
       </div>
       <div class="flex gap-2">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.closeAddExerciseModal()">Cancel</button>
-        <button class="btn-action-block btn-blue mt-0" onclick="window.confirmAddExercise()">Add</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-add-exercise">Cancel</button>
+        <button class="btn-action-block btn-blue mt-0" data-action="confirm-add-exercise">Add</button>
       </div>
     </div>
   </div>
@@ -715,8 +697,8 @@
       <h2 id="resetModalTitle" class="text-2xl font-heavy text-accent-red mb-1">Clear Today's Log?</h2>
       <p class="text-lg text-muted mb-5">This will erase all logged sets, runs, and notes for the currently selected day. This action cannot be undone.</p>
       <div class="flex gap-2">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.closeConfirmResetModal()">Cancel</button>
-        <button class="btn-action-block btn-danger mt-0" onclick="window.executeResetActiveDayMetrics()">Clear Logs</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-reset-modal">Cancel</button>
+        <button class="btn-action-block btn-danger mt-0" data-action="execute-reset">Clear Logs</button>
       </div>
     </div>
   </div>
@@ -726,8 +708,8 @@
       <h2 id="switchModalTitle" class="text-2xl font-heavy text-accent-amber mb-1">Switch Program?</h2>
       <p class="text-lg text-muted mb-5">Switching programs will clear all logged data for Week <span id="programSwitchWeekLabel"></span>. Your other weeks are untouched. This cannot be undone.</p>
       <div class="flex gap-2">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.cancelProgramSwitch()">Keep Current</button>
-        <button class="btn-action-block btn-amber mt-0" onclick="window.confirmProgramSwitch()">Switch & Clear</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="cancel-program-switch">Keep Current</button>
+        <button class="btn-action-block btn-amber mt-0" data-action="confirm-program-switch">Switch & Clear</button>
       </div>
     </div>
   </div>
@@ -752,8 +734,8 @@
       </div>
 
       <div class="flex gap-2 mt-4">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.closeCreateProgramModal()">Cancel</button>
-        <button class="btn-action-block btn-blue mt-0" onclick="window.executeCreateProgram()">Create</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-create-program">Cancel</button>
+        <button class="btn-action-block btn-blue mt-0" data-action="execute-create-program">Create</button>
       </div>
     </div>
   </div>
@@ -763,8 +745,8 @@
       <h3 class="text-xl font-heavy text-main mb-3">Time to Advance?</h3>
       <p id="weekAdvanceMessage" class="text-sub mb-5" style="color: var(--text-muted);"></p>
       <div style="display: flex; gap: 12px; justify-content: center;">
-        <button class="btn-action-block btn-ghost" style="flex: 1;" onclick="window.cancelWeekAdvance()">Not Yet</button>
-        <button class="btn-action-block btn-blue" style="flex: 1;" onclick="window.confirmWeekAdvance()">Start Next Week</button>
+        <button class="btn-action-block btn-ghost" style="flex: 1;" data-action="cancel-week-advance">Not Yet</button>
+        <button class="btn-action-block btn-blue" style="flex: 1;" data-action="confirm-week-advance">Start Next Week</button>
       </div>
     </div>
   </div>
@@ -775,108 +757,26 @@
       <p class="text-lg text-muted mb-3">This will generate a new week with 60% of your normal volume. Your existing data is untouched.</p>
       <p id="deloadModalReason" class="text-sm text-muted mb-5" style="color:var(--accent-amber);"></p>
       <div class="flex gap-2">
-        <button class="btn-action-block btn-ghost mt-0" onclick="window.closeDeloadModal()">Cancel</button>
-        <button class="btn-action-block btn-amber mt-0" onclick="window.executeDeloadWeek()">Apply Deload</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-deload-modal">Cancel</button>
+        <button class="btn-action-block btn-amber mt-0" data-action="execute-deload-week">Apply Deload</button>
       </div>
     </div>
   </div>
 
-  <!-- Tile Customiser Bottom Sheet -->
-  <div id="tileCustomiserBackdrop" class="sheet-backdrop" onclick="window.closeTileCustomiser(false)"></div>
+  <div id="tileCustomiserBackdrop" class="sheet-backdrop" data-action="close-tile-customiser" data-apply="false"></div>
   <div id="tileCustomiserSheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="tileCustomiserTitle">
     <div class="bottom-sheet-handle"></div>
     <div class="bottom-sheet-header">
       <h3 id="tileCustomiserTitle" class="bottom-sheet-title">Customise Tiles</h3>
-      <button class="sheet-close-btn" onclick="window.closeTileCustomiser(false)" aria-label="Close">✕</button>
+      <button class="sheet-close-btn" data-action="close-tile-customiser" data-apply="false" aria-label="Close">✕</button>
     </div>
     <p class="bottom-sheet-hint">Toggle tiles on or off. Long-press a tile on the dashboard to drag and reorder.</p>
     <div id="tileCustomiserList" class="tile-picker-list"></div>
     <div class="bottom-sheet-actions">
-      <button class="btn-action-block btn-ghost mt-0" onclick="window.resetTileCustomiser()">Reset to Default</button>
-      <button class="btn-action-block btn-blue mt-0" onclick="window.closeTileCustomiser(true)">Done</button>
+      <button class="btn-action-block btn-ghost mt-0" data-action="reset-tile-customiser">Reset to Default</button>
+      <button class="btn-action-block btn-blue mt-0" data-action="close-tile-customiser" data-apply="true">Done</button>
     </div>
   </div>
-
-  <script>
-    window.openTodaySummaryModal = function() {
-      const modal = document.getElementById('todaySummaryModal');
-
-      const appState = window.__getAppState ? window.__getAppState() : null;
-      const selectedDay = window.__getSelectedDay ? window.__getSelectedDay() : null;
-
-      const days = ['sun','mon','tue','wed','thu','fri','sat'];
-      const dayNames = {sun:'Sunday',mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday'};
-      const todayKey = selectedDay || days[new Date().getDay()];
-
-      document.getElementById('todaySummaryDayLabel').textContent = dayNames[todayKey] || '';
-
-      let volume = 0, sets = 0, gymRpe = null, runDist = null, runTime = null, runPace = null, runRpe = null, notes = '';
-
-      if (appState) {
-        const wk = appState.currentWeek || '1';
-        const weekData = appState.weeks?.[wk];
-        if (weekData) {
-          const dayLifts = weekData.lifts?.[todayKey] || {};
-          for (const lift in dayLifts) {
-            if (Array.isArray(dayLifts[lift])) {
-              dayLifts[lift].forEach(s => {
-                if (s && s.c) {
-                  sets++;
-                  volume += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
-                }
-              });
-            }
-          }
-
-          const runData = weekData.runs?.[todayKey] || {};
-          runDist = parseFloat(runData.dist) || null;
-          runTime = runData.time || null;
-          runRpe  = runData.rpe  || null;
-
-          gymRpe = weekData.gymRpe?.[todayKey] || null;
-          notes = weekData.notes?.[todayKey] || '';
-        }
-      }
-
-      if (runDist && runTime) {
-        const p = runTime.toString().split(':');
-        const tm = p.length === 2 ? parseInt(p[0]) + parseInt(p[1]) / 60 : parseFloat(p[0]);
-        if (tm > 0 && runDist > 0) {
-          const pt = tm / runDist;
-          const pm = Math.floor(pt);
-          const ps = Math.round((pt - pm) * 60).toString().padStart(2, '0');
-          runPace = pm + ':' + ps;
-        }
-      }
-
-      const hasLift  = volume > 0 || sets > 0;
-      const hasRun   = runDist > 0 || runTime;
-      const hasNotes = notes && notes.trim().length > 0;
-      const isEmpty  = !hasLift && !hasRun && !hasNotes;
-
-      document.getElementById('todaySummaryLiftBlock').style.display = hasLift ? '' : 'none';
-      document.getElementById('todaySummaryVolume').textContent  = Math.round(volume).toLocaleString() + ' kg';
-      document.getElementById('todaySummarySets').textContent    = sets;
-      document.getElementById('todaySummaryGymRpe').textContent  = gymRpe || '--';
-
-      document.getElementById('todaySummaryRunBlock').style.display = hasRun ? '' : 'none';
-      document.getElementById('todaySummaryRunDist').textContent  = runDist ? runDist + ' km' : '-- km';
-      document.getElementById('todaySummaryRunTime').textContent  = runTime || '--:--';
-      document.getElementById('todaySummaryRunPace').textContent  = runPace ? runPace + ' /km' : '-- /km';
-      document.getElementById('todaySummaryRunRpe').textContent   = runRpe || '--';
-
-      document.getElementById('todaySummaryNotesBlock').style.display = hasNotes ? '' : 'none';
-      document.getElementById('todaySummaryNotes').textContent = notes;
-
-      document.getElementById('todaySummaryEmpty').style.display = isEmpty ? '' : 'none';
-
-      modal.style.display = 'flex';
-    };
-
-    window.closeTodaySummaryModal = function() {
-      document.getElementById('todaySummaryModal').style.display = 'none';
-    };
-  </script>
 
   <script type="module" src="./js/app.js"></script>
 </body>
