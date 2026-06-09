@@ -25,7 +25,7 @@ import {
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
 import { initHome, renderHome, closeTileCustomiser, resetTileCustomiser } from './home.js';
-import { initAnalytics, renderAnalytics } from './analytics.js';
+import { initAnalytics, renderAnalytics, saveThresholdPace, logBodyWeight } from './analytics.js';
 import { initDragDrop, resetTileOrder, exitTileEditMode } from './dragdrop.js';
 import {
   initWorkout, renderWorkout,
@@ -442,6 +442,8 @@ document.addEventListener('click', (e) => {
   const target = e.target.closest('[data-action]');
   if (!target) return;
 
+else if (action === 'log-body-weight') logBodyWeight();
+
   const action = target.getAttribute('data-action');
   const progId = target.getAttribute('data-program-id');
 
@@ -496,6 +498,8 @@ document.addEventListener('change', (e) => {
   if (action === 'macro-week-switch') handleMacroWeekSwitch();
   else if (action === 'import-json') triggerEngineImport(e);
 });
+
+  if (target.id === 'analyticsThresholdPaceInput') saveThresholdPace(target.value);
 
 // ==========================================
 // BOOTSTRAP AND INITIALIZATION
