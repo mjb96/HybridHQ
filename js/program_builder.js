@@ -1,7 +1,7 @@
 // ==========================================
 // PROGRAM BUILDER LOGIC (program_builder.js)
 // ==========================================
-import { appState, saveStateToLocalStorage, getProgramById } from './state.js';
+import { saveStateToLocalStorage, getProgramById } from './state.js';
 
 let activeBuilderId = null;
 
