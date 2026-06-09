@@ -57,6 +57,20 @@ document.addEventListener('app:library-updated', () => {
   }
 });
 
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.getAttribute('data-action');
+  const progId = target.getAttribute('data-program-id');
+
+  if (action === 'edit-program') triggerEditActiveProgram(progId);
+  else if (action === 'make-active-program') triggerMakeActiveProgram(progId);
+  else if (action === 'open-builder') openBuilder(progId);
+  else if (action === 'delete-program') executeDeleteProgram(progId);
+  else if (action === 'duplicate-program') executeDuplicateProgram(progId);
+});
+
 window.analyticsContext = 'overview';
 
 export function openAnalyticsView(context) {
