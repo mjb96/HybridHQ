@@ -1,31 +1,8 @@
 // ==========================================
 // DASHBOARD TILE REGISTRY (dashboard.js)
 // ==========================================
-// Architecture: add a new tile by adding one entry to TILE_REGISTRY.
-// Each entry is a DashboardTileConfig object — no other files need touching
-// for basic tiles that navigate to an existing analytics context.
-//
-// DashboardTileConfig shape:
-// {
-//   id:          string          — unique key, matches HTML element id prefix
-//   type:        DashboardTileType
-//   icon:        string          — emoji icon
-//   label:       string          — uppercase micro-label
-//   accentVar:   string          — CSS var name for the icon/accent colour
-//   navTarget:   string | null   — analytics context string, or 'custom' for special handlers
-//   order:       number          — render order (lower = first)
-//   renderData:  (appState, defaultDays) => DashboardTileData
-// }
-//
-// DashboardTileData shape:
-// {
-//   hero:        string          — large primary value
-//   sub?:        string          — optional secondary line
-//   tag?:        string          — optional small tag/badge (coloured)
-//   tagColor?:   string          — CSS colour string for the tag
-//   extraHTML?:  string          — raw HTML injected below hero (for progress bars, etc.)
-//   state:       'loaded'|'empty'|'error'
-// }
+import { openAnalyticsView } from './app.js';
+import { openTodaySummaryModal } from './workout.js';
 
 // ==========================================
 // TILE TYPE ENUM
@@ -509,11 +486,8 @@ export const TILE_REGISTRY = [
               }
             }
             if (rDist > 0 || completedSets > 0) {
-              // Use week number & day position as a proxy since we don't store absolute dates per set
-              // We'll use the week-day combo with a deterministic offset from weekStartedAt if available
               const weekNum = parseInt(wk, 10) || 1;
               const dayIdx  = defaultDays.indexOf(d);
-              // Generate an approximate ISO date string
               const base  = appState.weekStartedAt ? new Date(appState.weekStartedAt) : new Date();
               const approx = new Date(base);
               approx.setDate(base.getDate() - ((parseInt(appState.currentWeek, 10) - weekNum) * 7) + dayIdx);
@@ -522,12 +496,10 @@ export const TILE_REGISTRY = [
           });
         }
 
-        // Compute current streak (consecutive days back from today)
         const today = new Date();
         let streak = 0, longest = 0, tempStreak = 0;
         const sorted = [...activeDates].sort();
 
-        // Simple consecutive-day streak from today going backwards
         for (let i = 0; i <= 90; i++) {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
@@ -539,7 +511,6 @@ export const TILE_REGISTRY = [
           }
         }
 
-        // Longest streak over all data
         let prev = null;
         sorted.forEach(ds => {
           if (prev) {
@@ -580,7 +551,6 @@ export const TILE_REGISTRY = [
         const total  = activeProgram?.totalWeeks || 12;
         const pct    = Math.round((wk / total) * 100);
 
-        // Compute weekly completion as the "next milestone"
         const weekData = appState.weeks?.[appState.currentWeek];
         let weekDone = 0, weekTotal = 0;
         if (weekData) {
@@ -622,13 +592,11 @@ export const TILE_REGISTRY = [
 
 // ==========================================
 // NAVIGATION RESOLVER
-// Maps a navTarget string → the correct navigation call
 // ==========================================
 export function resolveTileNavigation(navTarget) {
   if (!navTarget) return null;
   if (navTarget === 'custom:today-summary') {
-    return () => window.openTodaySummaryModal?.();
+    return () => openTodaySummaryModal();
   }
-  // All other targets are analytics context strings
-  return () => window.openAnalyticsView?.(navTarget);
+  return () => openAnalyticsView(navTarget);
 }
