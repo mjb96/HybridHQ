@@ -178,12 +178,6 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
       }
     }
 
-    // Render loading state on first paint (empty innerHTML)
-    if (!article.innerHTML) {
-      article.innerHTML = renderTileLoading();
-      return;
-    }
-
     // Compute data and update content
     let data;
     try {
