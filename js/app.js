@@ -3,7 +3,7 @@
 // ==========================================
 import { CONFIG, PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { buildProgramOverviewHTML, buildWeekMatrixHTML, buildDaysSplitHTML, buildLibraryCardHTML } from './templates.js';
-import { openBuilder } from './program_builder.js'; // <-- NEW BUILDER IMPORT
+import { openBuilder } from './program_builder.js'; 
 
 import {
   appState, activeTab, selectedDay, DEFAULT_DAYS,
@@ -19,7 +19,8 @@ import {
   triggerEngineImport,
   setImportSuccessCallback,
   showToast,
-  checkActiveSession
+  checkActiveSession,
+  loginToSupabase
 } from './state.js';
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
@@ -55,20 +56,6 @@ document.addEventListener('app:library-updated', () => {
   } catch (err) {
     console.warn('Library render failed after builder closed.', err);
   }
-});
-
-document.addEventListener('click', (e) => {
-  const target = e.target.closest('[data-action]');
-  if (!target) return;
-
-  const action = target.getAttribute('data-action');
-  const progId = target.getAttribute('data-program-id');
-
-  if (action === 'edit-program') triggerEditActiveProgram(progId);
-  else if (action === 'make-active-program') triggerMakeActiveProgram(progId);
-  else if (action === 'open-builder') openBuilder(progId);
-  else if (action === 'delete-program') executeDeleteProgram(progId);
-  else if (action === 'duplicate-program') executeDuplicateProgram(progId);
 });
 
 window.analyticsContext = 'overview';
@@ -370,57 +357,149 @@ export function executeDuplicateProgram(id) {
   renderProgramLibrary();
 }
 
-// BINDINGS
-window.saveStateToLocalStorage = saveStateToLocalStorage;
-window.switchGlobalAppTab = switchGlobalAppTab;
-window.openAnalyticsView = openAnalyticsView;
-window.setCockpitActiveDay = setCockpitActiveDay;
-window.launchActiveWorkoutCockpit = launchActiveWorkoutCockpit;
-window.handleMacroWeekSwitch = handleMacroWeekSwitch;
-window.confirmProgramSwitch = confirmProgramSwitch;
-window.cancelProgramSwitch = cancelProgramSwitch;
-window.startWorkoutTimer = startWorkoutTimer;
-window.dismissRestTimer = dismissRestTimer;
-window.updateInputState = updateInputState;
-window.commitWorkoutUIState = commitWorkoutUIState;
-window.toggleGymCheckLoggingState = toggleGymCheckLoggingState;
-window.applyQuickFillModifier = applyQuickFillModifier;
-window.appendCustomSetRow = appendCustomSetRow;
-window.removeCustomSetRow = removeCustomSetRow;
-window.openAddExerciseModal = openAddExerciseModal;
-window.closeAddExerciseModal = closeAddExerciseModal;
-window.confirmAddExercise = confirmAddExercise;
-window.openConfirmResetModal = openConfirmResetModal;
-window.closeConfirmResetModal = closeConfirmResetModal;
-window.executeResetActiveDayMetrics = executeResetActiveDayMetrics;
-window.openFinishSessionModal = openFinishSessionModal;
-window.closeFinishSessionModal = closeFinishSessionModal;
-window.triggerTextSummaryExport = triggerTextSummaryExport;
-window.triggerEngineExport = triggerEngineExport;
-window.triggerCSVExport = triggerCSVExport;
-window.triggerEngineImport = triggerEngineImport;
-window.toggleAccordionManual = toggleAccordionManual;
-window.toggleQuickPad = toggleQuickPad;
-window.switchBrowserSectionTab = switchBrowserSectionTab;
-window.handleExerciseDropdownSelectionChange = handleExerciseDropdownSelectionChange; 
-window.confirmWeekAdvance = confirmWeekAdvance;
-window.cancelWeekAdvance = cancelWeekAdvance;
-window.triggerEditActiveProgram = triggerEditActiveProgram;
+// ==========================================
+// MODALS & SUMMARY LOGIC
+// ==========================================
+export function openTodaySummaryModal() {
+  const modal = document.getElementById('todaySummaryModal');
+  const days = ['sun','mon','tue','wed','thu','fri','sat'];
+  const dayNames = {sun:'Sunday',mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday'};
+  const todayKey = selectedDay || days[new Date().getDay()];
 
-// NEW PROGRAM BINDINGS
-window.switchProgramMode = switchProgramMode;
-window.triggerMakeActiveProgram = triggerMakeActiveProgram;
-window.openCreateProgramModal = openCreateProgramModal;
-window.closeCreateProgramModal = closeCreateProgramModal;
-window.executeCreateProgram = executeCreateProgram;
-window.executeDeleteProgram = executeDeleteProgram;
-window.executeDuplicateProgram = executeDuplicateProgram;
-window.openBuilder = openBuilder;
-window.resetDashboardTileOrder = () => { resetTileOrder(); exitTileEditMode(); hydrateCurrentView(); };
-window.exitTileDragMode = exitTileEditMode;
-window.closeTileCustomiser = closeTileCustomiser;
-window.resetTileCustomiser = resetTileCustomiser;
+  document.getElementById('todaySummaryDayLabel').textContent = dayNames[todayKey] || '';
 
+  let volume = 0, sets = 0, gymRpe = null, runDist = null, runTime = null, runPace = null, runRpe = null, notes = '';
+
+  const wk = appState.currentWeek || '1';
+  const weekData = appState.weeks?.[wk];
+  
+  if (weekData) {
+    const dayLifts = weekData.lifts?.[todayKey] || {};
+    for (const lift in dayLifts) {
+      if (Array.isArray(dayLifts[lift])) {
+        dayLifts[lift].forEach(s => {
+          if (s && s.c) {
+            sets++;
+            volume += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
+          }
+        });
+      }
+    }
+
+    const runData = weekData.runs?.[todayKey] || {};
+    runDist = parseFloat(runData.dist) || null;
+    runTime = runData.time || null;
+    runRpe  = runData.rpe  || null;
+
+    gymRpe = weekData.gymRpe?.[todayKey] || null;
+    notes = weekData.notes?.[todayKey] || '';
+  }
+
+  if (runDist && runTime) {
+    const p = runTime.toString().split(':');
+    const tm = p.length === 2 ? parseInt(p[0]) + parseInt(p[1]) / 60 : parseFloat(p[0]);
+    if (tm > 0 && runDist > 0) {
+      const pt = tm / runDist;
+      const pm = Math.floor(pt);
+      const ps = Math.round((pt - pm) * 60).toString().padStart(2, '0');
+      runPace = pm + ':' + ps;
+    }
+  }
+
+  const hasLift  = volume > 0 || sets > 0;
+  const hasRun   = runDist > 0 || runTime;
+  const hasNotes = notes && notes.trim().length > 0;
+  const isEmpty  = !hasLift && !hasRun && !hasNotes;
+
+  document.getElementById('todaySummaryLiftBlock').style.display = hasLift ? '' : 'none';
+  document.getElementById('todaySummaryVolume').textContent  = Math.round(volume).toLocaleString() + ' kg';
+  document.getElementById('todaySummarySets').textContent    = sets;
+  document.getElementById('todaySummaryGymRpe').textContent  = gymRpe || '--';
+
+  document.getElementById('todaySummaryRunBlock').style.display = hasRun ? '' : 'none';
+  document.getElementById('todaySummaryRunDist').textContent  = runDist ? runDist + ' km' : '-- km';
+  document.getElementById('todaySummaryRunTime').textContent  = runTime || '--:--';
+  document.getElementById('todaySummaryRunPace').textContent  = runPace ? runPace + ' /km' : '-- /km';
+  document.getElementById('todaySummaryRunRpe').textContent   = runRpe || '--';
+
+  document.getElementById('todaySummaryNotesBlock').style.display = hasNotes ? '' : 'none';
+  document.getElementById('todaySummaryNotes').textContent = notes;
+
+  document.getElementById('todaySummaryEmpty').style.display = isEmpty ? '' : 'none';
+
+  if (modal) modal.style.display = 'flex';
+}
+
+export function closeTodaySummaryModal() {
+  const modal = document.getElementById('todaySummaryModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// ==========================================
+// GLOBAL EVENT DELEGATION ROUTER
+// ==========================================
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.getAttribute('data-action');
+  const progId = target.getAttribute('data-program-id');
+
+  // Tab & Navigation
+  if (action === 'switch-tab') switchGlobalAppTab(target.getAttribute('data-target'));
+  else if (action === 'open-analytics') openAnalyticsView(target.getAttribute('data-context'));
+  else if (action === 'set-day') setCockpitActiveDay(target.getAttribute('data-day'));
+  else if (action === 'switch-browser-tab') switchBrowserSectionTab(target.getAttribute('data-tab'));
+  
+  // Timers
+  else if (action === 'start-timer') startWorkoutTimer();
+  else if (action === 'dismiss-rest') dismissRestTimer();
+
+  // Programs & Library
+  else if (action === 'switch-program-mode') switchProgramMode(target.getAttribute('data-mode'));
+  else if (action === 'open-create-program') openCreateProgramModal();
+  else if (action === 'close-create-program') closeCreateProgramModal();
+  else if (action === 'execute-create-program') executeCreateProgram();
+  else if (action === 'cancel-program-switch') cancelProgramSwitch();
+  else if (action === 'confirm-program-switch') confirmProgramSwitch();
+  else if (action === 'cancel-week-advance') cancelWeekAdvance();
+  else if (action === 'confirm-week-advance') confirmWeekAdvance();
+  else if (action === 'edit-program') triggerEditActiveProgram(progId);
+  else if (action === 'make-active-program') triggerMakeActiveProgram(progId);
+  else if (action === 'open-builder') openBuilder(progId);
+  else if (action === 'delete-program') executeDeleteProgram(progId);
+  else if (action === 'duplicate-program') executeDuplicateProgram(progId);
+  
+  // Export & Data
+  else if (action === 'export-text') triggerTextSummaryExport();
+  else if (action === 'export-json') triggerEngineExport();
+  else if (action === 'export-csv') triggerCSVExport();
+  
+  // Auth
+  else if (action === 'login-supabase') loginToSupabase();
+  else if (action === 'close-auth') document.getElementById('authOverlay').style.display = 'none';
+  
+  // Summary Modals
+  else if (action === 'open-today-summary') openTodaySummaryModal();
+  else if (action === 'close-today-summary') closeTodaySummaryModal();
+  else if (action === 'close-today-summary-nav') { 
+    closeTodaySummaryModal(); 
+    switchGlobalAppTab('workout'); 
+  }
+});
+
+document.addEventListener('change', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+  const action = target.getAttribute('data-action');
+
+  if (action === 'macro-week-switch') handleMacroWeekSwitch();
+  else if (action === 'import-json') triggerEngineImport(e);
+});
+
+// ==========================================
+// BOOTSTRAP AND INITIALIZATION
+// ==========================================
 const getState = () => appState;
 const getSelectedDay = () => selectedDay;
 const getDays = () => DEFAULT_DAYS;
