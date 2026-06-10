@@ -90,7 +90,10 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
     <div class="local-timer-placeholder"></div>
     <span class="cockpit-history-line">⚡ ${historicalLineText}</span>
     <div class="set-rows-list">${setsMarkup}</div>
-    <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}">+ Append Custom Overload Set</button>
+    <div class="flex gap-2">
+      <button class="btn-pad-append tactile-scale" data-action="repeat-last" data-liftname="${safeLiftName}" style="flex:1;">⟲ Repeat Last</button>
+      <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}" style="flex:1;">+ Add Set</button>
+    </div>
   </div>`;
 }
 
