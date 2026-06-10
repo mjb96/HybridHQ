@@ -525,34 +525,142 @@ export function computeWeeklyCaloriesSeries(state, days, maxWeek) {
   return out;
 }
 
-// Per-week training load split into lift vs run, weeks 1..maxWeek. Mirrors the
-// Stress Balance tile's TSS proxy (lift = completed sets x RPE; run = dist x
-// RPE x 3, RPE defaulting to 6 when unlogged).
+// Parse "MM:SS", "H:MM:SS", or "M:SS" into minutes (float). 0 if unparseable.
+// A bare number is treated as minutes.
+export function parseDurationToMinutes(timeStr) {
+  if (timeStr == null || timeStr === '') return 0;
+  const parts = String(timeStr).trim().split(':').map(p => Number(p));
+  if (parts.some(n => Number.isNaN(n))) return 0;
+  let sec = 0;
+  if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) sec = parts[0] * 60 + parts[1];
+  else if (parts.length === 1) return parts[0]; // bare number = minutes
+  else return 0;
+  return sec / 60;
+}
+
+// Per-week training load split into lift vs run, weeks 1..maxWeek, using
+// session-RPE (Foster's sRPE = RPE x duration_min) in arbitrary units (AU).
+// Lifts and runs share the same unit so they're directly comparable. A session
+// contributes 0 if it lacks RPE or duration -- no fabricated constants.
 export function computeWeeklyLoadSeries(state, days, maxWeek) {
   const lift = [], run = [];
   const dayList = Array.isArray(days) ? days : [];
   for (let w = 1; w <= maxWeek; w++) {
     const wkData = state?.weeks?.[String(w)];
-    let gymTSS = 0, runTSS = 0;
+    let gymLoad = 0, runLoad = 0;
     if (wkData) {
       dayList.forEach(d => {
-        let completedSets = 0;
-        const dayLifts = wkData.lifts?.[d] || {};
-        for (const l in dayLifts) {
-          if (Array.isArray(dayLifts[l])) completedSets += dayLifts[l].filter(isCompletedSet).length;
-        }
         const gRpe = parseInt(wkData.gymRpe?.[d], 10) || 0;
-        gymTSS += completedSets * (gRpe > 0 ? gRpe : 6);
+        const gMin = parseDurationToMinutes(wkData.gymStats?.[d]?.time);
+        if (gRpe > 0 && gMin > 0) gymLoad += gRpe * gMin;
 
-        const rDist = parseFloat(wkData.runs?.[d]?.dist) || 0;
         const rRpe = parseInt(wkData.runs?.[d]?.rpe, 10) || 0;
-        runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
+        const rMin = parseDurationToMinutes(wkData.runs?.[d]?.time);
+        if (rRpe > 0 && rMin > 0) runLoad += rRpe * rMin;
       });
     }
-    lift.push(Math.round(gymTSS));
-    run.push(Math.round(runTSS));
+    lift.push(Math.round(gymLoad));
+    run.push(Math.round(runLoad));
   }
   return { lift, run };
+}
+
+// Acute:Chronic Workload Ratio readiness. acute = current-week load; chronic =
+// mean weekly load over the trailing chronicWeeks (default 4, current week
+// included), counting only weeks that had load. ACWR's recognised sweet spot is
+// ~0.8-1.3; spiking above it raises injury risk (lower readiness), very low
+// ratios indicate detraining. Maps ACWR -> 0..100 readiness.
+export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
+  const cw = parseInt(currentWeek, 10) || 1;
+  const acute = loadByWeek[cw - 1] || 0;
+  const start = Math.max(0, cw - chronicWeeks);
+  const windowWeeks = loadByWeek.slice(start, cw);
+  const nonZero = windowWeeks.filter(v => v > 0);
+  if (acute <= 0 || nonZero.length === 0) {
+    return { score: 0, acwr: 0, acute, chronic: 0, hasData: false };
+  }
+  const chronic = nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
+  const acwr = chronic > 0 ? acute / chronic : 0;
+  let score;
+  if (acwr <= 1.0) score = 60 + acwr * 40;
+  else if (acwr <= 1.3) score = 100;
+  else score = 100 - (acwr - 1.3) * 80;
+  return {
+    score: Math.round(clamp01to100(score)),
+    acwr: Math.round(acwr * 100) / 100,
+    acute, chronic: Math.round(chronic), hasData: true,
+  };
+}
+
+// Goal adherence: cumulative completion % across ELAPSED weeks (1..currentWeek)
+// -- of everything scheduled so far, how much is actually done.
+export function computeGoalAdherence(state, program, days, currentWeek) {
+  const cw = parseInt(currentWeek, 10) || 1;
+  const dayList = Array.isArray(days) ? days : [];
+  let total = 0, done = 0;
+  for (let w = 1; w <= cw; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    if (!wkData) continue;
+    dayList.forEach(d => {
+      const bp = program?.days?.[d];
+      const runsStr = (bp?.runs || '').toLowerCase();
+      const isRunScheduled = runsStr && !runsStr.includes('no structured') && runsStr !== 'rest';
+      if (isRunScheduled) { total++; if ((parseFloat(wkData.runs?.[d]?.dist) || 0) > 0) done++; }
+      const dayLifts = wkData.lifts?.[d] || {};
+      for (const l in dayLifts) {
+        if (Array.isArray(dayLifts[l])) dayLifts[l].forEach(s => { total++; if (isCompletedSet(s)) done++; });
+      }
+    });
+  }
+  return { pct: total > 0 ? Math.round((done / total) * 100) : 0, total, done, elapsedWeeks: cw };
+}
+
+// Program milestones derived from its length (replaces hardcoded weeks 6/12).
+export function computeDynamicMilestones(totalWeeks) {
+  const t = parseInt(totalWeeks, 10) || 12;
+  const mk = (frac, label) => ({ week: Math.max(1, Math.round(t * frac)), label });
+  return [
+    mk(0.25, 'Foundation phase'),
+    mk(0.5,  'Midpoint check-in'),
+    mk(0.75, 'Peak build'),
+    mk(1.0,  'Program completion'),
+  ];
+}
+
+// Weekly avg/max HR from run sessions, weeks 1..maxWeek.
+export function computeWeeklyHrSeries(state, days, maxWeek) {
+  const avgHr = [], maxHr = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let sum = 0, cnt = 0, mx = 0;
+    if (wkData) dayList.forEach(d => {
+      const a = parseFloat(wkData.runs?.[d]?.avgHR) || 0;
+      const m = parseFloat(wkData.runs?.[d]?.maxHR) || 0;
+      if (a > 0) { sum += a; cnt++; }
+      if (m > mx) mx = m;
+    });
+    avgHr.push(cnt > 0 ? Math.round(sum / cnt) : 0);
+    maxHr.push(Math.round(mx));
+  }
+  return { avgHr, maxHr };
+}
+
+// Weekly average aerobic training effect from run sessions, weeks 1..maxWeek.
+export function computeWeeklyTrainingEffectSeries(state, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let sum = 0, cnt = 0;
+    if (wkData) dayList.forEach(d => {
+      const te = parseFloat(wkData.runs?.[d]?.trainingEffect) || 0;
+      if (te > 0) { sum += te; cnt++; }
+    });
+    out.push(cnt > 0 ? Math.round((sum / cnt) * 10) / 10 : 0);
+  }
+  return out;
 }
 
 // Per-week completion percentage (0..100) for weeks 1..maxWeek, using the same
