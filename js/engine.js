@@ -338,6 +338,85 @@ export function computeBig3Maxes(state) {
 }
 
 // ==========================================
+// .FIT PER-RECORD STREAM HELPERS (PURE)
+// Operate on column-oriented stream objects: parallel numeric arrays keyed by
+// metric (t, distKm, hr, altitude, cadence, power, paceSecPerKm, ...). They
+// are unit-agnostic — transforming whatever numeric arrays they're handed.
+// Storage lives in db.js (IndexedDB); these are the testable transforms the
+// analytics charts will consume. None of this touches the synced state blob.
+// ==========================================
+
+// Uniformly downsample every parallel array in a stream to at most maxPoints
+// samples, preserving index alignment across metrics and always keeping the
+// final sample. Scalars (type/version/lengthUnit/...) pass through untouched.
+export function downsampleStream(stream, maxPoints = 500) {
+  if (!stream || typeof stream !== 'object') return stream;
+  const arrays = Object.keys(stream).filter(k => Array.isArray(stream[k]));
+  const n = arrays.reduce((m, k) => Math.max(m, stream[k].length), 0);
+  if (n <= maxPoints || maxPoints < 2) {
+    return { ...stream, n };
+  }
+  const step = Math.ceil(n / maxPoints);
+  const idx = [];
+  for (let i = 0; i < n; i += step) idx.push(i);
+  if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
+
+  const out = {};
+  for (const k of Object.keys(stream)) {
+    out[k] = Array.isArray(stream[k]) ? idx.map(i => stream[k][i]) : stream[k];
+  }
+  out.n = idx.length;
+  return out;
+}
+
+// Per-sample pace (seconds per km) from cumulative distance (km) and elapsed
+// time (s). pace[i] uses the delta from sample i-1 -> i; pace[0] mirrors
+// pace[1]. Non-advancing samples (pauses) yield 0.
+export function derivePaceSeries(distKm, elapsedSec) {
+  const n = Math.min(distKm?.length || 0, elapsedSec?.length || 0);
+  const out = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const dDist = (parseFloat(distKm[i]) || 0) - (parseFloat(distKm[i - 1]) || 0);
+    const dTime = (parseFloat(elapsedSec[i]) || 0) - (parseFloat(elapsedSec[i - 1]) || 0);
+    out[i] = dDist > 0 && dTime > 0 ? dTime / dDist : 0;
+  }
+  if (n > 1) out[0] = out[1];
+  return out;
+}
+
+// Total positive elevation change across an altitude series (unit in = unit out).
+export function elevationGain(altitude) {
+  let gain = 0;
+  for (let i = 1; i < (altitude?.length || 0); i++) {
+    const d = (parseFloat(altitude[i]) || 0) - (parseFloat(altitude[i - 1]) || 0);
+    if (d > 0) gain += d;
+  }
+  return gain;
+}
+
+// Seconds spent in each HR zone. zoneFloors is an ascending array of lower bpm
+// bounds, one per zone (e.g. [0,114,133,152,171] for Z1..Z5); a sample falls
+// in the highest zone whose floor it meets. secPerSample is the seconds
+// attributed to each sample (a scalar, or a per-sample array). Zero/blank HR
+// samples are skipped.
+export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
+  const floors = Array.isArray(zoneFloors) ? zoneFloors : [];
+  const zones = new Array(floors.length).fill(0);
+  const n = hr?.length || 0;
+  const dt = i => Array.isArray(secPerSample)
+    ? (parseFloat(secPerSample[i]) || 0)
+    : (parseFloat(secPerSample) || 0);
+  for (let i = 0; i < n; i++) {
+    const bpm = parseFloat(hr[i]) || 0;
+    if (bpm <= 0) continue;
+    let z = -1;
+    for (let f = 0; f < floors.length; f++) if (bpm >= floors[f]) z = f;
+    if (z >= 0) zones[z] += dt(i);
+  }
+  return zones;
+}
+
+// ==========================================
 // DELOAD SUGGESTION MATCH STUB
 // ==========================================
 export function shouldSuggestDeload() {
