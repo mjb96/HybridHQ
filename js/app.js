@@ -545,7 +545,7 @@ initGarminRunImport((distance, timeStr, coordinates, stats) => {
       cals:           stats?.calories     != null ? Math.round(stats.calories)    : '',
       avgCadence:     stats?.avgCadence   != null ? Math.round(stats.avgCadence)  : '',
       trainingEffect: stats?.trainingEffect != null ? stats.trainingEffect        : '',
-      aerobicTE:      stats?.aerobicTE    != null ? stats.aerobicTE               : '',
+      anaerobicTE:    stats?.anaerobicTE   != null ? stats.anaerobicTE             : '',
       hrZones:        stats?.hrZones      || null,
       splits:         stats?.splits       || null,
     };
@@ -571,7 +571,7 @@ initGarminGymImport((timeStr, stats) => {
     g.maxHR       = stats?.maxHR       != null ? Math.round(stats.maxHR)      : '';
     g.cals        = stats?.calories    != null ? Math.round(stats.calories)   : '';
     g.trainingEffect = stats?.trainingEffect != null ? stats.trainingEffect   : '';
-    g.aerobicTE   = stats?.aerobicTE   != null ? stats.aerobicTE              : '';
+    g.anaerobicTE = stats?.anaerobicTE != null ? stats.anaerobicTE            : '';
     g.gymSets     = stats?.gymSets     || null;
   }
   saveStateToLocalStorage(true);
