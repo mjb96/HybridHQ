@@ -1,8 +1,8 @@
 // ==========================================
 // CLOUD-CONNECTED STATE MANAGER (state.js)
 // ==========================================
-import { PROGRAMS, CONFIG } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription } from './engine.js';
+import { PROGRAMS } from './constants.js';
+import { prescribeSetsForLift } from './engine.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -194,28 +194,8 @@ export function verifyWeekStorageSchema(wk) {
         const weekModifier = activeProgram.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: "Working Sets" };
 
         dayBlueprint.lifts.forEach(liftName => {
-          const parsedTarget = parseTargetFromDescription(dayBlueprint.desc, liftName);
-          
-          let setsCount = dayBlueprint.desc && dayBlueprint.desc.includes('x') ? parsedTarget.sets : (weekModifier.sets || 4);
-          let repsTarget = dayBlueprint.desc && dayBlueprint.desc.includes('x') ? parsedTarget.reps : (weekModifier.reps || 5);
-
-          if (weekModifier.intensityLabel.toLowerCase().includes("taper") || weekModifier.reps === 1) {
-            repsTarget = weekModifier.reps;
-          }
-
-          const diagnostic = computeDiagnosticForLift(wk, d, liftName);
-          if (diagnostic.isStalled || diagnostic.isFatigueOverload) {
-            setsCount = Math.max(1, Math.round(setsCount * CONFIG.stallSetReductionModifier));
-          }
-
-          appState.weeks[wk].lifts[d][liftName] = [];
-          for (let i = 0; i < setsCount; i++) {
-            appState.weeks[wk].lifts[d][liftName].push({
-              w: diagnostic.suggestedWeight !== '' ? diagnostic.suggestedWeight.toString() : '',
-              r: repsTarget.toString(),
-              c: false
-            });
-          }
+          appState.weeks[wk].lifts[d][liftName] =
+            prescribeSetsForLift(wk, d, liftName, dayBlueprint.desc, weekModifier);
         });
       }
     });
@@ -594,29 +574,9 @@ export async function executeResetActiveDayMetrics() {
   if (blueprint && blueprint.lifts) {
     blueprint.lifts.forEach(liftName => {
       try {
-        const parsedTarget = parseTargetFromDescription(blueprint.desc, liftName);
         const weekModifier = activeProgram.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: "Working Sets" };
-        
-        let setsCount = blueprint.desc && blueprint.desc.includes('x') ? parsedTarget.sets : (weekModifier.sets || 4);
-        let repsTarget = blueprint.desc && blueprint.desc.includes('x') ? parsedTarget.reps : (weekModifier.reps || 5);
-
-        if (weekModifier.intensityLabel.toLowerCase().includes("taper") || weekModifier.reps === 1) {
-          repsTarget = weekModifier.reps;
-        }
-
-        const diagnostic = computeDiagnosticForLift(wk, selectedDay, liftName);
-        if (diagnostic.isStalled || diagnostic.isFatigueOverload) {
-          setsCount = Math.max(1, Math.round(setsCount * CONFIG.stallSetReductionModifier));
-        }
-
-        appState.weeks[wk].lifts[selectedDay][liftName] = [];
-        for (let i = 0; i < setsCount; i++) {
-          appState.weeks[wk].lifts[selectedDay][liftName].push({
-            w: diagnostic.suggestedWeight !== '' ? diagnostic.suggestedWeight.toString() : '',
-            r: repsTarget.toString(),
-            c: false
-          });
-        }
+        appState.weeks[wk].lifts[selectedDay][liftName] =
+          prescribeSetsForLift(wk, selectedDay, liftName, blueprint.desc, weekModifier);
       } catch(e) { console.warn(e); }
     });
   }
