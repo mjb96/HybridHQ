@@ -175,7 +175,7 @@ export function verifyWeekStorageSchema(wk) {
   if (!appState.weeks) appState.weeks = {};
   
   if (!appState.weeks[wk]) {
-    appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {} };
+    appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {}, sessionType: {} };
     DEFAULT_DAYS.forEach(d => {
       appState.weeks[wk].runs[d] = { dist: '', time: '', rpe: '' };
       appState.weeks[wk].notes[d] = '';
@@ -183,6 +183,7 @@ export function verifyWeekStorageSchema(wk) {
       appState.weeks[wk].bodyWeight[d] = '';
       appState.weeks[wk].gymStats[d] = { time: '', avgHR: '', maxHR: '', cals: '' };
       appState.weeks[wk].lifts[d] = {};
+      appState.weeks[wk].sessionType[d] = d; // default: each slot runs its own day's session
     });
 
     const activeProgram = getProgramById(appState.activeProgramId);
@@ -199,6 +200,65 @@ export function verifyWeekStorageSchema(wk) {
       }
     });
   }
+}
+
+// ==========================================
+// SESSION ↔ DAY DECOUPLING
+// A calendar day-slot can run any day's session template. sessionType[day]
+// records the SOURCE template day (defaults to the day itself). Logged data
+// still lives under the real day key, so streak / "today" / analytics are
+// unaffected — only which template/targets/labels a slot shows changes.
+// ==========================================
+
+// The source-template day for a given calendar slot (back-compatible default).
+export function getSessionSourceDay(wk, day) {
+  return appState.weeks?.[wk]?.sessionType?.[day] || day;
+}
+
+// True if a calendar slot has any logged work (completed sets or a run dist).
+function dayHasLoggedWork(wk, day) {
+  const wd = appState.weeks?.[wk];
+  if (!wd) return false;
+  if ((parseFloat(wd.runs?.[day]?.dist) || 0) > 0) return true;
+  const lifts = wd.lifts?.[day] || {};
+  for (const l in lifts) {
+    if (Array.isArray(lifts[l]) && lifts[l].some(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1))) return true;
+  }
+  return false;
+}
+
+// Load a different day's session template into the target calendar slot. Reseeds
+// the slot's lifts from the source day's blueprint and records the marker.
+// Returns false if the slot already has logged work (caller should confirm).
+export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {}) {
+  const wk = appState.currentWeek;
+  verifyWeekStorageSchema(wk);
+  const weekData = appState.weeks[wk];
+  if (!weekData) return false;
+  if (!force && dayHasLoggedWork(wk, targetDay)) return false;
+
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const blueprint = activeProgram?.days?.[sourceDay];
+  const weekModifier = activeProgram?.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: 'Working Sets' };
+
+  if (!weekData.sessionType) weekData.sessionType = {};
+  weekData.sessionType[targetDay] = sourceDay;
+
+  // Reseed the target slot's lifts from the source template.
+  weekData.lifts[targetDay] = {};
+  if (blueprint?.lifts?.length) {
+    blueprint.lifts.forEach(liftName => {
+      weekData.lifts[targetDay][liftName] =
+        prescribeSetsForLift(wk, sourceDay, liftName, blueprint.desc, weekModifier);
+    });
+  }
+  saveStateToLocalStorage(true);
+  return true;
+}
+
+// Reset a slot back to its own native day's session.
+export function resetSessionForDay(targetDay) {
+  return loadSessionIntoDay(targetDay, targetDay, { force: true });
 }
 
 // ==========================================
