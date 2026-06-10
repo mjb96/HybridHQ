@@ -26,7 +26,7 @@ import {
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
 import { initHome, renderHome, closeTileCustomiser, resetTileCustomiser } from './home.js';
-import { initAnalytics, renderAnalytics, saveThresholdPace, logBodyWeight } from './analytics.js';
+import { initAnalytics, renderAnalytics, saveThresholdPace, logBodyWeight, setAnalyticsContext } from './analytics.js';
 import { initDragDrop, resetTileOrder, exitTileEditMode } from './dragdrop.js';
 import {
   initWorkout, renderWorkout,
@@ -62,10 +62,10 @@ document.addEventListener('app:navigate', (e) => {
   else openAnalyticsView(target);
 });
 
-window.analyticsContext = 'overview';
+setAnalyticsContext('overview');
 
 export function openAnalyticsView(context) {
-  window.analyticsContext = context;
+  setAnalyticsContext(context);
   switchGlobalAppTab('analytics');
 }
 
