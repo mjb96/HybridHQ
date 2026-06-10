@@ -8,16 +8,14 @@ import { triggerRestTimerEngine, moveRestTimerToActiveExercise, dismissRestTimer
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast, saveNewCustomExerciseToLibrary } from './state.js'; 
 import { buildEmptyWorkoutCard, buildSetRow, buildExerciseCard } from './templates.js';
-import { getMapFromDB, deleteMapFromDB } from './db.js';
+import { deleteMapFromDB } from './db.js';
+import { renderRunMap } from './workout-map.js';
 
 let _getState;
 let _getSelectedDay;
 let _getDays;
 let _saveState;
 let _switchTab;
-
-// Private module-scoped map instance
-let activeWorkoutMapInstance = null;
 
 export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn, switchTabFn) {
   _getState = getStateFn;
@@ -186,29 +184,7 @@ export function renderWorkout() {
   }
 
   // === RENDER MAP FROM IndexedDB ===
-  const runMapContainer = document.getElementById('runMapContainer');
-  if (runMapContainer) {
-    if (runContext.dist) {
-      getMapFromDB(wk, selectedDay).then(coords => {
-        if (coords && coords.length > 0) {
-          runMapContainer.style.display = 'block';
-          setTimeout(() => {
-            if (activeWorkoutMapInstance) { activeWorkoutMapInstance.remove(); activeWorkoutMapInstance = null; }
-            runMapContainer.innerHTML = '';
-            activeWorkoutMapInstance = L.map('runMapContainer');
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(activeWorkoutMapInstance);
-            const route = L.polyline(coords, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(activeWorkoutMapInstance);
-            activeWorkoutMapInstance.fitBounds(route.getBounds(), { padding: [10, 10] });
-            activeWorkoutMapInstance.invalidateSize();
-          }, 100);
-        } else {
-          runMapContainer.style.display = 'none';
-        }
-      });
-    } else {
-      runMapContainer.style.display = 'none';
-    }
-  }
+  renderRunMap(wk, selectedDay, runContext.dist);
 
   const notesEl = document.getElementById('sessionNotesInput');
   const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
