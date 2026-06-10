@@ -33,10 +33,8 @@ import {
   updateInputState, commitWorkoutUIState, toggleGymCheckLoggingState,
   applyQuickFillModifier, appendCustomSetRow, removeCustomSetRow,
   toggleAccordionManual, toggleQuickPad,
-  openAddExerciseModal, closeAddExerciseModal, confirmAddExercise,
   openConfirmResetModal, closeConfirmResetModal, executeResetActiveDayMetrics,
-  openFinishSessionModal, closeFinishSessionModal,
-  handleExerciseDropdownSelectionChange 
+  openFinishSessionModal, closeFinishSessionModal
 } from './workout.js';
 
 import { startWorkoutTimer, dismissRestTimer, checkActiveTimerOnLoad } from './timers.js';
