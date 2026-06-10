@@ -22,21 +22,18 @@ export function parseTargetFromDescription(descString, liftName) {
   try {
     const escapedLift = liftName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     
-    // UPDATED REGEX: Catches normal 'x', capital 'X', and the formal multiplication sign '×'
     const regex = new RegExp(escapedLift + '\\s*\\((\\d+)\\s*[xX×]\\s*([^\\)]+)\\)', 'i');
     const match = descString.match(regex);
 
     if (match) {
       result.sets = parseInt(match[1], 10) || 3;
       
-      // Normalize en-dashes (–) to standard hyphens (-) before splitting
       let repValue = match[2].trim().toLowerCase().replace(/–/g, '-');
 
       if (repValue.includes('-')) {
-        // If it's a range like "8-10", grab the higher number
         result.reps = parseInt(repValue.split('-')[1], 10) || 10;
       } else if (repValue === 'max') {
-        result.reps = 10; // Fallback visual target for 'max' reps
+        result.reps = 10; 
       } else {
         result.reps = parseInt(repValue, 10) || 10;
       }
@@ -67,7 +64,8 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   for (let w = cWk - 1; w >= 1; w--) {
     const wData = appState.weeks[w.toString()];
     if (wData && wData.lifts && wData.lifts[dayKey]?.[liftName]) {
-      const finishedSets = wData.lifts[dayKey][liftName].filter(s => s && s.c && s.w && s.r);
+      // INCREMENT WARMUP: Exclude warmups from diagnostics and suggestions
+      const finishedSets = wData.lifts[dayKey][liftName].filter(s => s && s.c && s.w && s.r && !s.isWarmup);
       if (finishedSets.length > 0) {
         let bestE1rm = 0, bestWeight = 0, bestReps = 0;
         finishedSets.forEach(s => {
@@ -118,9 +116,6 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   return result;
 }
 
-// ==========================================
-// SET/REP PRESCRIPTION
-// ==========================================
 export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
   const parsedTarget = parseTargetFromDescription(desc, liftName);
   const usesInlineSpec = desc && desc.includes('x');
@@ -176,7 +171,8 @@ export function computeEstimated1RMs() {
         if (!Array.isArray(setsArr)) continue;
         
         setsArr.forEach(s => {
-          if (s && s.c) {
+          // INCREMENT WARMUP: Exclude warmups from global max
+          if (s && s.c && !s.isWarmup) {
             const weight = parseFloat(s.w) || 0;
             const reps = parseInt(s.r, 10) || 0;
             const e1rm = weight * (1 + reps / 30);
@@ -212,7 +208,8 @@ export function computeExercisePRs(state, stats = {}) {
         if (!Array.isArray(setsArr)) continue;
 
         setsArr.forEach(set => {
-          if (set && set.c && set.w && set.r) {
+          // INCREMENT WARMUP: Exclude warmups from PRs
+          if (set && set.c && set.w && set.r && !set.isWarmup) {
             const weight = parseFloat(set.w);
             const reps = parseInt(set.r);
             const e1RM = weight * (1 + (reps / 30));
@@ -285,7 +282,8 @@ export function computeBig3Progression(state) {
         if (!Array.isArray(setsArr)) continue;
 
         setsArr.forEach(s => {
-          if (!isCompletedSet(s)) return;
+          // INCREMENT WARMUP: Exclude warmups from Big 3 Charts
+          if (!isCompletedSet(s) || s.isWarmup) return;
           const e = epley1RM(s.w, s.r);
           if (e <= 0) return;
           if (e > (out[cat].byWeek[wKey] || 0)) out[cat].byWeek[wKey] = e;
@@ -365,6 +363,7 @@ export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
   return zones;
 }
 
+// INCREMENT WARMUP: Dual-Stream Indexing Extraction
 export function findLastPerformance(state, liftName, opts = {}) {
   if (!state || !state.weeks || !liftName) return null;
   const { excludeWeek, excludeDay } = opts;
@@ -380,11 +379,21 @@ export function findLastPerformance(state, liftName, opts = {}) {
       if (excludeWeek != null && String(w) === String(excludeWeek) && d === excludeDay) continue;
       const arr = wkData.lifts[d]?.[liftName];
       if (!Array.isArray(arr)) continue;
-      const completed = arr.filter(s => isCompletedSet(s) && parseFloat(s.w) > 0 && parseInt(s.r, 10) > 0);
-      if (completed.length > 0) {
+
+      const workingSets = arr.filter(s => !s.isWarmup);
+      const warmupSets = arr.filter(s => s.isWarmup);
+      const completedWorking = workingSets.filter(s => isCompletedSet(s) && parseFloat(s.w) > 0 && parseInt(s.r, 10) > 0);
+
+      // Require at least 1 completed working set to be considered a valid historical "Performance"
+      if (completedWorking.length > 0) {
         let e1rm = 0;
-        completed.forEach(s => { const e = epley1RM(s.w, s.r); if (e > e1rm) e1rm = e; });
-        return { sets: completed.map(s => ({ w: s.w, r: s.r })), week: w, day: d, e1rm: Math.round(e1rm) };
+        completedWorking.forEach(s => { const e = epley1RM(s.w, s.r); if (e > e1rm) e1rm = e; });
+        return { 
+          sets: workingSets.map(s => ({ w: s.w, r: s.r })), 
+          warmupSets: warmupSets.map(s => ({ w: s.w, r: s.r })), 
+          workingSets: workingSets.map(s => ({ w: s.w, r: s.r })), 
+          week: w, day: d, e1rm: Math.round(e1rm) 
+        };
       }
     }
   }
@@ -399,7 +408,8 @@ function dayHasActivity(weekData, day) {
   if (rDist > 0) return true;
   const dayLifts = weekData.lifts?.[day] || {};
   for (const lift in dayLifts) {
-    if (Array.isArray(dayLifts[lift]) && dayLifts[lift].some(isCompletedSet)) return true;
+    // INCREMENT WARMUP: Ensure a day with ONLY a warmup isn't counted as an active training day
+    if (Array.isArray(dayLifts[lift]) && dayLifts[lift].some(s => isCompletedSet(s) && !s.isWarmup)) return true;
   }
   return false;
 }
@@ -553,7 +563,8 @@ export function computeGoalAdherence(state, program, days, currentWeek) {
       if (isRunScheduled) { total++; if ((parseFloat(wkData.runs?.[d]?.dist) || 0) > 0) done++; }
       const dayLifts = wkData.lifts?.[d] || {};
       for (const l in dayLifts) {
-        if (Array.isArray(dayLifts[l])) dayLifts[l].forEach(s => { total++; if (isCompletedSet(s)) done++; });
+        // INCREMENT WARMUP: Exclude from adherence
+        if (Array.isArray(dayLifts[l])) dayLifts[l].forEach(s => { if (!s.isWarmup) { total++; if (isCompletedSet(s)) done++; } });
       }
     });
   }
@@ -620,7 +631,13 @@ export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
         const dayLifts = wkData.lifts?.[d] || {};
         for (const l in dayLifts) {
           if (Array.isArray(dayLifts[l])) {
-            dayLifts[l].forEach(s => { total++; if (isCompletedSet(s)) done++; });
+            dayLifts[l].forEach(s => { 
+              // INCREMENT WARMUP: Exclude warmups from program completion %
+              if (!s.isWarmup) {
+                total++; 
+                if (isCompletedSet(s)) done++; 
+              }
+            });
           }
         }
       });
@@ -634,9 +651,6 @@ export function shouldSuggestDeload() {
   return { suggest: false, reason: '' };
 }
 
-// ==========================================
-// INCREMENT 4: EXERCISE HISTORY LOG RETRIEVAL
-// ==========================================
 export function getExerciseHistoryLog(state, liftName) {
   if (!state || !state.weeks) return { sessions: [], bestE1RM: 0, bestVolume: 0 };
   
@@ -644,7 +658,6 @@ export function getExerciseHistoryLog(state, liftName) {
   let bestE1RM = 0;
   let bestVolume = 0;
 
-  // Added safety checks for parsing keys
   const weekNums = Object.keys(state.weeks).map(Number).filter(n => !isNaN(n)).sort((a,b) => b - a);
   
   for(let wk of weekNums) {
@@ -655,8 +668,8 @@ export function getExerciseHistoryLog(state, liftName) {
       const sets = wData.lifts[d][liftName];
       if(!sets || !Array.isArray(sets)) continue;
       
-      // FIX: Improved truthy evaluation to capture legacy data stored as strings
-      const completedSets = sets.filter(s => !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)));
+      // INCREMENT WARMUP: History Modal only displays working volume/sets
+      const completedSets = sets.filter(s => !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) && !s.isWarmup);
       if(completedSets.length === 0) continue;
 
       let vol = 0;
