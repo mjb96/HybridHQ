@@ -33,6 +33,7 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null)
   const ghostWeight = historicalSetData && historicalSetData.w ? historicalSetData.w : 'kg';
   const ghostReps = historicalSetData && historicalSetData.r ? historicalSetData.r : 'reps';
 
+  // Increment 2/3 Feature Retained: Visible History Micro-Label
   const hasHistory = historicalSetData && historicalSetData.w && historicalSetData.r;
   const historyMarkup = hasHistory 
     ? `<div style="flex-basis: 100%; grid-column: 1 / -1; text-align: center; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45); margin-top: 4px; margin-bottom: 2px; font-weight: 500; letter-spacing: 0.02em;">Last: ${historicalSetData.w}kg × ${historicalSetData.r}</div>`
@@ -85,6 +86,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
       <div class="header-text-block">
         <div class="title-badge-row" style="display:flex; align-items:center;">
           <span class="cockpit-ex-name">${displaySafeName}</span>
+          <button class="tactile-scale" style="background:none; border:none; padding: 0 0 0 8px; font-size:1.1rem; cursor:pointer; color:var(--text-muted);" data-action="open-exercise-history" data-liftname="${safeLiftName}" title="Exercise History">📊</button>
           ${stalledBadge}
         </div>
         <div class="cockpit-ex-target" style="${targetStyle}">${blueprintLabel}</div>
