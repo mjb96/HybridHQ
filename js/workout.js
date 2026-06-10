@@ -40,7 +40,12 @@ export function openExerciseHistoryModal(liftName) {
   const bestE1RMEl = document.getElementById('historyBestE1RM');
   const logContainer = document.getElementById('historyModalLog');
 
-  if (!modal || !logContainer) return;
+  // FIX: Added explicit console warning for missing HTML
+  if (!modal || !logContainer) {
+    console.error("Exercise History Modal HTML missing from index.html! Ensure <div id='exerciseHistoryModal'> exists.");
+    showToast("Error: Modal structure missing. Check index.html.", true);
+    return;
+  }
 
   const appState = _getState();
   const historyData = getExerciseHistoryLog(appState, liftName);
@@ -102,14 +107,10 @@ export function renderWorkout() {
   const weekData = appState.weeks[wk];
 
   const activeProgram = getProgramById(appState.activeProgramId);
-  // The session running in this slot may be a different day's template (the
-  // user can train any session on any day). Resolve targets/labels from the
-  // SOURCE template, while logged data stays under the real calendar day.
   const sessionSourceDay = getSessionSourceDay(wk, selectedDay);
   const isMovedSession = sessionSourceDay !== selectedDay;
   const homeBlueprint = activeProgram.days?.[sessionSourceDay] || { lifts: [], runs: "Rest" };
 
-  // --- RUN METRICS ---
   const runContext = weekData.runs[selectedDay] || { dist: '', time: '', rpe: '', avgHR: '', maxHR: '', elev: '', cals: '' };
   
   const distEl       = document.getElementById('runInputDist');
@@ -133,7 +134,6 @@ export function renderWorkout() {
                       runContext.avgCadence || runContext.descent || runContext.trainingEffect;
   if (runExtraStatsRow) runExtraStatsRow.style.display = hasRunExtra ? 'block' : 'none';
 
-  // HR Zones strip
   const hrZonesContainer = document.getElementById('runHrZonesContainer');
   const hrZonesBar       = document.getElementById('runHrZonesBar');
   const hrZonesLabels    = document.getElementById('runHrZonesLabels');
@@ -160,7 +160,6 @@ export function renderWorkout() {
     }
   }
 
-  // --- GYM METRICS ---
   const gymContext = weekData.gymStats[selectedDay] || { time: '', avgHR: '', maxHR: '', cals: '' };
   
   const gTimeEl        = document.getElementById('gymInputTime');
@@ -176,15 +175,12 @@ export function renderWorkout() {
   if (gMaxHREl)     gMaxHREl.value     = gymContext.maxHR        || '';
   if (gCalsEl)      gCalsEl.value      = gymContext.cals         || '';
   if (gTEEl)        gTEEl.value        = gymContext.trainingEffect || '';
-  // Legacy fallback: pre-fix sessions stored the anaerobic value under
-  // `aerobicTE`, so surface it under the now-correct anaerobic field.
   if (gAnaerobicTEEl) gAnaerobicTEEl.value = (gymContext.anaerobicTE ?? gymContext.aerobicTE) || '';
 
   const hasGymStats = gymContext.time || gymContext.avgHR || gymContext.maxHR || gymContext.cals ||
                       gymContext.trainingEffect;
   if (gymStatsRow) gymStatsRow.style.display = hasGymStats ? 'block' : 'none';
 
-  // --- MAP GARMIN DATA TO INPUTS ---
   const rStats = appState.weeks[appState.currentWeek].runs?.[selectedDay] || {};
 
   const cadenceEl = document.getElementById('runInputCadence');
@@ -243,7 +239,6 @@ export function renderWorkout() {
       }
   }
 
-  // === RENDER MAP FROM IndexedDB ===
   renderRunMap(wk, selectedDay, runContext.dist);
 
   const notesEl = document.getElementById('sessionNotesInput');
@@ -252,7 +247,6 @@ export function renderWorkout() {
   if (notesEl) notesEl.value = weekData.notes[selectedDay] || '';
   if (gymRpeEl) gymRpeEl.value = weekData.gymRpe?.[selectedDay] || '';
 
-  // --- REORDER AEROBIC TILE DYNAMICALLY ---
   const runPanel = document.getElementById('cockpitRunPanel');
   const runSpecsEl = document.getElementById('cockpitRunSpecs');
   const exercisesContainer = document.getElementById('cockpitExercisesContainer');
@@ -287,7 +281,6 @@ export function renderWorkout() {
     });
   }
 
-  // Session selector — run any day's session in this slot (decoupled from day).
   const sessionSelect = document.getElementById('cockpitSessionSelect');
   if (sessionSelect) {
     sessionSelect.innerHTML = _getDays().map(dk => {
@@ -368,8 +361,6 @@ export function renderWorkout() {
       }
     } catch(e) { console.warn(e); }
 
-    // Per-exercise history: the most recent time this lift was done ANYWHERE
-    // (day-independent), so the reference stays correct when sessions move.
     const lastPerf = findLastPerformance(appState, liftName, {
       excludeWeek: wk, excludeDay: selectedDay, days: _getDays()
     });
@@ -511,9 +502,6 @@ export function commitWorkoutUIState() {
   const calsEl = document.getElementById('runInputCals');
 
   if (distEl && distEl.offsetParent !== null) {
-    // Merge, don't replace: preserve .fit-only fields that have no input here
-    // (hrZones, avgCadence, trainingEffect, anaerobicTE, descent, splits,
-    // hasStreams). Replacing wholesale wiped imported run data on the next save.
     const existingRun = weekData.runs[selectedDay] || {};
     weekData.runs[selectedDay] = {
         ...existingRun,
@@ -537,8 +525,6 @@ export function commitWorkoutUIState() {
   const gCalsEl = document.getElementById('gymInputCals');
 
   if (gTimeEl && gTimeEl.offsetParent !== null) {
-    // Merge, don't replace: preserve .fit-only gym fields (trainingEffect,
-    // anaerobicTE, gymSets) that have no input in this view.
     const existingGym = weekData.gymStats[selectedDay] || {};
     weekData.gymStats[selectedDay] = {
         ...existingGym,
@@ -697,8 +683,6 @@ export function toggleQuickPad(rowEl) {
   rowEl.classList.toggle('pad-visible');
 }
 
-// Load the chosen day's session into the currently-selected calendar slot.
-// Non-destructive: refuses (and reverts) if the slot already has logged work.
 export function handleSessionChange(selectEl) {
   if (!selectEl) return;
   const appState = _getState();
@@ -709,14 +693,13 @@ export function handleSessionChange(selectEl) {
   const ok = loadSessionIntoDay(selectedDay, sourceDay);
   if (!ok) {
     showToast('This day already has logged work — reset it first.');
-    renderWorkout(); // revert the dropdown to the actual state
+    renderWorkout(); 
     return;
   }
   showToast('Session loaded for today');
   renderWorkout();
 }
 
-// Fill an exercise's sets from the last time it was performed (anywhere).
 export function repeatLastForExercise(liftName) {
   if (!liftName) return;
   const appState = _getState();
@@ -796,7 +779,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
   else if (action === 'open-exercise-history') {
-    e.stopPropagation(); // Prevents accordion from closing when tapping the 📊 icon
+    e.preventDefault(); // FIX: added preventDefault so the button is completely decoupled
     openExerciseHistoryModal(liftName);
   }
   else if (action === 'close-exercise-history') closeExerciseHistoryModal();
