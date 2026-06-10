@@ -309,7 +309,7 @@
           </div>
           <div class="run-grid-inputs mb-2" style="grid-template-columns: repeat(2, 1fr);">
             <label><span class="set-num-lbl block mb-1 text-accent-green">Training Effect</span><input type="text" id="gymInputTE" placeholder="--" readonly style="text-align: center; color:#10b981; border-color: rgba(255,255,255,0.1);"></label>
-            <label><span class="set-num-lbl block mb-1 text-accent-amber">Aerobic TE</span><input type="text" id="gymInputAerobicTE" placeholder="--" readonly style="text-align: center; color:#f59e0b; border-color: rgba(255,255,255,0.1);"></label>
+            <label><span class="set-num-lbl block mb-1 text-accent-amber">Anaerobic TE</span><input type="text" id="gymInputAnaerobicTE" placeholder="--" readonly style="text-align: center; color:#f59e0b; border-color: rgba(255,255,255,0.1);"></label>
           </div>
           <div id="gymSetsBreakdown" style="display:none;">
             <div class="set-num-lbl mb-1" style="color:rgba(255,255,255,0.4);">SET BREAKDOWN (from .FIT)</div>
@@ -381,6 +381,17 @@
 
       <div id="analytics-strength_pr" class="analytics-section">
         <h2 class="section-header">Top Lifts & PR Tracking</h2>
+        <h2 class="section-header mt-4">Estimated 1RM Progression</h2>
+        <article class="card-dark p-3 mb-4">
+          <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
+            <span style="color:#3b82f6;">● Squat</span>
+            <span style="color:#f59e0b;">● Bench</span>
+            <span style="color:#ef4444;">● Deadlift</span>
+          </div>
+          <div id="big3ProgressionContainer">
+            <p style="color:var(--text-muted);font-size:0.75rem;">Complete big-3 sets to see 1RM progression.</p>
+          </div>
+        </article>
         <article class="card-dark p-4 mb-4">
           <div id="allLiftsRmContainer_PR">
             <p style="color:var(--text-muted);font-size:0.75rem;">Complete sets to populate lift PRs.</p>
