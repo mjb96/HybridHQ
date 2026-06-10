@@ -622,13 +622,13 @@ export const TILE_REGISTRY = [
 
 // ==========================================
 // NAVIGATION RESOLVER
-// Maps a navTarget string → the correct navigation call
+// Emits an 'app:navigate' event carrying the raw navTarget.
+// app.js owns the routing (sentinel 'custom:today-summary' → modal,
+// any other target → analytics context). No reverse import on app.js.
 // ==========================================
 export function resolveTileNavigation(navTarget) {
   if (!navTarget) return null;
-  if (navTarget === 'custom:today-summary') {
-    return () => window.openTodaySummaryModal?.();
-  }
-  // All other targets are analytics context strings
-  return () => window.openAnalyticsView?.(navTarget);
+  return () => document.dispatchEvent(
+    new CustomEvent('app:navigate', { detail: { target: navTarget } })
+  );
 }
