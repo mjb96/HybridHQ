@@ -113,7 +113,7 @@ export function renderWorkout() {
   const gMaxHREl       = document.getElementById('gymInputMaxHR');
   const gCalsEl        = document.getElementById('gymInputCals');
   const gTEEl          = document.getElementById('gymInputTE');
-  const gAerobicTEEl   = document.getElementById('gymInputAerobicTE');
+  const gAnaerobicTEEl = document.getElementById('gymInputAnaerobicTE');
   const gymStatsRow    = document.getElementById('gymStatsRow');
 
   if (gTimeEl)      gTimeEl.value      = gymContext.time         || '';
@@ -121,7 +121,9 @@ export function renderWorkout() {
   if (gMaxHREl)     gMaxHREl.value     = gymContext.maxHR        || '';
   if (gCalsEl)      gCalsEl.value      = gymContext.cals         || '';
   if (gTEEl)        gTEEl.value        = gymContext.trainingEffect || '';
-  if (gAerobicTEEl) gAerobicTEEl.value = gymContext.aerobicTE   || '';
+  // Legacy fallback: pre-fix sessions stored the anaerobic value under
+  // `aerobicTE`, so surface it under the now-correct anaerobic field.
+  if (gAnaerobicTEEl) gAnaerobicTEEl.value = (gymContext.anaerobicTE ?? gymContext.aerobicTE) || '';
 
   const hasGymStats = gymContext.time || gymContext.avgHR || gymContext.maxHR || gymContext.cals ||
                       gymContext.trainingEffect;
