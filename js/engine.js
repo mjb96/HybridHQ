@@ -729,3 +729,53 @@ export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
 export function shouldSuggestDeload() {
   return { suggest: false, reason: '' };
 }
+
+// ==========================================
+// INCREMENT 4: EXERCISE HISTORY LOG RETRIEVAL
+// ==========================================
+export function getExerciseHistoryLog(state, liftName) {
+  if (!state || !state.weeks) return { sessions: [], bestE1RM: 0, bestVolume: 0 };
+  
+  let sessions = [];
+  let bestE1RM = 0;
+  let bestVolume = 0;
+
+  const weekNums = Object.keys(state.weeks).map(Number).sort((a,b) => b - a);
+  
+  for(let wk of weekNums) {
+    const wData = state.weeks[wk];
+    if(!wData || !wData.lifts) continue;
+    
+    for(let d in wData.lifts) {
+      const sets = wData.lifts[d][liftName];
+      if(!sets) continue;
+      
+      const completedSets = sets.filter(s => s && s.c === true);
+      if(completedSets.length === 0) continue;
+
+      let vol = 0;
+      let sessionMaxE1RM = 0;
+      
+      completedSets.forEach(s => {
+        const w = parseFloat(s.w) || 0;
+        const r = parseInt(s.r, 10) || 0;
+        vol += (w * r);
+        const e1rm = w * (1 + (r/30));
+        if (e1rm > sessionMaxE1RM) sessionMaxE1RM = e1rm;
+      });
+
+      if (sessionMaxE1RM > bestE1RM) bestE1RM = sessionMaxE1RM;
+      if (vol > bestVolume) bestVolume = vol;
+
+      sessions.push({
+        week: wk,
+        day: d,
+        sets: completedSets,
+        volume: vol,
+        e1rm: sessionMaxE1RM
+      });
+    }
+  }
+
+  return { sessions, bestE1RM, bestVolume };
+}
