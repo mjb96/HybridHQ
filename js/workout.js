@@ -5,7 +5,7 @@ import { getProgramById } from './state.js';
 import { logActivityForStreak } from './state.js';
 import { getSessionSourceDay, loadSessionIntoDay, resetSessionForDay } from './state.js';
 import { CONFIG } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance } from './engine.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast } from './state.js'; 
@@ -28,6 +28,54 @@ export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn
   _switchTab = switchTabFn;
   initExercisePicker(getStateFn, getSelectedDayFn, saveStateFn, renderWorkout);
   initSessionModals(getStateFn, getSelectedDayFn, saveStateFn, switchTabFn, renderWorkout, updateExercisePRs);
+}
+
+// ==========================================
+// INCREMENT 4: HISTORY MODAL LOGIC
+// ==========================================
+export function openExerciseHistoryModal(liftName) {
+  const modal = document.getElementById('exerciseHistoryModal');
+  const titleEl = document.getElementById('historyModalTitle');
+  const bestVolEl = document.getElementById('historyBestVolume');
+  const bestE1RMEl = document.getElementById('historyBestE1RM');
+  const logContainer = document.getElementById('historyModalLog');
+
+  if (!modal || !logContainer) return;
+
+  const appState = _getState();
+  const historyData = getExerciseHistoryLog(appState, liftName);
+
+  titleEl.textContent = liftName;
+  bestVolEl.textContent = historyData.bestVolume > 0 ? `${historyData.bestVolume} kg` : '--';
+  bestE1RMEl.textContent = historyData.bestE1RM > 0 ? `${Math.round(historyData.bestE1RM)} kg` : '--';
+
+  if (historyData.sessions.length === 0) {
+    logContainer.innerHTML = '<div class="text-sm text-muted text-center mt-4">No completed history found.</div>';
+  } else {
+    logContainer.innerHTML = historyData.sessions.map(sess => {
+      const setsStr = sess.sets.map(s => `${s.w}×${s.r}`).join(', ');
+      return `
+        <div class="card-dark p-3" style="border: 1px solid var(--overlay-sm);">
+          <div class="flex-between mb-2">
+            <span class="text-sm font-heavy text-inverse">Week ${sess.week}</span>
+            <span class="text-xs text-muted uppercase">${sess.day}</span>
+          </div>
+          <div class="text-sm text-muted mb-2">${setsStr}</div>
+          <div class="flex-between" style="border-top: 1px dashed var(--overlay-sm); padding-top: 6px; margin-top: 4px;">
+            <span class="text-xs text-muted">Vol: <strong class="text-main">${sess.volume} kg</strong></span>
+            <span class="text-xs text-muted">e1RM: <strong class="text-accent-blue">${Math.round(sess.e1rm)} kg</strong></span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.classList.add('active');
+}
+
+export function closeExerciseHistoryModal() {
+  const modal = document.getElementById('exerciseHistoryModal');
+  if (modal) modal.classList.remove('active');
 }
 
 // ==========================================
@@ -747,6 +795,11 @@ document.addEventListener('click', (e) => {
   else if (action === 'append-set') appendCustomSetRow(target, liftName);
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
+  else if (action === 'open-exercise-history') {
+    e.stopPropagation(); // Prevents accordion from closing when tapping the 📊 icon
+    openExerciseHistoryModal(liftName);
+  }
+  else if (action === 'close-exercise-history') closeExerciseHistoryModal();
   else if (action === 'open-add-exercise') openAddExerciseModal();
   else if (action === 'close-add-exercise') closeAddExerciseModal();
   else if (action === 'confirm-add-exercise') confirmAddExercise();
