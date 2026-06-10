@@ -201,6 +201,55 @@ export function computeEstimated1RMs() {
 }
 
 // ==========================================
+// PER-EXERCISE PR (ESTIMATED 1RM) AGGREGATION
+// Scans all logged sets and raises per-exercise PRs. Mutates and returns
+// `stats` in place; only ever RAISES maxes (sticky by design — a PR is not
+// lost if the set that produced it is later deleted). Verbatim from the
+// former workout.updateExercisePRs(); state and stats are now parameters.
+// ==========================================
+export function computeExercisePRs(state, stats = {}) {
+  for (let wKey in state.weeks) {
+    const weekObj = state.weeks[wKey];
+    if (!weekObj || !weekObj.lifts) continue;
+
+    for (let dKey in weekObj.lifts) {
+      const dayLifts = weekObj.lifts[dKey];
+      if (!dayLifts) continue;
+
+      for (let lift in dayLifts) {
+        let maxEstimated1RM = 0;
+        const setsArr = dayLifts[lift];
+        if (!Array.isArray(setsArr)) continue;
+
+        setsArr.forEach(set => {
+          if (set && set.c && set.w && set.r) {
+            const weight = parseFloat(set.w);
+            const reps = parseInt(set.r);
+            const e1RM = weight * (1 + (reps / 30));
+            if (e1RM > maxEstimated1RM) maxEstimated1RM = e1RM;
+          }
+        });
+
+        if (maxEstimated1RM > 0) {
+          if (!stats[lift]) {
+            stats[lift] = { allTimeMax: 0, currentEstimatedMax: 0 };
+          }
+          if (maxEstimated1RM > stats[lift].allTimeMax) {
+            stats[lift].allTimeMax = maxEstimated1RM;
+          }
+          if (wKey === state.currentWeek) {
+            if (maxEstimated1RM > (stats[lift].currentEstimatedMax || 0)) {
+              stats[lift].currentEstimatedMax = maxEstimated1RM;
+            }
+          }
+        }
+      }
+    }
+  }
+  return stats;
+}
+
+// ==========================================
 // DELOAD SUGGESTION MATCH STUB
 // ==========================================
 export function shouldSuggestDeload() {
