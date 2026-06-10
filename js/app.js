@@ -36,7 +36,7 @@ import {
 } from './workout.js';
 
 import { startWorkoutTimer, dismissRestTimer, checkActiveTimerOnLoad } from './timers.js';
-import { saveMapToDB } from './db.js';
+import { saveMapToDB, saveStreamToDB } from './db.js';
 import { initGarminRunImport, initGarminGymImport } from './garmin.js';
 
 document.addEventListener('app:storage-loaded', () => {
@@ -529,9 +529,10 @@ initWorkout(getState, getSelectedDay, getDays, saveState, switchGlobalAppTab);
 
 // === DEVICE IMPORT WIRING ===
 
-initGarminRunImport((distance, timeStr, coordinates, stats) => {
+initGarminRunImport((distance, timeStr, coordinates, stats, stream) => {
   const wk = appState.currentWeek;
   const sd = selectedDay;
+  const hasStreams = !!(stream && stream.n > 0);
   if (appState.weeks[wk]) {
     if (!appState.weeks[wk].runs) appState.weeks[wk].runs = {};
     appState.weeks[wk].runs[sd] = {
@@ -548,15 +549,18 @@ initGarminRunImport((distance, timeStr, coordinates, stats) => {
       anaerobicTE:    stats?.anaerobicTE   != null ? stats.anaerobicTE             : '',
       hrZones:        stats?.hrZones      || null,
       splits:         stats?.splits       || null,
+      hasStreams,                       // flag only; bulky arrays live in IndexedDB
     };
   }
-  if (coordinates && coordinates.length > 0) {
-    saveMapToDB(wk, sd, coordinates).then(() => {
-      saveStateToLocalStorage(true); hydrateCurrentView();
-    });
-  } else {
-    saveStateToLocalStorage(true); hydrateCurrentView();
-  }
+  // Bulky payloads (GPS route, per-record streams) go to IndexedDB, never the
+  // synced state blob. Persist state once both writes settle.
+  const tasks = [];
+  if (coordinates && coordinates.length > 0) tasks.push(saveMapToDB(wk, sd, coordinates));
+  if (hasStreams) tasks.push(saveStreamToDB(wk, sd, 'run', stream));
+  Promise.allSettled(tasks).then(() => {
+    saveStateToLocalStorage(true);
+    hydrateCurrentView();
+  });
 });
 
 initGarminGymImport((timeStr, stats) => {
