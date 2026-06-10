@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v23';
+const CACHE_NAME = 'hybrid-training-v24';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -25,6 +25,7 @@ const ASSETS_TO_CACHE = [
   './js/workout.js',
   './js/workout-map.js',
   './js/workout-exercise-picker.js',
+  './js/workout-session-modals.js',
   './js/program_builder.js'
 ];
 
