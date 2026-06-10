@@ -58,6 +58,13 @@ document.addEventListener('app:library-updated', () => {
   }
 });
 
+document.addEventListener('app:navigate', (e) => {
+  const target = e.detail?.target;
+  if (!target) return;
+  if (target === 'custom:today-summary') openTodaySummaryModal();
+  else openAnalyticsView(target);
+});
+
 window.analyticsContext = 'overview';
 
 export function openAnalyticsView(context) {
@@ -609,13 +616,6 @@ function checkForAutomaticWeekAdvance() {
     }
   }
 }
-
-// TEMP compatibility bridge for dashboard/home modules
-
-window.openAnalyticsView = openAnalyticsView;
-window.openTodaySummaryModal = openTodaySummaryModal;
-window.switchGlobalAppTab = switchGlobalAppTab;
-window.launchActiveWorkoutCockpit = launchActiveWorkoutCockpit;
 
 async function bootstrapApp() {
   try {
