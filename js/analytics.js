@@ -1006,10 +1006,9 @@ function renderRecoveryAnalytics(data) {
   renderRpeChart(document.getElementById('rpeTrendContainer'), data.weekLabels, data.rpeData);
 
   // Load / readiness (ACWR) — the signal behind the Readiness tile.
-  const appState = _getState();
-  const days = _getDays();
+  // (appState and defaultDays are already declared at the top of this function.)
   const maxWeek = data.weekLabels.length;
-  const load = computeWeeklyLoadSeries(appState, days, maxWeek);
+  const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
   const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
   const readiness = computeReadiness(totalByWeek, appState.currentWeek);
 
