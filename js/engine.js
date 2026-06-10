@@ -417,6 +417,174 @@ export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
 }
 
 // ==========================================
+// TILE METRICS (PURE, TESTED)
+// Real-data computations behind the Home tiles + their drill-down trends.
+// All pure: state/program/days passed explicitly.
+// ==========================================
+
+function clamp01to100(v) { return Math.max(0, Math.min(100, v)); }
+
+// True when a (week,day) has any completed activity (a completed set or a
+// logged run distance). Used for rest-day / active-day counting.
+function dayHasActivity(weekData, day) {
+  if (!weekData) return false;
+  const rDist = parseFloat(weekData.runs?.[day]?.dist) || 0;
+  if (rDist > 0) return true;
+  const dayLifts = weekData.lifts?.[day] || {};
+  for (const lift in dayLifts) {
+    if (Array.isArray(dayLifts[lift]) && dayLifts[lift].some(isCompletedSet)) return true;
+  }
+  return false;
+}
+
+// Live streak view from the real streakData store ({current, longest,
+// lastActivityDate}). The stored `current` only stays "live" if the last
+// activity was today or yesterday; otherwise the current streak is broken (0)
+// while the all-time longest is retained. Pure — `now` is injectable.
+export function computeStreakView(streakData, now = new Date()) {
+  const sd = streakData || {};
+  const longest = sd.longest || 0;
+  if (!sd.lastActivityDate) {
+    return { current: 0, longest, hasData: false, broken: false, lastActivityDate: null };
+  }
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const last = new Date(sd.lastActivityDate); last.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today - last) / 86400000);
+  const live = diffDays <= 1;
+  return {
+    current: live ? (sd.current || 0) : 0,
+    longest,
+    hasData: true,
+    broken: !live,
+    lastActivityDate: sd.lastActivityDate,
+  };
+}
+
+// Recovery score from real signals only (no fabricated sleep data):
+//   fatigueScore = inverse of this week's average RPE (higher RPE -> lower)
+//   restScore    = rest days this week (3+ rest days -> full)
+//   score        = 0.7*fatigue + 0.3*rest, clamped 0..100
+// Returns hasData:false when no RPE has been logged this week.
+export function computeRecoveryScore(state, days) {
+  const wk = state?.currentWeek || '1';
+  const weekData = state?.weeks?.[wk];
+  const dayList = Array.isArray(days) ? days : [];
+  const empty = {
+    score: 0, hasData: false, avgRpe: 0,
+    fatigueScore: 0, restScore: 0, restDays: dayList.length, activeDays: 0,
+    recommendation: 'Log sessions to generate recovery insights.',
+  };
+  if (!weekData) return empty;
+
+  let totalRpe = 0, rpeCount = 0, activeDays = 0;
+  dayList.forEach(d => {
+    const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
+    const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
+    if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
+    if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
+    if (dayHasActivity(weekData, d)) activeDays++;
+  });
+
+  if (rpeCount === 0) return empty;
+
+  const avgRpe = totalRpe / rpeCount;
+  const fatigueScore = clamp01to100(((10 - avgRpe) / 9) * 100);
+  const restDays = Math.max(0, dayList.length - activeDays);
+  const restScore = clamp01to100((restDays / 3) * 100);
+  const score = Math.round(clamp01to100(fatigueScore * 0.7 + restScore * 0.3));
+
+  let recommendation;
+  if (score >= 80)      recommendation = 'Well recovered. You can push intensity today.';
+  else if (score >= 60) recommendation = 'Moderately recovered. Stick to planned volume.';
+  else if (score >= 40) recommendation = 'Fatigue accumulating. Prioritise rest and sleep.';
+  else                  recommendation = 'High fatigue load. Consider a deload or rest day.';
+
+  return {
+    score, hasData: true, avgRpe,
+    fatigueScore: Math.round(fatigueScore),
+    restScore: Math.round(restScore),
+    restDays, activeDays, recommendation,
+  };
+}
+
+// Per-week total calories (run + gym) for weeks 1..maxWeek.
+export function computeWeeklyCaloriesSeries(state, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let cals = 0;
+    if (wkData) {
+      dayList.forEach(d => {
+        cals += parseInt(wkData.runs?.[d]?.cals, 10) || 0;
+        cals += parseInt(wkData.gymStats?.[d]?.cals, 10) || 0;
+      });
+    }
+    out.push(cals);
+  }
+  return out;
+}
+
+// Per-week training load split into lift vs run, weeks 1..maxWeek. Mirrors the
+// Stress Balance tile's TSS proxy (lift = completed sets x RPE; run = dist x
+// RPE x 3, RPE defaulting to 6 when unlogged).
+export function computeWeeklyLoadSeries(state, days, maxWeek) {
+  const lift = [], run = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let gymTSS = 0, runTSS = 0;
+    if (wkData) {
+      dayList.forEach(d => {
+        let completedSets = 0;
+        const dayLifts = wkData.lifts?.[d] || {};
+        for (const l in dayLifts) {
+          if (Array.isArray(dayLifts[l])) completedSets += dayLifts[l].filter(isCompletedSet).length;
+        }
+        const gRpe = parseInt(wkData.gymRpe?.[d], 10) || 0;
+        gymTSS += completedSets * (gRpe > 0 ? gRpe : 6);
+
+        const rDist = parseFloat(wkData.runs?.[d]?.dist) || 0;
+        const rRpe = parseInt(wkData.runs?.[d]?.rpe, 10) || 0;
+        runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
+      });
+    }
+    lift.push(Math.round(gymTSS));
+    run.push(Math.round(runTSS));
+  }
+  return { lift, run };
+}
+
+// Per-week completion percentage (0..100) for weeks 1..maxWeek, using the same
+// scheduled-run + logged-set accounting as the Home progress bar. `program` is
+// the active program object (passed in to keep this pure).
+export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let total = 0, done = 0;
+    if (wkData) {
+      dayList.forEach(d => {
+        const bp = program?.days?.[d];
+        const runsStr = (bp?.runs || '').toLowerCase();
+        const isRunScheduled = runsStr && !runsStr.includes('no structured') && runsStr !== 'rest';
+        if (isRunScheduled) { total++; if ((parseFloat(wkData.runs?.[d]?.dist) || 0) > 0) done++; }
+
+        const dayLifts = wkData.lifts?.[d] || {};
+        for (const l in dayLifts) {
+          if (Array.isArray(dayLifts[l])) {
+            dayLifts[l].forEach(s => { total++; if (isCompletedSet(s)) done++; });
+          }
+        }
+      });
+    }
+    out.push(total > 0 ? Math.round((done / total) * 100) : 0);
+  }
+  return out;
+}
+
+// ==========================================
 // DELOAD SUGGESTION MATCH STUB
 // ==========================================
 export function shouldSuggestDeload() {
