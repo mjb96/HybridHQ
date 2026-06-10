@@ -21,7 +21,8 @@ import {
   setImportSuccessCallback,
   showToast,
   checkActiveSession,
-  loginToSupabase
+  loginToSupabase,
+  logActivityForStreak
 } from './state.js';
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
@@ -557,6 +558,7 @@ initGarminRunImport((distance, timeStr, coordinates, stats, stream) => {
   const tasks = [];
   if (coordinates && coordinates.length > 0) tasks.push(saveMapToDB(wk, sd, coordinates));
   if (hasStreams) tasks.push(saveStreamToDB(wk, sd, 'run', stream));
+  try { logActivityForStreak(); } catch (e) { console.warn(e); }
   Promise.allSettled(tasks).then(() => {
     saveStateToLocalStorage(true);
     hydrateCurrentView();
@@ -578,6 +580,7 @@ initGarminGymImport((timeStr, stats) => {
     g.anaerobicTE = stats?.anaerobicTE != null ? stats.anaerobicTE            : '';
     g.gymSets     = stats?.gymSets     || null;
   }
+  try { logActivityForStreak(); } catch (e) { console.warn(e); }
   saveStateToLocalStorage(true);
   hydrateCurrentView();
 });
