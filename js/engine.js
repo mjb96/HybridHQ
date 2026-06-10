@@ -115,6 +115,37 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
 }
 
 // ==========================================
+// SET/REP PRESCRIPTION
+// Owns the per-lift prescription decision: inline-spec vs weekly modifier,
+// taper override, and stall/fatigue set reduction. Returns the sets array.
+// ==========================================
+export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
+  const parsedTarget = parseTargetFromDescription(desc, liftName);
+  const usesInlineSpec = desc && desc.includes('x');
+  let setsCount  = usesInlineSpec ? parsedTarget.sets : (weekModifier.sets || 4);
+  let repsTarget = usesInlineSpec ? parsedTarget.reps : (weekModifier.reps || 5);
+
+  if (weekModifier.intensityLabel.toLowerCase().includes("taper") || weekModifier.reps === 1) {
+    repsTarget = weekModifier.reps;
+  }
+
+  const diagnostic = computeDiagnosticForLift(wk, dayKey, liftName);
+  if (diagnostic.isStalled || diagnostic.isFatigueOverload) {
+    setsCount = Math.max(1, Math.round(setsCount * CONFIG.stallSetReductionModifier));
+  }
+
+  const sets = [];
+  for (let i = 0; i < setsCount; i++) {
+    sets.push({
+      w: diagnostic.suggestedWeight !== '' ? diagnostic.suggestedWeight.toString() : '',
+      r: repsTarget.toString(),
+      c: false
+    });
+  }
+  return sets;
+}
+
+// ==========================================
 // ESTIMATED 1RM CALCULATOR
 // ==========================================
 export function computeEstimated1RMs() {
