@@ -104,11 +104,13 @@ function extractData(garminData, isRun, onDataExtracted) {
   const secs = Math.floor(durationSeconds % 60);
   const timeFormatted = `${mins}:${secs.toString().padStart(2, '0')}`;
 
-  function getStat(searchTerms) {
+  function getStat(searchTerms, excludeTerms = []) {
     const keys = Object.keys(foundSession);
     for (let i = 0; i < keys.length; i++) {
+      const lowerKey = keys[i].toLowerCase();
+      if (excludeTerms.some(ex => lowerKey.includes(ex))) continue;
       for (let j = 0; j < searchTerms.length; j++) {
-        if (keys[i].toLowerCase().includes(searchTerms[j])) {
+        if (lowerKey.includes(searchTerms[j])) {
           return foundSession[keys[i]];
         }
       }
@@ -116,7 +118,11 @@ function extractData(garminData, isRun, onDataExtracted) {
     return 0;
   }
 
-  // Extended parameter extraction
+  // Extended parameter extraction.
+  // FIT semantics: `total_training_effect` is AEROBIC TE;
+  // `total_anaerobic_training_effect` is ANAEROBIC TE. The aerobic search
+  // excludes any 'anaerobic' key so it can never grab the anaerobic value
+  // regardless of field order in the parsed session.
   const extraStats = {
     avgHR: getStat(['avg_heart', 'average_heart', 'avg_hr']),
     maxHR: getStat(['max_heart', 'maximum_heart', 'max_hr']),
@@ -124,8 +130,8 @@ function extractData(garminData, isRun, onDataExtracted) {
     calories: getStat(['cal']),
     descent: getStat(['descent', 'total_descent']),
     avgCadence: getStat(['avg_cadence', 'avg_running_cadence', 'average_cadence']),
-    trainingEffect: getStat(['total_training_effect', 'training_effect']),
-    aerobicTE: getStat(['total_anaerobic_effect', 'anaerobic_training_effect']),
+    trainingEffect: getStat(['total_training_effect', 'training_effect'], ['anaerobic']),
+    anaerobicTE: getStat(['total_anaerobic_training_effect', 'anaerobic_training_effect', 'anaerobic']),
     hrZones: getStat(['time_in_hr_zone']) || null
   };
 
