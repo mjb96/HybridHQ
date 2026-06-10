@@ -416,6 +416,37 @@ export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
   return zones;
 }
 
+// Most recent completed performance of a given exercise ANYWHERE in the log
+// (scanning weeks high->low, then days latest-first), optionally excluding the
+// current slot. This is the Hevy-style "last time you did this exercise"
+// reference — independent of day-of-week, so it stays correct when a session is
+// performed on a different day. Returns { sets:[{w,r}], week, day, e1rm } | null.
+export function findLastPerformance(state, liftName, opts = {}) {
+  if (!state || !state.weeks || !liftName) return null;
+  const { excludeWeek, excludeDay } = opts;
+  const dayList = Array.isArray(opts.days) && opts.days.length
+    ? opts.days
+    : ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const weekNums = Object.keys(state.weeks).map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a);
+  for (const w of weekNums) {
+    const wkData = state.weeks[String(w)];
+    if (!wkData || !wkData.lifts) continue;
+    for (let i = dayList.length - 1; i >= 0; i--) {
+      const d = dayList[i];
+      if (excludeWeek != null && String(w) === String(excludeWeek) && d === excludeDay) continue;
+      const arr = wkData.lifts[d]?.[liftName];
+      if (!Array.isArray(arr)) continue;
+      const completed = arr.filter(s => isCompletedSet(s) && parseFloat(s.w) > 0 && parseInt(s.r, 10) > 0);
+      if (completed.length > 0) {
+        let e1rm = 0;
+        completed.forEach(s => { const e = epley1RM(s.w, s.r); if (e > e1rm) e1rm = e; });
+        return { sets: completed.map(s => ({ w: s.w, r: s.r })), week: w, day: d, e1rm: Math.round(e1rm) };
+      }
+    }
+  }
+  return null;
+}
+
 // ==========================================
 // TILE METRICS (PURE, TESTED)
 // Real-data computations behind the Home tiles + their drill-down trends.
