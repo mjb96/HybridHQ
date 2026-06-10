@@ -145,7 +145,6 @@ export async function loginToSupabase() {
     window.location.reload();
   }
 }
-window.loginToSupabase = loginToSupabase; 
 
 export async function checkActiveSession() {
   if (!supabaseClient) return; 
