@@ -455,6 +455,21 @@
           </div>
         </article>
 
+        <div id="runStreamSection" style="display:none;">
+          <h2 class="section-header mt-4">Latest Run — Pace</h2>
+          <article class="card-dark p-3 mb-4">
+            <div id="runPaceDistContainer"></div>
+          </article>
+          <h2 class="section-header mt-2">Latest Run — Heart Rate</h2>
+          <article class="card-dark p-3 mb-4">
+            <div id="runHrCurveContainer"></div>
+          </article>
+          <h2 class="section-header mt-2">Latest Run — Elevation</h2>
+          <article class="card-dark p-3 mb-4">
+            <div id="runElevProfileContainer"></div>
+          </article>
+        </div>
+
       </div>
 
       <div id="analytics-recovery" class="analytics-section">
@@ -517,15 +532,19 @@
             <div id="recoveryAvgRpe" class="text-lg font-heavy text-inverse">--</div>
           </article>
         </div>
-        <h2 class="section-header">Contribution Breakdown</h2>
+        <h2 class="section-header">Score Components</h2>
         <article class="card-dark p-4 mb-4">
           <div class="flex-between mb-3">
-            <span class="text-sm text-muted">Sleep Contribution</span>
-            <span id="recoverySleepContrib" class="font-heavy text-inverse">--%</span>
+            <span class="text-sm text-muted">Fatigue component <span style="font-size:0.65rem;">(inverse of avg RPE)</span></span>
+            <span id="recoveryFatigueScore" class="font-heavy text-inverse">--</span>
           </div>
           <div class="flex-between mb-3">
-            <span class="text-sm text-muted">Fatigue Contribution</span>
-            <span id="recoveryFatigueContrib" class="font-heavy text-inverse">--%</span>
+            <span class="text-sm text-muted">Rest component <span style="font-size:0.65rem;">(rest days this week)</span></span>
+            <span id="recoveryRestScore" class="font-heavy text-inverse">--</span>
+          </div>
+          <div class="flex-between mb-3">
+            <span class="text-sm text-muted">Rest days</span>
+            <span id="recoveryRestDays" class="font-heavy text-inverse">--</span>
           </div>
           <div class="flex-between">
             <span class="text-sm text-muted">Recommendation</span>
@@ -576,6 +595,50 @@
           <div id="streakDetailContainer">
             <p style="color:var(--text-muted);font-size:0.75rem;">Complete workouts to build your streak.</p>
           </div>
+        </article>
+      </div>
+
+      <div id="analytics-active-fuel" class="analytics-section">
+        <h2 class="section-header">Active Fuel</h2>
+        <div class="grid-3-col gap-2 mb-4">
+          <article class="card-dark flex-col flex-center p-2" style="border:1px solid rgba(245,158,11,0.35);">
+            <div class="text-xs text-muted mb-1">This Week</div>
+            <div id="fuelThisWeekCals" class="text-lg font-heavy text-inverse">0</div>
+          </article>
+          <article class="card-dark flex-col flex-center p-2" style="border:1px solid rgba(99,102,241,0.35);">
+            <div class="text-xs text-muted mb-1">Avg / Week</div>
+            <div id="fuelAvgCals" class="text-lg font-heavy text-inverse">0</div>
+          </article>
+          <article class="card-dark flex-col flex-center p-2" style="border:1px solid rgba(16,185,129,0.35);">
+            <div class="text-xs text-muted mb-1">Total</div>
+            <div id="fuelTotalCals" class="text-lg font-heavy text-inverse">0</div>
+          </article>
+        </div>
+        <h2 class="section-header">Weekly Calories Trend</h2>
+        <article class="card-dark p-3 mb-4">
+          <div id="fuelChartContainer"></div>
+        </article>
+      </div>
+
+      <div id="analytics-stress-balance" class="analytics-section">
+        <h2 class="section-header">Stress Balance</h2>
+        <div class="grid-2-col gap-2 mb-4">
+          <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(59,130,246,0.35);">
+            <div class="text-xs text-muted mb-1">Lifting Load Share</div>
+            <div id="stressLiftShare" class="text-lg font-heavy text-inverse">0%</div>
+          </article>
+          <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(236,72,153,0.35);">
+            <div class="text-xs text-muted mb-1">Running Load Share</div>
+            <div id="stressRunShare" class="text-lg font-heavy text-inverse">0%</div>
+          </article>
+        </div>
+        <h2 class="section-header">Weekly Load (Lift vs Run)</h2>
+        <article class="card-dark p-3 mb-4">
+          <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
+            <span style="color:#3b82f6;">● Lifting</span>
+            <span style="color:#ec4899;">● Running</span>
+          </div>
+          <div id="stressChartContainer"></div>
         </article>
       </div>
 
