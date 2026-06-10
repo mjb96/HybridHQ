@@ -2,8 +2,8 @@
 // WORKOUT VIEW
 // ==========================================
 import { getProgramById } from './state.js';
-import { CONFIG, PROGRAMS, EXERCISE_LIBRARY } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription } from './engine.js';
+import { CONFIG, EXERCISE_LIBRARY } from './constants.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, prescribeSetsForLift } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise, dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast, saveNewCustomExerciseToLibrary } from './state.js'; 
@@ -847,19 +847,15 @@ export function executeResetActiveDayMetrics() {
   appState.weeks[wk].lifts[selectedDay] = {};
   appState.weeks[wk].notes[selectedDay] = '';
 
-  const activeProgram = PROGRAMS[appState.activeProgramId] || PROGRAMS["hybrid_engine"];
+  const activeProgram = getProgramById(appState.activeProgramId);
   const blueprint = activeProgram.days?.[selectedDay];
 
   if (blueprint && blueprint.lifts) {
     blueprint.lifts.forEach(liftName => {
       try {
-        const parsedTarget = parseTargetFromDescription(blueprint.desc, liftName);
-        let setsCount = parsedTarget.sets || 3;
-
-        appState.weeks[wk].lifts[selectedDay][liftName] = [];
-        for (let i = 0; i < setsCount; i++) {
-          appState.weeks[wk].lifts[selectedDay][liftName].push({ w: '', r: (parsedTarget.reps || 10).toString(), c: false });
-        }
+        const weekModifier = activeProgram.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: "Working Sets" };
+        appState.weeks[wk].lifts[selectedDay][liftName] =
+          prescribeSetsForLift(wk, selectedDay, liftName, blueprint.desc, weekModifier);
       } catch(e) { console.warn(e); }
     });
   }
