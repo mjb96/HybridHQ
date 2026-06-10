@@ -1,7 +1,8 @@
 // ==========================================
 // ENGINE: DIAGNOSTICS, 1RM, PARSER
 // ==========================================
-import { CONFIG, PROGRAMS } from './constants.js';
+import { CONFIG } from './constants.js';
+import { devWarn } from './debug.js';
 
 let _getState;
 let _getDays;
@@ -52,7 +53,10 @@ export function parseTargetFromDescription(descString, liftName) {
 export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   let result = { suggestedWeight: '', suggestedReps: '', isStalled: false, isFatigueOverload: false, message: '' };
   
-  if (!_getState || !_getDays) return result;
+  if (!_getState || !_getDays) {
+    devWarn('computeDiagnosticForLift called before initEngine() — returning empty diagnostic.');
+    return result;
+  }
   
   const appState = _getState();
   const DEFAULT_DAYS = _getDays();
@@ -151,7 +155,10 @@ export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
 export function computeEstimated1RMs() {
   const result = { currentSq: 0, currentBp: 0, currentDl: 0, globalMaxSq: 0, globalMaxBp: 0, globalMaxDl: 0 };
   
-  if (!_getState) return result;
+  if (!_getState) {
+    devWarn('computeEstimated1RMs called before initEngine() — returning zeroed 1RMs.');
+    return result;
+  }
   
   const appState = _getState();
   
