@@ -2,18 +2,19 @@
 // UPGRADED TEMPLATES — HTML SPATIAL BUILDERS
 // ==========================================
 import { DAY_NAMES_FULL } from './constants.js';
+import { escapeHtml } from './util.js';
 
 export function buildRunPreviewRow(runsText) {
   const firstSegment = runsText.split('•')[0];
   return `<div class="flex-between dashboard-preview-row" style="font-size: 0.8rem; color: var(--accent-cyan-glow); font-weight: 700;">
     <span>🏃 Road Assignment Focus</span>
-    <span class="text-xs-muted text-truncate">${firstSegment}</span>
+    <span class="text-xs-muted text-truncate">${escapeHtml(firstSegment)}</span>
   </div>`;
 }
 
 export function buildLiftPreviewRow(displayLiftName, setsCount) {
   return `<div class="flex-between dashboard-preview-row" style="font-size: 0.8rem; color: #f1f5f9; font-weight: 700;">
-    <span>🏋️ ${displayLiftName}</span>
+    <span>🏋️ ${escapeHtml(displayLiftName)}</span>
     <span class="text-xs-muted badge-count-pill">${setsCount} Sets</span>
   </div>`;
 }
@@ -101,18 +102,18 @@ export function buildProgramOverviewHTML(prog, currentWeek) {
     <article class="card-dark p-4 mb-5 program-overview-card" style="border: 1px solid rgba(59, 130, 246, 0.3); background: linear-gradient(180deg, var(--bg-card) 0%, #0a1122 100%);">
       <div class="flex-between mb-3">
         <span class="badge-primary" style="background: rgba(34, 211, 238, 0.1); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);">
-          ✍️ By: ${dossier.creator}
+          ✍️ By: ${escapeHtml(dossier.creator)}
         </span>
-        <span class="text-xs-bold text-accent-blue tracking-wide uppercase">${dossier.focus}</span>
+        <span class="text-xs-bold text-accent-blue tracking-wide uppercase">${escapeHtml(dossier.focus)}</span>
       </div>
       
       <h3 class="text-2xl font-heavy text-inverse mb-2" style="letter-spacing: -0.5px;">
-        ${prog.name}
+        ${escapeHtml(prog.name)}
       </h3>
       
       <div class="mt-3 pt-3" style="border-top: 1px dashed var(--overlay-sm);">
         <p class="text-sm text-muted leading-relaxed mb-4">
-          ${dossier.philosophy}
+          ${escapeHtml(dossier.philosophy)}
         </p>
         <div class="flex-between text-sm py-2 border-b-glass">
           <span class="text-muted">Total Timeline</span>
@@ -142,7 +143,7 @@ export function buildWeekMatrixHTML(prog, currentWeek) {
     const isCurrent = wk === currentWeek;
     rows += `<div class="flex-between p-3 mb-2 rounded week-matrix-row ${isCurrent ? 'matrix-row-active' : ''}">
       <span class="text-sm font-bold ${isCurrent ? 'text-accent-blue' : 'text-muted'}">Week ${wk}</span>
-      <span class="text-xs font-heavy text-inverse">${mod.sets} × ${mod.reps} <span class="text-muted font-medium">— ${mod.intensityLabel}</span></span>
+      <span class="text-xs font-heavy text-inverse">${mod.sets} × ${mod.reps} <span class="text-muted font-medium">— ${escapeHtml(mod.intensityLabel)}</span></span>
     </div>`;
   }
   return `<div class="card-dark p-4">${rows}</div>`;
@@ -154,18 +155,18 @@ export function buildDaysSplitHTML(prog) {
   for (const [dayKey, day] of Object.entries(prog.days)) {
     const liftsHTML = (day.lifts && day.lifts.length > 0)
       ? `<div class="text-sm-label mt-2 mb-2">LIFTING DISCIPLINE TIERS</div>` +
-        day.lifts.map(l => `<div class="text-sm text-inverse day-split-lift-item">🔹 ${l}</div>`).join('')
+        day.lifts.map(l => `<div class="text-sm text-inverse day-split-lift-item">🔹 ${escapeHtml(l)}</div>`).join('')
       : '';
     const runsHTML = (day.runs && day.runs !== "Rest")
-      ? `<div class="text-sm-label mt-3 mb-2" style="color: var(--accent-cyan-glow)">AEROBIC COMPONENT TARGET</div><div class="text-xs-muted day-split-run-item">🏃 ${day.runs}</div>`
+      ? `<div class="text-sm-label mt-3 mb-2" style="color: var(--accent-cyan-glow)">AEROBIC COMPONENT TARGET</div><div class="text-xs-muted day-split-run-item">🏃 ${escapeHtml(day.runs)}</div>`
       : '';
     html += `<div class="card-dark p-4 flex-col">
       <div class="flex-between mb-2">
-        <span class="badge-primary" style="background:${day.color || 'var(--accent-blue)'}">${day.badge || 'Rest'}</span>
+        <span class="badge-primary" style="background:${day.color || 'var(--accent-blue)'}">${escapeHtml(day.badge || 'Rest')}</span>
         <span class="text-xs-muted font-heavy text-uppercase tracking-wider">${DAY_NAMES_FULL[dayKey] || dayKey}</span>
       </div>
-      <div class="text-lg font-heavy text-inverse mb-1">${day.title || 'Rest'}</div>
-      <div class="text-xs-muted mb-3 leading-snug">${day.desc || ''}</div>
+      <div class="text-lg font-heavy text-inverse mb-1">${escapeHtml(day.title || 'Rest')}</div>
+      <div class="text-xs-muted mb-3 leading-snug">${escapeHtml(day.desc || '')}</div>
       <div class="split-drill-deck">${liftsHTML}${runsHTML}</div>
     </div>`;
   }
@@ -194,9 +195,9 @@ export function buildLibraryCardHTML(prog, id, isCustom, isActive) {
         <div class="flex gap-2">${activeBadge}${typeBadge}</div>
         <span class="text-xs-bold text-muted">${prog.totalWeeks} Weeks</span>
       </div>
-      <h3 class="text-lg font-heavy text-inverse mb-1">${prog.name}</h3>
+      <h3 class="text-lg font-heavy text-inverse mb-1">${escapeHtml(prog.name)}</h3>
       <p class="text-xs text-muted mb-3" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
-        ${prog.dossier?.philosophy || 'No description provided.'}
+        ${escapeHtml(prog.dossier?.philosophy || 'No description provided.')}
       </p>
       <div class="flex gap-2 mt-2 pt-3" style="border-top: 1px dashed var(--overlay-sm);">
         ${actionsHTML}
