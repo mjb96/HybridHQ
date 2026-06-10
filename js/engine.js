@@ -120,8 +120,6 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
 
 // ==========================================
 // SET/REP PRESCRIPTION
-// Owns the per-lift prescription decision: inline-spec vs weekly modifier,
-// taper override, and stall/fatigue set reduction. Returns the sets array.
 // ==========================================
 export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
   const parsedTarget = parseTargetFromDescription(desc, liftName);
@@ -161,7 +159,6 @@ export function computeEstimated1RMs() {
   }
   
   const appState = _getState();
-  
   if (!appState || !appState.weeks) return result;
   
   const wk = appState.currentWeek || "1";
@@ -200,13 +197,6 @@ export function computeEstimated1RMs() {
   return result;
 }
 
-// ==========================================
-// PER-EXERCISE PR (ESTIMATED 1RM) AGGREGATION
-// Scans all logged sets and raises per-exercise PRs. Mutates and returns
-// `stats` in place; only ever RAISES maxes (sticky by design — a PR is not
-// lost if the set that produced it is later deleted). Verbatim from the
-// former workout.updateExercisePRs(); state and stats are now parameters.
-// ==========================================
 export function computeExercisePRs(state, stats = {}) {
   for (let wKey in state.weeks) {
     const weekObj = state.weeks[wKey];
@@ -249,14 +239,6 @@ export function computeExercisePRs(state, stats = {}) {
   return stats;
 }
 
-// ==========================================
-// BIG-3 ESTIMATED 1RM (SHARED, PURE)
-// Single source of truth for the big-3 lift maxes. Replaces the inline
-// duplicate that lived in the Top Lifts dashboard tile. All functions are
-// pure (state passed explicitly) so they unit-test without init order.
-// ==========================================
-
-// Epley estimated 1RM. Returns 0 for non-positive weight/reps.
 export function epley1RM(weight, reps) {
   const w = parseFloat(weight) || 0;
   const r = parseInt(reps, 10) || 0;
@@ -264,14 +246,10 @@ export function epley1RM(weight, reps) {
   return w * (1 + r / 30);
 }
 
-// True when a logged set is marked complete (tolerates legacy truthy forms).
 function isCompletedSet(s) {
   return !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1));
 }
 
-// Classify a lift name into 'squat' | 'bench' | 'deadlift' | null (fuzzy,
-// case-insensitive substring match). Mirrors the former tile keyword lists
-// and order (squat → bench → deadlift); the keyword sets do not overlap.
 export function classifyBig3Lift(name) {
   if (!name) return null;
   const n = String(name).toLowerCase();
@@ -284,12 +262,6 @@ export function classifyBig3Lift(name) {
   return null;
 }
 
-// Per-week + aggregate best estimated 1RM for the big-3, fuzzy-matched.
-// Pure: takes state explicitly. Shape:
-// { squat: { current, allTime, byWeek: { '1': e1rm, ... } }, bench: {...}, deadlift: {...} }
-//   current  — best e1RM in state.currentWeek
-//   allTime  — best e1RM across every logged week
-//   byWeek   — best e1RM keyed by week string (for progression charts)
 export function computeBig3Progression(state) {
   const cats = ['squat', 'bench', 'deadlift'];
   const out = {};
@@ -326,8 +298,6 @@ export function computeBig3Progression(state) {
   return out;
 }
 
-// Thin wrapper for the Top Lifts glance tile: best all-time e1RM per big-3.
-// Mirrors the previous inline tile behaviour (max across all weeks).
 export function computeBig3Maxes(state) {
   const prog = computeBig3Progression(state);
   return {
@@ -337,18 +307,6 @@ export function computeBig3Maxes(state) {
   };
 }
 
-// ==========================================
-// .FIT PER-RECORD STREAM HELPERS (PURE)
-// Operate on column-oriented stream objects: parallel numeric arrays keyed by
-// metric (t, distKm, hr, altitude, cadence, power, paceSecPerKm, ...). They
-// are unit-agnostic — transforming whatever numeric arrays they're handed.
-// Storage lives in db.js (IndexedDB); these are the testable transforms the
-// analytics charts will consume. None of this touches the synced state blob.
-// ==========================================
-
-// Uniformly downsample every parallel array in a stream to at most maxPoints
-// samples, preserving index alignment across metrics and always keeping the
-// final sample. Scalars (type/version/lengthUnit/...) pass through untouched.
 export function downsampleStream(stream, maxPoints = 500) {
   if (!stream || typeof stream !== 'object') return stream;
   const arrays = Object.keys(stream).filter(k => Array.isArray(stream[k]));
@@ -369,9 +327,6 @@ export function downsampleStream(stream, maxPoints = 500) {
   return out;
 }
 
-// Per-sample pace (seconds per km) from cumulative distance (km) and elapsed
-// time (s). pace[i] uses the delta from sample i-1 -> i; pace[0] mirrors
-// pace[1]. Non-advancing samples (pauses) yield 0.
 export function derivePaceSeries(distKm, elapsedSec) {
   const n = Math.min(distKm?.length || 0, elapsedSec?.length || 0);
   const out = new Array(n).fill(0);
@@ -384,7 +339,6 @@ export function derivePaceSeries(distKm, elapsedSec) {
   return out;
 }
 
-// Total positive elevation change across an altitude series (unit in = unit out).
 export function elevationGain(altitude) {
   let gain = 0;
   for (let i = 1; i < (altitude?.length || 0); i++) {
@@ -394,11 +348,6 @@ export function elevationGain(altitude) {
   return gain;
 }
 
-// Seconds spent in each HR zone. zoneFloors is an ascending array of lower bpm
-// bounds, one per zone (e.g. [0,114,133,152,171] for Z1..Z5); a sample falls
-// in the highest zone whose floor it meets. secPerSample is the seconds
-// attributed to each sample (a scalar, or a per-sample array). Zero/blank HR
-// samples are skipped.
 export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
   const floors = Array.isArray(zoneFloors) ? zoneFloors : [];
   const zones = new Array(floors.length).fill(0);
@@ -416,11 +365,6 @@ export function computeTimeInHrZones(hr, secPerSample, zoneFloors) {
   return zones;
 }
 
-// Most recent completed performance of a given exercise ANYWHERE in the log
-// (scanning weeks high->low, then days latest-first), optionally excluding the
-// current slot. This is the Hevy-style "last time you did this exercise"
-// reference — independent of day-of-week, so it stays correct when a session is
-// performed on a different day. Returns { sets:[{w,r}], week, day, e1rm } | null.
 export function findLastPerformance(state, liftName, opts = {}) {
   if (!state || !state.weeks || !liftName) return null;
   const { excludeWeek, excludeDay } = opts;
@@ -447,16 +391,8 @@ export function findLastPerformance(state, liftName, opts = {}) {
   return null;
 }
 
-// ==========================================
-// TILE METRICS (PURE, TESTED)
-// Real-data computations behind the Home tiles + their drill-down trends.
-// All pure: state/program/days passed explicitly.
-// ==========================================
-
 function clamp01to100(v) { return Math.max(0, Math.min(100, v)); }
 
-// True when a (week,day) has any completed activity (a completed set or a
-// logged run distance). Used for rest-day / active-day counting.
 function dayHasActivity(weekData, day) {
   if (!weekData) return false;
   const rDist = parseFloat(weekData.runs?.[day]?.dist) || 0;
@@ -468,10 +404,6 @@ function dayHasActivity(weekData, day) {
   return false;
 }
 
-// Live streak view from the real streakData store ({current, longest,
-// lastActivityDate}). The stored `current` only stays "live" if the last
-// activity was today or yesterday; otherwise the current streak is broken (0)
-// while the all-time longest is retained. Pure — `now` is injectable.
 export function computeStreakView(streakData, now = new Date()) {
   const sd = streakData || {};
   const longest = sd.longest || 0;
@@ -491,11 +423,6 @@ export function computeStreakView(streakData, now = new Date()) {
   };
 }
 
-// Recovery score from real signals only (no fabricated sleep data):
-//   fatigueScore = inverse of this week's average RPE (higher RPE -> lower)
-//   restScore    = rest days this week (3+ rest days -> full)
-//   score        = 0.7*fatigue + 0.3*rest, clamped 0..100
-// Returns hasData:false when no RPE has been logged this week.
 export function computeRecoveryScore(state, days) {
   const wk = state?.currentWeek || '1';
   const weekData = state?.weeks?.[wk];
@@ -538,7 +465,6 @@ export function computeRecoveryScore(state, days) {
   };
 }
 
-// Per-week total calories (run + gym) for weeks 1..maxWeek.
 export function computeWeeklyCaloriesSeries(state, days, maxWeek) {
   const out = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -556,8 +482,6 @@ export function computeWeeklyCaloriesSeries(state, days, maxWeek) {
   return out;
 }
 
-// Parse "MM:SS", "H:MM:SS", or "M:SS" into minutes (float). 0 if unparseable.
-// A bare number is treated as minutes.
 export function parseDurationToMinutes(timeStr) {
   if (timeStr == null || timeStr === '') return 0;
   const parts = String(timeStr).trim().split(':').map(p => Number(p));
@@ -565,15 +489,11 @@ export function parseDurationToMinutes(timeStr) {
   let sec = 0;
   if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
   else if (parts.length === 2) sec = parts[0] * 60 + parts[1];
-  else if (parts.length === 1) return parts[0]; // bare number = minutes
+  else if (parts.length === 1) return parts[0]; 
   else return 0;
   return sec / 60;
 }
 
-// Per-week training load split into lift vs run, weeks 1..maxWeek, using
-// session-RPE (Foster's sRPE = RPE x duration_min) in arbitrary units (AU).
-// Lifts and runs share the same unit so they're directly comparable. A session
-// contributes 0 if it lacks RPE or duration -- no fabricated constants.
 export function computeWeeklyLoadSeries(state, days, maxWeek) {
   const lift = [], run = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -597,11 +517,6 @@ export function computeWeeklyLoadSeries(state, days, maxWeek) {
   return { lift, run };
 }
 
-// Acute:Chronic Workload Ratio readiness. acute = current-week load; chronic =
-// mean weekly load over the trailing chronicWeeks (default 4, current week
-// included), counting only weeks that had load. ACWR's recognised sweet spot is
-// ~0.8-1.3; spiking above it raises injury risk (lower readiness), very low
-// ratios indicate detraining. Maps ACWR -> 0..100 readiness.
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
   const acute = loadByWeek[cw - 1] || 0;
@@ -624,8 +539,6 @@ export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   };
 }
 
-// Goal adherence: cumulative completion % across ELAPSED weeks (1..currentWeek)
-// -- of everything scheduled so far, how much is actually done.
 export function computeGoalAdherence(state, program, days, currentWeek) {
   const cw = parseInt(currentWeek, 10) || 1;
   const dayList = Array.isArray(days) ? days : [];
@@ -647,7 +560,6 @@ export function computeGoalAdherence(state, program, days, currentWeek) {
   return { pct: total > 0 ? Math.round((done / total) * 100) : 0, total, done, elapsedWeeks: cw };
 }
 
-// Program milestones derived from its length (replaces hardcoded weeks 6/12).
 export function computeDynamicMilestones(totalWeeks) {
   const t = parseInt(totalWeeks, 10) || 12;
   const mk = (frac, label) => ({ week: Math.max(1, Math.round(t * frac)), label });
@@ -659,7 +571,6 @@ export function computeDynamicMilestones(totalWeeks) {
   ];
 }
 
-// Weekly avg/max HR from run sessions, weeks 1..maxWeek.
 export function computeWeeklyHrSeries(state, days, maxWeek) {
   const avgHr = [], maxHr = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -678,7 +589,6 @@ export function computeWeeklyHrSeries(state, days, maxWeek) {
   return { avgHr, maxHr };
 }
 
-// Weekly average aerobic training effect from run sessions, weeks 1..maxWeek.
 export function computeWeeklyTrainingEffectSeries(state, days, maxWeek) {
   const out = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -694,9 +604,6 @@ export function computeWeeklyTrainingEffectSeries(state, days, maxWeek) {
   return out;
 }
 
-// Per-week completion percentage (0..100) for weeks 1..maxWeek, using the same
-// scheduled-run + logged-set accounting as the Home progress bar. `program` is
-// the active program object (passed in to keep this pure).
 export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
   const out = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -723,9 +630,6 @@ export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
   return out;
 }
 
-// ==========================================
-// DELOAD SUGGESTION MATCH STUB
-// ==========================================
 export function shouldSuggestDeload() {
   return { suggest: false, reason: '' };
 }
@@ -740,17 +644,19 @@ export function getExerciseHistoryLog(state, liftName) {
   let bestE1RM = 0;
   let bestVolume = 0;
 
-  const weekNums = Object.keys(state.weeks).map(Number).sort((a,b) => b - a);
+  // Added safety checks for parsing keys
+  const weekNums = Object.keys(state.weeks).map(Number).filter(n => !isNaN(n)).sort((a,b) => b - a);
   
   for(let wk of weekNums) {
-    const wData = state.weeks[wk];
+    const wData = state.weeks[String(wk)];
     if(!wData || !wData.lifts) continue;
     
     for(let d in wData.lifts) {
       const sets = wData.lifts[d][liftName];
-      if(!sets) continue;
+      if(!sets || !Array.isArray(sets)) continue;
       
-      const completedSets = sets.filter(s => s && s.c === true);
+      // FIX: Improved truthy evaluation to capture legacy data stored as strings
+      const completedSets = sets.filter(s => !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)));
       if(completedSets.length === 0) continue;
 
       let vol = 0;
