@@ -889,6 +889,30 @@
     </div>
   </div>
 
+  <div id="exerciseHistoryModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+    <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+      <h2 class="text-xl font-heavy text-inverse mb-2" id="historyModalTitle">Exercise History</h2>
+      
+      <div class="grid-2-col gap-2 mb-4">
+        <article class="card-dark p-3 text-center" style="border: 1px solid var(--overlay-sm);">
+          <div class="text-xs text-muted mb-1">Best Vol</div>
+          <div class="text-lg font-heavy text-accent-blue" id="historyBestVolume">0 kg</div>
+        </article>
+        <article class="card-dark p-3 text-center" style="border: 1px solid var(--overlay-sm);">
+          <div class="text-xs text-muted mb-1">Best e1RM</div>
+          <div class="text-lg font-heavy text-main" id="historyBestE1RM">0 kg</div>
+        </article>
+      </div>
+
+      <div id="historyModalLog" class="flex-col gap-3">
+        </div>
+
+      <div class="flex gap-2 mt-4">
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-exercise-history">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="weekAdvanceModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="weekAdvanceMessage">
     <div class="modal-content" style="background: var(--bg-dark); padding: 24px; border-radius: 12px; max-width: 350px; text-align: center; border: 1px solid var(--border-light);">
       <h3 class="text-xl font-heavy text-main mb-3">Time to Advance?</h3>
