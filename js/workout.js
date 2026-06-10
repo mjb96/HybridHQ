@@ -40,7 +40,6 @@ export function openExerciseHistoryModal(liftName) {
   const bestE1RMEl = document.getElementById('historyBestE1RM');
   const logContainer = document.getElementById('historyModalLog');
 
-  // FIX: Added explicit console warning for missing HTML
   if (!modal || !logContainer) {
     console.error("Exercise History Modal HTML missing from index.html! Ensure <div id='exerciseHistoryModal'> exists.");
     showToast("Error: Modal structure missing. Check index.html.", true);
@@ -422,14 +421,12 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   let targetW = wInput.value;
   let targetR = rInput.value;
 
+  // INCREMENT 6: Unified history look-up
   if (!targetW || !targetR) {
-    const pastWkNum = parseInt(wk, 10) - 1;
-    if (pastWkNum >= 1 && appState.weeks) {
-      const historicalSet = appState.weeks[pastWkNum.toString()]?.lifts?.[selectedDay]?.[liftName]?.[sIdx];
-      if (historicalSet && historicalSet.w && historicalSet.r) {
-        targetW = historicalSet.w;
-        targetR = historicalSet.r;
-      }
+    const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
+    if (lastPerf && lastPerf.sets[sIdx]) {
+      if (!targetW && lastPerf.sets[sIdx].w) targetW = lastPerf.sets[sIdx].w;
+      if (!targetR && lastPerf.sets[sIdx].r) targetR = lastPerf.sets[sIdx].r;
     }
   }
 
@@ -590,14 +587,15 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       const liftName = exCard ? exCard.getAttribute('data-liftname') : null;
       const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
       
-      const pastWkNum = parseInt(wk, 10) - 1;
-      if (pastWkNum >= 1 && appState.weeks && liftName) {
-        const historicalSet = appState.weeks[pastWkNum.toString()]?.lifts?.[selectedDay]?.[liftName]?.[sIdx];
-        if (historicalSet && historicalSet.w && historicalSet.r) {
-          if (!wInput.value) wInput.value = historicalSet.w;
-          if (!rInput.value) rInput.value = historicalSet.r;
+      // INCREMENT 6: Unified history look-up
+      if (liftName) {
+        const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
+        if (lastPerf && lastPerf.sets[sIdx]) {
+          if (!wInput.value && lastPerf.sets[sIdx].w) wInput.value = lastPerf.sets[sIdx].w;
+          if (!rInput.value && lastPerf.sets[sIdx].r) rInput.value = lastPerf.sets[sIdx].r;
         }
       }
+
       if (!wInput.value) wInput.value = "40";
       if (!rInput.value) rInput.value = "10";
     }
@@ -656,16 +654,15 @@ export function applyQuickFillModifier(btnNode, typeModifier, sIdx) {
     const exCard = btnNode.closest('.cockpit-exercise');
     if (exCard) {
       const liftName = exCard.getAttribute('data-liftname');
-      const wkNum = parseInt(appState.currentWeek, 10);
-      if (wkNum > 1 && appState.weeks) {
-        const prevWeekData = appState.weeks[(wkNum - 1).toString()];
-        if (prevWeekData && prevWeekData.lifts?.[selectedDay]?.[liftName]) {
-          const matchedSet = prevWeekData.lifts[selectedDay][liftName][sIdx];
-          if (matchedSet) {
-            baseW = parseFloat(matchedSet.w) || 0;
-            baseR = parseInt(matchedSet.r, 10) || 0;
-          }
-        }
+      
+      // INCREMENT 6: Unified history look-up
+      const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: appState.currentWeek, excludeDay: selectedDay, days: _getDays() });
+      if (lastPerf && lastPerf.sets[sIdx]) {
+        baseW = parseFloat(lastPerf.sets[sIdx].w) || baseW;
+        baseR = parseInt(lastPerf.sets[sIdx].r, 10) || baseR;
+      } else {
+        // Fallback: If no data found for this set, do nothing but alert the user.
+        showToast("No previous data found for this set.");
       }
     }
   } else if (typeModifier === 'p25') baseW += (CONFIG.weightIncrement || 2.5);
@@ -779,7 +776,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
   else if (action === 'open-exercise-history') {
-    e.preventDefault(); // FIX: added preventDefault so the button is completely decoupled
+    e.preventDefault();
     openExerciseHistoryModal(liftName);
   }
   else if (action === 'close-exercise-history') closeExerciseHistoryModal();
