@@ -30,9 +30,6 @@ export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn
   initSessionModals(getStateFn, getSelectedDayFn, saveStateFn, switchTabFn, renderWorkout, updateExercisePRs);
 }
 
-// ==========================================
-// INCREMENT 4: HISTORY MODAL LOGIC
-// ==========================================
 export function openExerciseHistoryModal(liftName) {
   const modal = document.getElementById('exerciseHistoryModal');
   const titleEl = document.getElementById('historyModalTitle');
@@ -82,9 +79,6 @@ export function closeExerciseHistoryModal() {
   if (modal) modal.classList.remove('active');
 }
 
-// ==========================================
-// RENDER
-// ==========================================
 export function renderWorkout() {
   if (!_getState || !_getSelectedDay) return;
   
@@ -326,7 +320,9 @@ export function renderWorkout() {
     const setsArr = loggedLiftsData[liftName];
     if (!Array.isArray(setsArr)) continue;
     
-    const isCompleted = setsArr.length > 0 && setsArr.every(s => s && s.c);
+    // INCREMENT WARMUP: Exercise "DONE" status strictly ignores warmups
+    const workingSetsArr = setsArr.filter(s => !s.isWarmup);
+    const isCompleted = workingSetsArr.length > 0 && workingSetsArr.every(s => s && s.c);
     const isCompletedClass = isCompleted ? 'completed' : '';
 
     let isCollapsedClass = 'collapsed';
@@ -368,17 +364,35 @@ export function renderWorkout() {
     if (appState.exerciseStats && appState.exerciseStats[displayLiftName]) {
       historicalLineText = 'Global PR: ' + Math.round(appState.exerciseStats[displayLiftName].allTimeMax || 0) + 'kg (Est. 1RM)';
     }
-    if (lastPerf) {
-      historicalLineText = 'Last time: [ ' + lastPerf.sets.map(s => s.w + 'kg × ' + s.r).join(', ') + ' ]'
+    
+    // INCREMENT WARMUP: Historical summary explicitly reads from workingSets array
+    if (lastPerf && lastPerf.workingSets && lastPerf.workingSets.length > 0) {
+      historicalLineText = 'Last time: [ ' + lastPerf.workingSets.map(s => s.w + 'kg × ' + s.r).join(', ') + ' ]'
         + (lastPerf.e1rm ? ` · e1RM ${lastPerf.e1rm}kg` : '');
     }
 
     const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+    // INCREMENT WARMUP: Dual-Stream Indexing Implementation
+    let warmupIndex = 0;
+    let workingIndex = 0;
+
     const setsMarkup = setsArr.map((sData, sIdx) => {
-      const linkedGhostSet = (lastPerf && lastPerf.sets[sIdx]) ? lastPerf.sets[sIdx] : null;
-      return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet);
+      let linkedGhostSet = null;
+      let displayIndex = 0;
+      
+      if (sData.isWarmup) {
+        linkedGhostSet = (lastPerf && lastPerf.warmupSets && lastPerf.warmupSets[warmupIndex]) ? lastPerf.warmupSets[warmupIndex] : null;
+        displayIndex = warmupIndex;
+        warmupIndex++;
+      } else {
+        linkedGhostSet = (lastPerf && lastPerf.workingSets && lastPerf.workingSets[workingIndex]) ? lastPerf.workingSets[workingIndex] : null;
+        displayIndex = workingIndex;
+        workingIndex++;
+      }
+      
+      return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet, displayIndex);
     }).join('');
 
     try {
@@ -421,12 +435,24 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   let targetW = wInput.value;
   let targetR = rInput.value;
 
-  // INCREMENT 6: Unified history look-up
+  // INCREMENT WARMUP: Safely calculate dual-stream indices for quick logging
   if (!targetW || !targetR) {
     const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
-    if (lastPerf && lastPerf.sets[sIdx]) {
-      if (!targetW && lastPerf.sets[sIdx].w) targetW = lastPerf.sets[sIdx].w;
-      if (!targetR && lastPerf.sets[sIdx].r) targetR = lastPerf.sets[sIdx].r;
+    if (lastPerf) {
+      const sets = appState.weeks[wk].lifts[selectedDay][liftName];
+      if (sets && sets[sIdx]) {
+        const targetSet = sets[sIdx];
+        const streamIdx = targetSet.isWarmup ? 
+            sets.slice(0, sIdx).filter(s => s.isWarmup).length : 
+            sets.slice(0, sIdx).filter(s => !s.isWarmup).length;
+            
+        const sourceArr = targetSet.isWarmup ? lastPerf.warmupSets : lastPerf.workingSets;
+        
+        if (sourceArr && sourceArr[streamIdx]) {
+          if (!targetW && sourceArr[streamIdx].w) targetW = sourceArr[streamIdx].w;
+          if (!targetR && sourceArr[streamIdx].r) targetR = sourceArr[streamIdx].r;
+        }
+      }
     }
   }
 
@@ -440,7 +466,9 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
   if (!appState.weeks[wk].lifts[selectedDay][liftName]) appState.weeks[wk].lifts[selectedDay][liftName] = [];
   
-  appState.weeks[wk].lifts[selectedDay][liftName][sIdx] = { w: targetW, r: targetR, c: true };
+  appState.weeks[wk].lifts[selectedDay][liftName][sIdx].w = targetW;
+  appState.weeks[wk].lifts[selectedDay][liftName][sIdx].r = targetR;
+  appState.weeks[wk].lifts[selectedDay][liftName][sIdx].c = true;
 
   parentRow.classList.add('is-complete');
 
@@ -587,12 +615,23 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       const liftName = exCard ? exCard.getAttribute('data-liftname') : null;
       const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
       
-      // INCREMENT 6: Unified history look-up
       if (liftName) {
+        // INCREMENT WARMUP: Dual-stream index routing
         const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
-        if (lastPerf && lastPerf.sets[sIdx]) {
-          if (!wInput.value && lastPerf.sets[sIdx].w) wInput.value = lastPerf.sets[sIdx].w;
-          if (!rInput.value && lastPerf.sets[sIdx].r) rInput.value = lastPerf.sets[sIdx].r;
+        if (lastPerf) {
+          const sets = appState.weeks[wk].lifts[selectedDay][liftName];
+          if (sets && sets[sIdx]) {
+            const targetSet = sets[sIdx];
+            const streamIdx = targetSet.isWarmup ? 
+                sets.slice(0, sIdx).filter(s => s.isWarmup).length : 
+                sets.slice(0, sIdx).filter(s => !s.isWarmup).length;
+            const sourceArr = targetSet.isWarmup ? lastPerf.warmupSets : lastPerf.workingSets;
+            
+            if (sourceArr && sourceArr[streamIdx]) {
+              if (!wInput.value && sourceArr[streamIdx].w) wInput.value = sourceArr[streamIdx].w;
+              if (!rInput.value && sourceArr[streamIdx].r) rInput.value = sourceArr[streamIdx].r;
+            }
+          }
         }
       }
 
@@ -616,7 +655,11 @@ export function toggleGymCheckLoggingState(checkboxNode) {
 export function evaluateAccordionAutoFlowTransitions() {
   const expandedCard = document.querySelector('.cockpit-exercise:not(.collapsed)');
   if (!expandedCard) return;
-  const rows = Array.from(expandedCard.querySelectorAll('.cockpit-set-row'));
+  
+  // INCREMENT WARMUP: Accordion auto-flow strictly evaluates working sets
+  const rows = Array.from(expandedCard.querySelectorAll('.cockpit-set-row:not(.is-warmup)'));
+  if (rows.length === 0) return; 
+  
   const finished = rows.every(r => r.querySelector('.gym-check')?.checked);
 
   if (finished) {
@@ -639,6 +682,7 @@ export function applyQuickFillModifier(btnNode, typeModifier, sIdx) {
   if (!btnNode) return;
   const appState = _getState();
   const selectedDay = _getSelectedDay();
+  const wk = appState.currentWeek;
 
   const row = btnNode.closest('.cockpit-set-row');
   if (!row) return;
@@ -654,15 +698,25 @@ export function applyQuickFillModifier(btnNode, typeModifier, sIdx) {
     const exCard = btnNode.closest('.cockpit-exercise');
     if (exCard) {
       const liftName = exCard.getAttribute('data-liftname');
+      const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
       
-      // INCREMENT 6: Unified history look-up
-      const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: appState.currentWeek, excludeDay: selectedDay, days: _getDays() });
-      if (lastPerf && lastPerf.sets[sIdx]) {
-        baseW = parseFloat(lastPerf.sets[sIdx].w) || baseW;
-        baseR = parseInt(lastPerf.sets[sIdx].r, 10) || baseR;
-      } else {
-        // Fallback: If no data found for this set, do nothing but alert the user.
-        showToast("No previous data found for this set.");
+      // INCREMENT WARMUP: Dual-stream index routing
+      if (lastPerf) {
+        const sets = appState.weeks[wk].lifts[selectedDay][liftName];
+        if (sets && sets[sIdx]) {
+          const targetSet = sets[sIdx];
+          const streamIdx = targetSet.isWarmup ? 
+              sets.slice(0, sIdx).filter(s => s.isWarmup).length : 
+              sets.slice(0, sIdx).filter(s => !s.isWarmup).length;
+          const sourceArr = targetSet.isWarmup ? lastPerf.warmupSets : lastPerf.workingSets;
+          
+          if (sourceArr && sourceArr[streamIdx]) {
+            baseW = parseFloat(sourceArr[streamIdx].w) || baseW;
+            baseR = parseInt(sourceArr[streamIdx].r, 10) || baseR;
+          } else {
+            showToast("No previous data found for this set.");
+          }
+        }
       }
     }
   } else if (typeModifier === 'p25') baseW += (CONFIG.weightIncrement || 2.5);
@@ -705,10 +759,19 @@ export function repeatLastForExercise(liftName) {
   const last = findLastPerformance(appState, liftName, {
     excludeWeek: wk, excludeDay: selectedDay, days: _getDays()
   });
-  if (!last || !last.sets.length) { showToast('No previous performance for this lift'); return; }
+  if (!last || (!last.workingSets.length && !last.warmupSets.length)) { 
+    showToast('No previous performance for this lift'); 
+    return; 
+  }
 
   if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
-  appState.weeks[wk].lifts[selectedDay][liftName] = last.sets.map(s => ({ w: String(s.w), r: String(s.r), c: false }));
+  
+  // INCREMENT WARMUP: Reconstructs array by sequentially pushing historical warmups then working sets
+  const newSets = [];
+  if (last.warmupSets) last.warmupSets.forEach(s => newSets.push({ w: String(s.w), r: String(s.r), c: false, isWarmup: true }));
+  if (last.workingSets) last.workingSets.forEach(s => newSets.push({ w: String(s.w), r: String(s.r), c: false }));
+  
+  appState.weeks[wk].lifts[selectedDay][liftName] = newSets;
   _saveState(true);
   renderWorkout();
   showToast('Filled from last time');
@@ -724,6 +787,30 @@ export function appendCustomSetRow(btnNode, liftName) {
     appState.weeks[wk].lifts[selectedDay][liftName] = [];
   }
   appState.weeks[wk].lifts[selectedDay][liftName].push({ w: '', r: '', c: false });
+  _saveState(true);
+  renderWorkout();
+}
+
+// INCREMENT WARMUP: Splices warmup exactly after the last existing warmup
+export function appendWarmupSet(liftName) {
+  const appState = _getState();
+  const selectedDay = _getSelectedDay();
+  const wk = appState.currentWeek;
+  
+  if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
+  if (!appState.weeks[wk].lifts[selectedDay][liftName]) {
+    appState.weeks[wk].lifts[selectedDay][liftName] = [];
+  }
+  
+  const sets = appState.weeks[wk].lifts[selectedDay][liftName];
+  
+  let insertIndex = 0;
+  for (let i = 0; i < sets.length; i++) {
+    if (sets[i].isWarmup) insertIndex = i + 1;
+    else break; 
+  }
+  
+  sets.splice(insertIndex, 0, { w: '', r: '', c: false, isWarmup: true });
   _saveState(true);
   renderWorkout();
 }
@@ -773,6 +860,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'quick-modifier') applyQuickFillModifier(target, target.getAttribute('data-modifier'), sIdx);
   else if (action === 'toggle-pad') toggleQuickPad(row);
   else if (action === 'append-set') appendCustomSetRow(target, liftName);
+  else if (action === 'append-warmup-set') appendWarmupSet(liftName); // INCREMENT WARMUP ROUTER
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
   else if (action === 'open-exercise-history') {
