@@ -231,6 +231,12 @@
         <button class="day-pill" data-action="set-day" data-day="sun">Sun (Rest)</button>
       </nav>
 
+      <div id="cockpitSessionBar" class="flex gap-2 mb-1" style="align-items:center;">
+        <span class="set-num-lbl" style="color:rgba(255,255,255,0.5);white-space:nowrap;">Today's session:</span>
+        <select id="cockpitSessionSelect" aria-label="Session selector" style="flex:1;font-size:0.8rem;padding:5px 8px;background:var(--bg-card,#0a1122);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;"></select>
+      </div>
+      <div id="cockpitSessionMoved" style="display:none;font-size:0.65rem;color:var(--accent-amber);margin-bottom:8px;"></div>
+
       <button id="startWorkoutBtn" class="btn-action-block btn-green mb-3" data-action="start-timer">Start Workout</button>
 
       <div class="session-timer-bar" id="workoutDurationBar" role="timer">
