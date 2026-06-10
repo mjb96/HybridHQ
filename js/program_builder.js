@@ -2,6 +2,7 @@
 // PROGRAM BUILDER LOGIC (program_builder.js)
 // ==========================================
 import { saveStateToLocalStorage, getProgramById } from './state.js';
+import { escapeHtml } from './util.js';
 
 let activeBuilderId = null;
 
@@ -30,8 +31,8 @@ function renderBuilderUI(program) {
   container.innerHTML = `
     <button class="subview-back-btn" data-action="close-builder">← Back to Library</button>
     <div class="card-dark p-4 mb-4">
-      <h2 class="text-xl font-heavy text-inverse">${program.name}</h2>
-      <p class="text-sm text-muted">${program.dossier?.focus || 'Custom Program'}</p>
+      <h2 class="text-xl font-heavy text-inverse">${escapeHtml(program.name)}</h2>
+      <p class="text-sm text-muted">${escapeHtml(program.dossier?.focus || 'Custom Program')}</p>
     </div>
     <div id="weeksContainer"></div>
     <button class="btn-action-block btn-blue" data-action="add-week">+ Add Week</button>
@@ -63,12 +64,12 @@ function renderDay(day, wIdx, dIdx) {
   return `
     <div class="p-3 mb-3" style="border: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2); border-radius: 8px;">
       <div class="flex-between mb-3">
-        <input type="text" class="text-sm font-bold" value="${day.dayName || 'Day'}" data-action="update-day-name" data-w="${wIdx}" data-d="${dIdx}" style="background: transparent; border: none; color: var(--accent-blue); outline: none; border-bottom: 1px dashed var(--accent-blue); border-radius: 0; padding: 2px;">
+        <input type="text" class="text-sm font-bold" value="${escapeHtml(day.dayName || 'Day')}" data-action="update-day-name" data-w="${wIdx}" data-d="${dIdx}" style="background: transparent; border: none; color: var(--accent-blue); outline: none; border-bottom: 1px dashed var(--accent-blue); border-radius: 0; padding: 2px;">
         <button class="btn-pad" style="padding: 4px 8px; font-size: 0.7rem;" data-action="remove-day" data-w="${wIdx}" data-d="${dIdx}">✕</button>
       </div>
 
       <div class="mb-3">
-        <input type="text" value="${day.runs || 'Rest'}" data-action="update-day-field" data-field="runs" data-w="${wIdx}" data-d="${dIdx}" placeholder="Run Target (e.g. 5km Easy)" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--overlay-sm); color: var(--accent-cyan); padding: 6px; border-radius: 4px; font-size: 0.8rem;">
+        <input type="text" value="${escapeHtml(day.runs || 'Rest')}" data-action="update-day-field" data-field="runs" data-w="${wIdx}" data-d="${dIdx}" placeholder="Run Target (e.g. 5km Easy)" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--overlay-sm); color: var(--accent-cyan); padding: 6px; border-radius: 4px; font-size: 0.8rem;">
       </div>
       
       <div class="flex-col gap-2 mb-3">
@@ -78,7 +79,7 @@ function renderDay(day, wIdx, dIdx) {
               <button class="btn-pad tactile-scale" style="padding: 2px 6px; font-size: 0.6rem; min-width: 0;" data-action="move-ex-up" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" ${eIdx === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
               <button class="btn-pad tactile-scale" style="padding: 2px 6px; font-size: 0.6rem; min-width: 0;" data-action="move-ex-down" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" ${eIdx === day.exercises.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
             </div>
-            <input type="text" value="${ex.name || ''}" data-action="update-ex" data-field="name" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" placeholder="Exercise Name" style="flex: 2;">
+            <input type="text" value="${escapeHtml(ex.name || '')}" data-action="update-ex" data-field="name" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" placeholder="Exercise Name" style="flex: 2;">
             <input type="number" value="${ex.targetSets || 3}" data-action="update-ex" data-field="targetSets" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" title="Sets" style="flex: 1; text-align: center;">
             <span class="text-muted text-xs">x</span>
             <input type="number" value="${ex.targetReps || 10}" data-action="update-ex" data-field="targetReps" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" title="Reps" style="flex: 1; text-align: center;">
