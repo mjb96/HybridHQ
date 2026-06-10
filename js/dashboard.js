@@ -27,7 +27,7 @@
 //   state:       'loaded'|'empty'|'error'
 // }
 
-import { computeBig3Maxes } from './engine.js';
+import { computeBig3Maxes, computeStreakView, computeRecoveryScore } from './engine.js';
 
 // ==========================================
 // TILE TYPE ENUM
@@ -255,7 +255,7 @@ export const TILE_REGISTRY = [
     icon:      '🔥',
     label:     'Active Fuel',
     accentVar: '--color-amber',
-    navTarget: 'running',
+    navTarget: 'active-fuel',
     order:     5,
     renderData(appState, defaultDays) {
       try {
@@ -318,7 +318,7 @@ export const TILE_REGISTRY = [
     icon:      '⚖️',
     label:     'Stress Balance',
     accentVar: '--color-amber',
-    navTarget: 'recovery',
+    navTarget: 'stress-balance',
     order:     7,
     renderData(appState, defaultDays) {
       try {
@@ -370,35 +370,17 @@ export const TILE_REGISTRY = [
     order:     8,
     renderData(appState, defaultDays) {
       try {
-        const wk = appState.currentWeek || '1';
-        const weekData = appState.weeks?.[wk];
-        if (!weekData) return { hero: '--', sub: 'No data yet', tag: 'N/A', tagColor: 'var(--text-secondary)', state: 'empty' };
-
-        // Recovery score: inverse of accumulated fatigue (average weekly RPE)
-        let totalRpe = 0, rpeCount = 0;
-        defaultDays.forEach(d => {
-          const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-          const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-          if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
-          if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
-        });
-
-        if (rpeCount === 0) return { hero: '--', sub: 'Log sessions for score', tag: 'N/A', tagColor: 'var(--text-secondary)', state: 'empty' };
-
-        const avgRpe = totalRpe / rpeCount;
-        // Map RPE 1-10 to recovery 100-0 (higher RPE = lower recovery)
-        const score = Math.round(Math.max(0, Math.min(100, ((10 - avgRpe) / 9) * 100)));
-        const sleepContrib = Math.round(score * 0.4);
-        const fatigueContrib = Math.round(score * 0.6);
-
-        let tag = `${score}%`, tagColor = 'var(--color-green)';
-        if (score < 40) tagColor = 'var(--color-red)';
-        else if (score < 70) tagColor = 'var(--color-amber)';
-
+        const r = computeRecoveryScore(appState, defaultDays);
+        if (!r.hasData) {
+          return { hero: '--', sub: 'Log sessions for score', tag: 'N/A', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        let tagColor = 'var(--color-green)';
+        if (r.score < 40) tagColor = 'var(--color-red)';
+        else if (r.score < 70) tagColor = 'var(--color-amber)';
         return {
-          hero:  `${score}%`,
-          sub:   `Sleep ~${sleepContrib}%  Fatigue ~${fatigueContrib}%`,
-          tag,
+          hero:  `${r.score}%`,
+          sub:   `Fatigue ${r.fatigueScore} · Rest ${r.restScore}`,
+          tag:   `${r.score}%`,
           tagColor,
           state: 'loaded',
         };
@@ -465,71 +447,18 @@ export const TILE_REGISTRY = [
     accentVar: '--color-amber',
     navTarget: 'streak',
     order:     10,
-    renderData(appState, defaultDays) {
+    renderData(appState) {
       try {
-        // Build a sorted list of dates with any completed activity
-        const activeDates = new Set();
-        for (const wk in appState.weeks || {}) {
-          const wkData = appState.weeks[wk];
-          defaultDays.forEach(d => {
-            const rDist = parseFloat(wkData?.runs?.[d]?.dist) || 0;
-            let completedSets = 0;
-            const dayLifts = wkData?.lifts?.[d] || {};
-            for (const lift in dayLifts) {
-              if (Array.isArray(dayLifts[lift])) {
-                completedSets += dayLifts[lift].filter(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
-              }
-            }
-            if (rDist > 0 || completedSets > 0) {
-              // Use week number & day position as a proxy since we don't store absolute dates per set
-              // We'll use the week-day combo with a deterministic offset from weekStartedAt if available
-              const weekNum = parseInt(wk, 10) || 1;
-              const dayIdx  = defaultDays.indexOf(d);
-              // Generate an approximate ISO date string
-              const base  = appState.weekStartedAt ? new Date(appState.weekStartedAt) : new Date();
-              const approx = new Date(base);
-              approx.setDate(base.getDate() - ((parseInt(appState.currentWeek, 10) - weekNum) * 7) + dayIdx);
-              activeDates.add(approx.toISOString().slice(0, 10));
-            }
-          });
+        const sv = computeStreakView(appState.streakData);
+        if (!sv.hasData) {
+          return { hero: '0d', sub: 'Longest: 0 days', tag: 'Start today', tagColor: 'var(--color-blue)', state: 'empty' };
         }
-
-        // Compute current streak (consecutive days back from today)
-        const today = new Date();
-        let streak = 0, longest = 0, tempStreak = 0;
-        const sorted = [...activeDates].sort();
-
-        // Simple consecutive-day streak from today going backwards
-        for (let i = 0; i <= 90; i++) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const ds = d.toISOString().slice(0, 10);
-          if (activeDates.has(ds)) {
-            if (i === streak) streak++;
-          } else {
-            if (i === streak) break;
-          }
-        }
-
-        // Longest streak over all data
-        let prev = null;
-        sorted.forEach(ds => {
-          if (prev) {
-            const diff = (new Date(ds) - new Date(prev)) / 86400000;
-            tempStreak = diff === 1 ? tempStreak + 1 : 1;
-          } else {
-            tempStreak = 1;
-          }
-          if (tempStreak > longest) longest = tempStreak;
-          prev = ds;
-        });
-
         return {
-          hero:  `${streak}d`,
-          sub:   `Longest: ${longest} days`,
-          tag:   streak > 0 ? `🔥 ${streak}` : 'Start today',
-          tagColor: streak >= 7 ? 'var(--color-amber)' : 'var(--color-blue)',
-          state: activeDates.size > 0 ? 'loaded' : 'empty',
+          hero:  `${sv.current}d`,
+          sub:   `Longest: ${sv.longest} day${sv.longest !== 1 ? 's' : ''}`,
+          tag:   sv.current > 0 ? `🔥 ${sv.current}` : (sv.broken ? 'Streak reset' : 'Start today'),
+          tagColor: sv.current >= 7 ? 'var(--color-amber)' : 'var(--color-blue)',
+          state: 'loaded',
         };
       } catch {
         return { hero: '0d', sub: 'Longest: 0 days', state: 'error' };
