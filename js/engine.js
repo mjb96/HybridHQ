@@ -250,6 +250,94 @@ export function computeExercisePRs(state, stats = {}) {
 }
 
 // ==========================================
+// BIG-3 ESTIMATED 1RM (SHARED, PURE)
+// Single source of truth for the big-3 lift maxes. Replaces the inline
+// duplicate that lived in the Top Lifts dashboard tile. All functions are
+// pure (state passed explicitly) so they unit-test without init order.
+// ==========================================
+
+// Epley estimated 1RM. Returns 0 for non-positive weight/reps.
+export function epley1RM(weight, reps) {
+  const w = parseFloat(weight) || 0;
+  const r = parseInt(reps, 10) || 0;
+  if (w <= 0 || r <= 0) return 0;
+  return w * (1 + r / 30);
+}
+
+// True when a logged set is marked complete (tolerates legacy truthy forms).
+function isCompletedSet(s) {
+  return !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1));
+}
+
+// Classify a lift name into 'squat' | 'bench' | 'deadlift' | null (fuzzy,
+// case-insensitive substring match). Mirrors the former tile keyword lists
+// and order (squat → bench → deadlift); the keyword sets do not overlap.
+export function classifyBig3Lift(name) {
+  if (!name) return null;
+  const n = String(name).toLowerCase();
+  const squat = ['back squat', 'squat', 'front squat'];
+  const bench = ['bench press', 'incline bench press', 'incline barbell press'];
+  const dead  = ['deadlift', 'romanian deadlift', 'deficit deadlift'];
+  if (squat.some(k => n.includes(k))) return 'squat';
+  if (bench.some(k => n.includes(k))) return 'bench';
+  if (dead.some(k => n.includes(k)))  return 'deadlift';
+  return null;
+}
+
+// Per-week + aggregate best estimated 1RM for the big-3, fuzzy-matched.
+// Pure: takes state explicitly. Shape:
+// { squat: { current, allTime, byWeek: { '1': e1rm, ... } }, bench: {...}, deadlift: {...} }
+//   current  — best e1RM in state.currentWeek
+//   allTime  — best e1RM across every logged week
+//   byWeek   — best e1RM keyed by week string (for progression charts)
+export function computeBig3Progression(state) {
+  const cats = ['squat', 'bench', 'deadlift'];
+  const out = {};
+  cats.forEach(c => { out[c] = { current: 0, allTime: 0, byWeek: {} }; });
+  if (!state || !state.weeks) return out;
+
+  const currentWeek = state.currentWeek;
+
+  for (const wKey in state.weeks) {
+    const weekObj = state.weeks[wKey];
+    if (!weekObj || !weekObj.lifts) continue;
+
+    for (const dKey in weekObj.lifts) {
+      const dayLifts = weekObj.lifts[dKey];
+      if (!dayLifts) continue;
+
+      for (const lift in dayLifts) {
+        const cat = classifyBig3Lift(lift);
+        if (!cat) continue;
+        const setsArr = dayLifts[lift];
+        if (!Array.isArray(setsArr)) continue;
+
+        setsArr.forEach(s => {
+          if (!isCompletedSet(s)) return;
+          const e = epley1RM(s.w, s.r);
+          if (e <= 0) return;
+          if (e > (out[cat].byWeek[wKey] || 0)) out[cat].byWeek[wKey] = e;
+          if (e > out[cat].allTime) out[cat].allTime = e;
+          if (wKey === currentWeek && e > out[cat].current) out[cat].current = e;
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// Thin wrapper for the Top Lifts glance tile: best all-time e1RM per big-3.
+// Mirrors the previous inline tile behaviour (max across all weeks).
+export function computeBig3Maxes(state) {
+  const prog = computeBig3Progression(state);
+  return {
+    squat:    prog.squat.allTime,
+    bench:    prog.bench.allTime,
+    deadlift: prog.deadlift.allTime,
+  };
+}
+
+// ==========================================
 // DELOAD SUGGESTION MATCH STUB
 // ==========================================
 export function shouldSuggestDeload() {
