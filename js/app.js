@@ -2,6 +2,7 @@
 // CLEANED CORE PROTOCOL ROUTER (app.js)
 // ==========================================
 import { CONFIG, PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
+import { devWarn } from './debug.js';
 import { buildProgramOverviewHTML, buildWeekMatrixHTML, buildDaysSplitHTML, buildLibraryCardHTML } from './templates.js';
 import { openBuilder } from './program_builder.js'; 
 
@@ -60,7 +61,7 @@ document.addEventListener('app:library-updated', () => {
 
 document.addEventListener('app:navigate', (e) => {
   const target = e.detail?.target;
-  if (!target) return;
+  if (!target) { devWarn('app:navigate fired with no detail.target — ignoring.', e.detail); return; }
   if (target === 'custom:today-summary') openTodaySummaryModal();
   else openAnalyticsView(target);
 });
