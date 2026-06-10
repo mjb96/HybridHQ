@@ -33,6 +33,11 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null)
   const ghostWeight = historicalSetData && historicalSetData.w ? historicalSetData.w : 'kg';
   const ghostReps = historicalSetData && historicalSetData.r ? historicalSetData.r : 'reps';
 
+  const hasHistory = historicalSetData && historicalSetData.w && historicalSetData.r;
+  const historyMarkup = hasHistory 
+    ? `<div style="flex-basis: 100%; grid-column: 1 / -1; text-align: center; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45); margin-top: 4px; margin-bottom: 2px; font-weight: 500; letter-spacing: 0.02em;">Last: ${historicalSetData.w}kg × ${historicalSetData.r}</div>`
+    : '';
+
   return `<div class="cockpit-set-row ${sData.c ? 'is-complete' : ''}" data-set-index="${sIdx}">
     <div class="set-num-lbl tactile-scale" 
          data-action="quick-log" 
@@ -60,6 +65,7 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null)
         data-liftname="${safeLiftName}" 
         data-sidx="${sIdx}">✕</button>
     </div>
+    ${historyMarkup}
     <div class="quick-pad-row">
       <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="match" data-sidx="${sIdx}">LAST</button>
       <button class="btn-pad tactile-scale" data-action="quick-modifier" data-modifier="p25" data-sidx="${sIdx}">+2.5kg</button>
