@@ -30,6 +30,9 @@ export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn
   initSessionModals(getStateFn, getSelectedDayFn, saveStateFn, switchTabFn, renderWorkout, updateExercisePRs);
 }
 
+// ==========================================
+// INCREMENT 4: HISTORY MODAL LOGIC
+// ==========================================
 export function openExerciseHistoryModal(liftName) {
   const modal = document.getElementById('exerciseHistoryModal');
   const titleEl = document.getElementById('historyModalTitle');
@@ -79,6 +82,9 @@ export function closeExerciseHistoryModal() {
   if (modal) modal.classList.remove('active');
 }
 
+// ==========================================
+// RENDER
+// ==========================================
 export function renderWorkout() {
   if (!_getState || !_getSelectedDay) return;
   
@@ -791,28 +797,33 @@ export function appendCustomSetRow(btnNode, liftName) {
   renderWorkout();
 }
 
-// INCREMENT WARMUP: Splices warmup exactly after the last existing warmup
+// INCREMENT WARMUP: Bulletproofed Splice Function
 export function appendWarmupSet(liftName) {
-  const appState = _getState();
-  const selectedDay = _getSelectedDay();
-  const wk = appState.currentWeek;
-  
-  if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
-  if (!appState.weeks[wk].lifts[selectedDay][liftName]) {
-    appState.weeks[wk].lifts[selectedDay][liftName] = [];
+  try {
+    const appState = _getState();
+    const selectedDay = _getSelectedDay();
+    const wk = appState.currentWeek;
+    
+    if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
+    if (!appState.weeks[wk].lifts[selectedDay][liftName]) {
+      appState.weeks[wk].lifts[selectedDay][liftName] = [];
+    }
+    
+    const sets = appState.weeks[wk].lifts[selectedDay][liftName];
+    
+    let insertIndex = 0;
+    for (let i = 0; i < sets.length; i++) {
+      if (sets[i].isWarmup) insertIndex = i + 1;
+      else break; 
+    }
+    
+    sets.splice(insertIndex, 0, { w: '', r: '', c: false, isWarmup: true });
+    _saveState(true);
+    renderWorkout();
+  } catch (err) {
+    console.error("Warmup injection failed:", err);
+    showToast("Failed to add warmup. See console.", true);
   }
-  
-  const sets = appState.weeks[wk].lifts[selectedDay][liftName];
-  
-  let insertIndex = 0;
-  for (let i = 0; i < sets.length; i++) {
-    if (sets[i].isWarmup) insertIndex = i + 1;
-    else break; 
-  }
-  
-  sets.splice(insertIndex, 0, { w: '', r: '', c: false, isWarmup: true });
-  _saveState(true);
-  renderWorkout();
 }
 
 export function removeCustomSetRow(liftName, setIndex) {
@@ -860,7 +871,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'quick-modifier') applyQuickFillModifier(target, target.getAttribute('data-modifier'), sIdx);
   else if (action === 'toggle-pad') toggleQuickPad(row);
   else if (action === 'append-set') appendCustomSetRow(target, liftName);
-  else if (action === 'append-warmup-set') appendWarmupSet(liftName); // INCREMENT WARMUP ROUTER
+  else if (action === 'append-warmup-set') appendWarmupSet(liftName); // <--- ENSURE THIS LINE EXISTS
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
   else if (action === 'open-exercise-history') {
