@@ -709,8 +709,6 @@ export function renderHome() {
   }
 }
 
-export function calculateConcurrentBalanceUI(gymTSS, runTSS) {}
-
 // ==========================================
 // EVENT DELEGATION ROUTER
 // ==========================================
