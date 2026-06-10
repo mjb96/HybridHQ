@@ -2,7 +2,8 @@
 // PERFORMANCE MATRIX — analytics.js
 // ==========================================
 import { CONFIG, PROGRAMS } from './constants.js';
-import { getProgramById, saveStateToLocalStorage } from './state.js'; 
+import { getProgramById, saveStateToLocalStorage } from './state.js';
+import { computeBig3Progression } from './engine.js';
 
 let _getState;
 let _getDays;
@@ -366,9 +367,76 @@ function renderCadenceChart(container, weekLabels, cadenceData) {
   container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${line}${dots}${xAxis}</svg>`;
 }
 
-// ==========================================
-// CENTRALIZED DATA COLLECTION (UPGRADED)
-// ==========================================
+// Multi-line estimated-1RM progression for the big-3 lifts (squat / bench /
+// deadlift), one polyline each. Fed by engine.computeBig3Progression(). Weeks
+// with no data for a lift are gaps in that lift's line (segments connect only
+// consecutive logged weeks).
+function renderBig3ProgressionChart(container, progression, weekLabels) {
+  if (!container) return;
+  const n = weekLabels.length;
+
+  const series = [
+    { key: 'squat',    label: 'Squat',    color: '#3b82f6' },
+    { key: 'bench',    label: 'Bench',    color: '#f59e0b' },
+    { key: 'deadlift', label: 'Deadlift', color: '#ef4444' },
+  ];
+
+  // Collect every plotted e1RM to size the Y axis; bail if nothing logged.
+  const allVals = [];
+  series.forEach(s => {
+    for (let i = 0; i < n; i++) {
+      const v = progression?.[s.key]?.byWeek?.[String(i + 1)] || 0;
+      if (v > 0) allVals.push(v);
+    }
+  });
+
+  if (allVals.length === 0 || n === 0) {
+    container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">Complete big-3 sets to see 1RM progression.</p>';
+    return;
+  }
+
+  const W = 400, H = 180, PAD_L = 44, PAD_B = 30, PAD_T = 15, PAD_R = 15;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_B - PAD_T;
+
+  const minV = Math.max(0, Math.min(...allVals) - 10);
+  const maxV = Math.max(...allVals) + 10;
+  const rangeV = Math.max(maxV - minV, 10);
+
+  const toX = i => PAD_L + (i / n) * chartW + chartW / n / 2;
+  const toY = v => PAD_T + chartH - ((v - minV) / rangeV) * chartH;
+
+  let yAxis = '';
+  [minV, (minV + maxV) / 2, maxV].forEach(val => {
+    const vy = toY(val);
+    yAxis += `<text x="${PAD_L - 8}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.6)">${Math.round(val)}</text>
+              <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+  });
+
+  let lines = '';
+  series.forEach(s => {
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const v = progression?.[s.key]?.byWeek?.[String(i + 1)] || 0;
+      if (v > 0) pts.push({ x: toX(i), y: toY(v) });
+    }
+    if (pts.length >= 2) {
+      const poly = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+      lines += `<polyline fill="none" stroke="${s.color}" stroke-width="3" stroke-linejoin="round" points="${poly}"/>`;
+    }
+    pts.forEach(p => {
+      lines += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${s.color}" stroke="#111827" stroke-width="2"/>`;
+    });
+  });
+
+  let xAxis = '';
+  weekLabels.forEach((label, i) => {
+    const lx = toX(i);
+    xAxis += `<text x="${lx.toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="11" font-weight="600" fill="rgba(255,255,255,0.85)">${label}</text>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${lines}${xAxis}</svg>`;
+}
 function collectAnalyticsData() {
   const appState = _getState();
   const DEFAULT_DAYS = _getDays();
@@ -764,6 +832,8 @@ export function renderAnalytics() {
       document.getElementById('analytics-strength_pr').classList.add('active');
       const prContainer = document.getElementById('allLiftsRmContainer_PR');
       if (prContainer) render1RMList(prContainer, data.dynamicStats);
+      const big3El = document.getElementById('big3ProgressionContainer');
+      if (big3El) renderBig3ProgressionChart(big3El, computeBig3Progression(_getState()), data.weekLabels);
       break;
     case 'running':
       document.getElementById('analytics-running').classList.add('active');
