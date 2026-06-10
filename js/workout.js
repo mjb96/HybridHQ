@@ -443,14 +443,19 @@ export function commitWorkoutUIState() {
   const calsEl = document.getElementById('runInputCals');
 
   if (distEl && distEl.offsetParent !== null) {
-    weekData.runs[selectedDay] = { 
-        dist: distEl.value, 
-        time: timeEl.value, 
+    // Merge, don't replace: preserve .fit-only fields that have no input here
+    // (hrZones, avgCadence, trainingEffect, anaerobicTE, descent, splits,
+    // hasStreams). Replacing wholesale wiped imported run data on the next save.
+    const existingRun = weekData.runs[selectedDay] || {};
+    weekData.runs[selectedDay] = {
+        ...existingRun,
+        dist: distEl.value,
+        time: timeEl.value,
         rpe: rpeRunEl.value,
-        avgHR: avgHREl ? avgHREl.value : '',
-        maxHR: maxHREl ? maxHREl.value : '',
-        elev: elevEl ? elevEl.value : '',
-        cals: calsEl ? calsEl.value : ''
+        avgHR: avgHREl ? avgHREl.value : (existingRun.avgHR || ''),
+        maxHR: maxHREl ? maxHREl.value : (existingRun.maxHR || ''),
+        elev: elevEl ? elevEl.value : (existingRun.elev || ''),
+        cals: calsEl ? calsEl.value : (existingRun.cals || '')
     };
     if ((parseFloat(distEl.value) || 0) > 0) {
       try { logActivityForStreak(); } catch (e) { console.warn(e); }
@@ -464,11 +469,15 @@ export function commitWorkoutUIState() {
   const gCalsEl = document.getElementById('gymInputCals');
 
   if (gTimeEl && gTimeEl.offsetParent !== null) {
+    // Merge, don't replace: preserve .fit-only gym fields (trainingEffect,
+    // anaerobicTE, gymSets) that have no input in this view.
+    const existingGym = weekData.gymStats[selectedDay] || {};
     weekData.gymStats[selectedDay] = {
+        ...existingGym,
         time: gTimeEl.value,
-        avgHR: gAvgHREl ? gAvgHREl.value : '',
-        maxHR: gMaxHREl ? gMaxHREl.value : '',
-        cals: gCalsEl ? gCalsEl.value : ''
+        avgHR: gAvgHREl ? gAvgHREl.value : (existingGym.avgHR || ''),
+        maxHR: gMaxHREl ? gMaxHREl.value : (existingGym.maxHR || ''),
+        cals: gCalsEl ? gCalsEl.value : (existingGym.cals || '')
     };
   }
 
