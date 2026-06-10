@@ -4,7 +4,7 @@
 // workout.js; the only changes are dependencies that pointed back into
 // workout.js, now injected: renderWorkout() -> _rerender(),
 // updateExercisePRs() -> _recomputePRs(), and _switchTab.
-// ==========================================
+// ==========================================\
 import { getProgramById, showToast } from './state.js';
 import { prescribeSetsForLift } from './engine.js';
 import { dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
@@ -35,64 +35,64 @@ export function executeResetActiveDayMetrics() {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
   const wk = appState.currentWeek;
-
-  if (!appState.weeks[wk].runs) appState.weeks[wk].runs = {};
-  if (!appState.weeks[wk].lifts) appState.weeks[wk].lifts = {};
-  if (!appState.weeks[wk].notes) appState.weeks[wk].notes = {};
-  if (!appState.weeks[wk].gymStats) appState.weeks[wk].gymStats = {};
-
-  appState.weeks[wk].runs[selectedDay] = { dist: '', time: '', rpe: '', avgHR: '', maxHR: '', elev: '', cals: '' };
-  appState.weeks[wk].gymStats[selectedDay] = { time: '', avgHR: '', maxHR: '', cals: '' };
-  appState.weeks[wk].lifts[selectedDay] = {};
+  
+  appState.weeks[wk].runs[selectedDay] = { dist: '', time: '', rpe: '', avgHR: '', maxHR: '', elev: '', cals: '', hrZones: [], avgCadence: '', descent: '', trainingEffect: '', anaerobicTE: '', splits: [] };
   appState.weeks[wk].notes[selectedDay] = '';
+  appState.weeks[wk].gymRpe[selectedDay] = '';
+  appState.weeks[wk].bodyWeight[selectedDay] = '';
+  appState.weeks[wk].gymStats[selectedDay] = { time: '', avgHR: '', maxHR: '', cals: '', trainingEffect: '', anaerobicTE: '', gymSets: [] };
 
-  const activeProgram = getProgramById(appState.activeProgramId);
-  const blueprint = activeProgram.days?.[selectedDay];
-
-  if (blueprint && blueprint.lifts) {
-    blueprint.lifts.forEach(liftName => {
-      try {
-        const weekModifier = activeProgram.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: "Working Sets" };
-        appState.weeks[wk].lifts[selectedDay][liftName] =
-          prescribeSetsForLift(wk, selectedDay, liftName, blueprint.desc, weekModifier);
-      } catch(e) { console.warn(e); }
-    });
+  const dayLifts = appState.weeks[wk].lifts[selectedDay] || {};
+  for (const lift in dayLifts) {
+    const arr = dayLifts[lift];
+    if (Array.isArray(arr)) {
+      arr.forEach(s => {
+        s.w = '';
+        s.c = false;
+      });
+    }
   }
-  try {
-    stopAndResetWorkoutTimer();
-    dismissRestTimer();
-  } catch(e) { console.warn(e); }
 
+  deleteMapFromDB(wk, selectedDay);
+  
   _saveState(true);
-
-  deleteMapFromDB(wk, selectedDay).then(() => {
-    _rerender();
-  }).catch(() => _rerender());
-
+  _recomputePRs();
   closeConfirmResetModal();
-  showToast('Day Logs Cleared');
+  _rerender();
+  
+  dismissRestTimer();
+  stopAndResetWorkoutTimer();
+  
+  showToast("Day's logs and map cleared.");
 }
 
 export function openFinishSessionModal() {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
   const wk = appState.currentWeek;
-  let vol = 0, setsDone = 0;
-  const liftsData = appState.weeks[wk]?.lifts?.[selectedDay] || {};
+  
+  let vol = 0;
+  let setsDone = 0;
 
-  for (let lift in liftsData) {
-    if (Array.isArray(liftsData[lift])) {
-      liftsData[lift].forEach(s => {
-        if (s && s.c) { vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0); setsDone++; }
+  const dayLifts = appState.weeks[wk].lifts[selectedDay] || {};
+  for (const lift in dayLifts) {
+    const arr = dayLifts[lift];
+    if (Array.isArray(arr)) {
+      arr.forEach(s => {
+        // INCREMENT WARMUP: Exclude warmups from volume and completion totals
+        if (s && s.c && !s.isWarmup) {
+          setsDone++;
+          vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
+        }
       });
     }
   }
 
+  const sumModalEl = document.getElementById('finishSessionModal');
   const sumVolEl = document.getElementById('summaryVolume');
   const sumSetsEl = document.getElementById('summarySets');
   const sumGymRpeEl = document.getElementById('summaryGymRPE');
   const sumRunRpeEl = document.getElementById('summaryRunRPE');
-  const sumModalEl = document.getElementById('summaryModal');
 
   if (sumVolEl) sumVolEl.textContent = vol + ' kg';
   if (sumSetsEl) sumSetsEl.textContent = setsDone;
@@ -118,18 +118,14 @@ export function closeFinishSessionModal() {
   const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
   const runRpeEl = document.getElementById('runInputRpeCockpit');
   if (gymRpeEl) gymRpeEl.value = appState.weeks[wk].gymRpe[selectedDay] || '';
-  if (runRpeEl) runRpeEl.value = appState.weeks[wk].runs[selectedDay]?.rpe || '';
+  if (runRpeEl) runRpeEl.value = appState.weeks[wk].runs[selectedDay].rpe || '';
 
-  try { _recomputePRs(); } catch(e) { console.warn(e); }
   _saveState(true);
-
-  const sumModalEl = document.getElementById('summaryModal');
+  
+  const sumModalEl = document.getElementById('finishSessionModal');
   if (sumModalEl) sumModalEl.classList.remove('active');
 
-  try {
-    stopAndResetWorkoutTimer();
-    dismissRestTimer();
-  } catch(e) { console.warn(e); }
-
-  if (_switchTab) _switchTab('home');
+  stopAndResetWorkoutTimer();
+  dismissRestTimer();
+  _switchTab('home');
 }
