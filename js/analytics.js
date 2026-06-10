@@ -7,6 +7,8 @@ import {
   computeBig3Progression,
   computeRecoveryScore, computeStreakView,
   computeWeeklyCaloriesSeries, computeWeeklyLoadSeries, computeWeeklyCompletionSeries,
+  computeReadiness, computeGoalAdherence, computeDynamicMilestones,
+  computeWeeklyHrSeries, computeWeeklyTrainingEffectSeries,
 } from './engine.js';
 import { getStreamFromDB } from './db.js';
 
@@ -625,6 +627,85 @@ function renderStrengthAnalytics(data) {
   if (rmContainer) render1RMList(rmContainer, data.dynamicStats);
 }
 
+// Single-series weekly bar chart — renders with as little as one week of data
+// (unlike a line/area chart, which needs >=2 points). Used for calories etc.
+function renderWeeklyBarChart(container, weekLabels, values, opts = {}) {
+  if (!container) return;
+  const n = weekLabels.length;
+  const hasData = (values || []).some(v => v > 0);
+  if (!hasData || n === 0) {
+    container.innerHTML = `<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">${opts.emptyMsg || 'No data yet.'}</p>`;
+    return;
+  }
+  const color = opts.color || '#f59e0b';
+  const W = 400, H = 170, PAD_L = 44, PAD_B = 26, PAD_T = 12, PAD_R = 12;
+  const chartW = W - PAD_L - PAD_R, chartH = H - PAD_B - PAD_T;
+  const maxV = Math.max(...values, 1);
+  const barW = Math.max(6, Math.floor(chartW / n) - 5);
+  const toY = v => PAD_T + chartH - (v / maxV) * chartH;
+  const fmtY = opts.yFmt || (v => Math.round(v).toLocaleString());
+
+  let bars = '', xAxis = '';
+  values.forEach((v, i) => {
+    const x = PAD_L + (i / n) * chartW + (chartW / n - barW) / 2;
+    const y = toY(v);
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${(PAD_T + chartH - y).toFixed(1)}" rx="2" fill="${color}" fill-opacity="${v > 0 ? 0.95 : 0.2}"/>`;
+    if (i % 2 === 0 || n <= 8) {
+      xAxis += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">${weekLabels[i]}</text>`;
+    }
+  });
+  let yAxis = '';
+  [0, maxV / 2, maxV].forEach(v => {
+    const vy = toY(v);
+    yAxis += `<text x="${PAD_L - 6}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="rgba(255,255,255,0.6)">${fmtY(v)}</text>
+              <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+  });
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${bars}${xAxis}</svg>`;
+}
+
+// Multi-line weekly chart. seriesList: [{ values:[], color, label }]. Plots a
+// single logged week as a dot so sparse data still shows; value-0 weeks are gaps.
+function renderWeeklyLinesChart(container, weekLabels, seriesList, opts = {}) {
+  if (!container) return;
+  const n = weekLabels.length;
+  const all = [];
+  seriesList.forEach(s => (s.values || []).forEach(v => { if (v > 0) all.push(v); }));
+  if (all.length === 0 || n === 0) {
+    container.innerHTML = `<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">${opts.emptyMsg || 'No data yet.'}</p>`;
+    return;
+  }
+  const W = 400, H = 170, PAD_L = 44, PAD_B = 26, PAD_T = 12, PAD_R = 12;
+  const chartW = W - PAD_L - PAD_R, chartH = H - PAD_B - PAD_T;
+  let minV = Math.min(...all), maxV = Math.max(...all);
+  const pad = (maxV - minV) * 0.1 || Math.max(1, maxV * 0.1);
+  minV = Math.max(0, minV - pad); maxV += pad;
+  const rangeV = (maxV - minV) || 1;
+  const toX = i => PAD_L + (i / n) * chartW + chartW / n / 2;
+  const toY = v => PAD_T + chartH - ((v - minV) / rangeV) * chartH;
+  const fmtY = opts.yFmt || (v => Math.round(v));
+
+  let yAxis = '';
+  [minV, (minV + maxV) / 2, maxV].forEach(v => {
+    const vy = toY(v);
+    yAxis += `<text x="${PAD_L - 6}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="rgba(255,255,255,0.6)">${fmtY(v)}</text>
+              <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+  });
+  let lines = '';
+  seriesList.forEach(s => {
+    const pts = [];
+    (s.values || []).forEach((v, i) => { if (v > 0) pts.push({ x: toX(i), y: toY(v) }); });
+    if (pts.length >= 2) {
+      lines += `<polyline fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}"/>`;
+    }
+    pts.forEach(p => { lines += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${s.color}" stroke="#111827" stroke-width="1.5"/>`; });
+  });
+  let xAxis = '';
+  weekLabels.forEach((lbl, i) => {
+    if (i % 2 === 0 || n <= 8) xAxis += `<text x="${toX(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">${lbl}</text>`;
+  });
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${lines}${xAxis}</svg>`;
+}
+
 // ==========================================
 // PER-RUN STREAM CHARTS (Step 5) — fed from IndexedDB stream objects.
 // Generic XY renderer; thin wrappers build points from a stream's arrays.
@@ -792,8 +873,66 @@ function renderRunningAnalytics(data) {
   renderHrZonesChart(document.getElementById('hrZonesChartContainer'), data.weekLabels, data.hrZonesData);
   renderCadenceChart(document.getElementById('cadenceChartContainer'), data.weekLabels, data.cadenceData);
 
+  // Weekly HR trend (avg + max) and training-effect trend — fill from manual
+  // entry and .fit alike, so the view isn't barren without stream data.
+  const appState = _getState();
+  const days = _getDays();
+  const maxWeek = data.weekLabels.length;
+  const hr = computeWeeklyHrSeries(appState, days, maxWeek);
+  renderWeeklyLinesChart(document.getElementById('runHrTrendContainer'), data.weekLabels, [
+    { values: hr.avgHr, color: '#22d3ee', label: 'Avg HR' },
+    { values: hr.maxHr, color: '#ef4444', label: 'Max HR' },
+  ], { yFmt: v => `${Math.round(v)}`, emptyMsg: 'Log runs with HR (or import .FIT) to see HR trends.' });
+
+  const te = computeWeeklyTrainingEffectSeries(appState, days, maxWeek);
+  renderWeeklyLinesChart(document.getElementById('runTeTrendContainer'), data.weekLabels, [
+    { values: te, color: '#a78bfa', label: 'Training Effect' },
+  ], { yFmt: v => v.toFixed(1), emptyMsg: 'Import .FIT runs to see training-effect trends.' });
+
+  renderLatestRunSplits();
+
   // Per-run streams (async — renders when IndexedDB resolves).
   loadAndRenderLatestRunStream();
+}
+
+// Render the lap splits of the most recent run that has them (splits are stored
+// on the synced run object by the .fit import).
+function renderLatestRunSplits() {
+  const el = document.getElementById('analyticsRunSplitsContainer');
+  if (!el) return;
+  const appState = _getState();
+  const days = _getDays();
+  const weekKeys = Object.keys(appState.weeks || {}).map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a);
+  let splits = null;
+  for (const wk of weekKeys) {
+    const runs = appState.weeks[String(wk)]?.runs;
+    if (!runs) continue;
+    for (let i = days.length - 1; i >= 0; i--) {
+      const s = runs[days[i]]?.splits;
+      if (Array.isArray(s) && s.length > 0) { splits = s; break; }
+    }
+    if (splits) break;
+  }
+  if (!splits) {
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:0.75rem;">Import a .FIT run to see lap splits.</p>';
+    return;
+  }
+  const rows = splits.map((sp, i) => {
+    const dist = sp.distance != null ? `${(parseFloat(sp.distance)).toFixed(2)} km` : '--';
+    const tSec = parseFloat(sp.time || sp.duration || 0);
+    const pace = (parseFloat(sp.distance) > 0 && tSec > 0)
+      ? (() => { const p = tSec / parseFloat(sp.distance); const m = Math.floor(p / 60), s = Math.round(p % 60).toString().padStart(2, '0'); return `${m}:${s}/km`; })()
+      : '--';
+    const hr = sp.avgHR != null ? `${Math.round(parseFloat(sp.avgHR))} bpm` : (sp.heart_rate != null ? `${Math.round(parseFloat(sp.heart_rate))} bpm` : '--');
+    return `<div class="flex-between py-1 border-b-glass" style="font-size:0.75rem;">
+      <span class="text-muted">Lap ${i + 1}</span>
+      <span class="text-inverse">${dist}</span>
+      <span class="font-bold text-inverse" style="font-variant-numeric:tabular-nums;">${pace}</span>
+      <span class="text-muted">${hr}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="flex-between py-1" style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
+      <span>Lap</span><span>Dist</span><span>Pace</span><span>HR</span></div>${rows}`;
 }
 
 function renderRecoveryAnalytics(data) {
@@ -865,6 +1004,20 @@ function renderRecoveryAnalytics(data) {
   interpEl.innerHTML = `<div class="text-sm text-muted" style="line-height:1.5;">${interpretation}</div>`;
 
   renderRpeChart(document.getElementById('rpeTrendContainer'), data.weekLabels, data.rpeData);
+
+  // Load / readiness (ACWR) — the signal behind the Readiness tile.
+  const appState = _getState();
+  const days = _getDays();
+  const maxWeek = data.weekLabels.length;
+  const load = computeWeeklyLoadSeries(appState, days, maxWeek);
+  const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
+  const readiness = computeReadiness(totalByWeek, appState.currentWeek);
+
+  setText('recoveryAcwr', readiness.hasData ? readiness.acwr.toFixed(2) : '--');
+  setText('recoveryAcute', readiness.hasData ? readiness.acute.toLocaleString() + ' AU' : '--');
+  setText('recoveryChronic', readiness.hasData ? readiness.chronic.toLocaleString() + ' AU' : '--');
+
+  renderStackedLoadChart(document.getElementById('loadTrendContainer'), load.lift, load.run);
 }
 
 function renderBodyWeightAnalytics(data) {
@@ -1169,33 +1322,34 @@ function renderGoalProgressDetail(data) {
   const activeProgram = getProgramById(appState.activeProgramId);
 
   const wk    = parseInt(appState.currentWeek, 10) || 1;
-  const total = activeProgram.totalWeeks || 12; 
-  const pct   = Math.round((wk / total) * 100);
+  const total = activeProgram.totalWeeks || 12;
+  const calendarPct = Math.round((wk / total) * 100);
 
   const goalEl = document.getElementById('analytics-goal-detail');
   if (!goalEl) return;
 
-  const remaining = total - wk;
-  const milestones = [
-    { week: 4,  label: '1-month check-in' },
-    { week: 8,  label: 'Mid-program peak' },
-    { week: 12, label: 'Program completion' },
-  ];
+  // Real adherence: of everything scheduled through this week, how much is done.
+  const adherence = computeGoalAdherence(appState, activeProgram, _getDays(), wk);
+  const remaining = Math.max(0, total - wk);
+
+  const milestones = computeDynamicMilestones(total);
   const nextMilestone = milestones.find(m => m.week >= wk) || milestones[milestones.length - 1];
 
   goalEl.innerHTML = `
     <h2 class="section-header mt-4">Program Goal Progress</h2>
     <article class="card-dark p-4 mb-4">
-      <div class="flex-between mb-3">
-        <span class="text-sm text-muted">Mesocycle progress</span>
-        <span class="font-heavy text-inverse">Wk ${wk} / ${total}</span>
+      <div class="flex-between mb-2">
+        <span class="text-sm text-muted">Adherence (work done so far)</span>
+        <span class="font-heavy text-inverse" style="font-size:1.1rem;">${adherence.pct}%</span>
       </div>
-      <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;margin-bottom:12px;">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--color-blue),var(--color-indigo,#6366f1));border-radius:4px;transition:width 0.5s var(--ease-out);"></div>
+      <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;margin-bottom:6px;">
+        <div style="height:100%;width:${adherence.pct}%;background:linear-gradient(90deg,var(--color-green,#10b981),var(--color-blue));border-radius:4px;transition:width 0.5s var(--ease-out);"></div>
       </div>
+      <div class="text-muted mb-3" style="font-size:0.65rem;">${adherence.done} of ${adherence.total} scheduled items completed through week ${wk}.</div>
+
       <div class="flex-between mb-2" style="font-size:0.8rem;">
-        <span class="text-muted">Completion</span>
-        <span class="font-heavy text-inverse">${pct}%</span>
+        <span class="text-muted">Calendar position</span>
+        <span class="font-heavy text-inverse">Wk ${wk} / ${total} (${calendarPct}%)</span>
       </div>
       <div class="flex-between mb-2" style="font-size:0.8rem;">
         <span class="text-muted">Weeks remaining</span>
@@ -1210,7 +1364,7 @@ function renderGoalProgressDetail(data) {
     <article class="card-dark p-3 mb-4">
       <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
         <span style="color:#3b82f6;">● Actual completion</span>
-        <span style="color:rgba(255,255,255,0.5);">● Linear target</span>
+        <span style="color:rgba(255,255,255,0.5);">● 100% target</span>
       </div>
       <div id="goalCompletionChartContainer"></div>
     </article>
@@ -1280,10 +1434,10 @@ function renderActiveFuelDetail(data) {
 
   const chartEl = document.getElementById('fuelChartContainer');
   if (chartEl) {
-    const pts = series.map((v, i) => ({ x: i + 1, y: v }));
-    renderXYChart(chartEl, pts.filter(p => p.y > 0).length >= 2 ? pts : [], {
-      color: '#f59e0b', area: true, xLabel: 'Week',
-      xFmt: v => `W${Math.round(v)}`, yFmt: v => Math.round(v).toLocaleString(),
+    const labels = series.map((_, i) => `W${i + 1}`);
+    renderWeeklyBarChart(chartEl, labels, series, {
+      color: '#f59e0b',
+      yFmt: v => Math.round(v).toLocaleString(),
       emptyMsg: 'Log sessions with calories (or import .FIT) to see your fuel trend.',
     });
   }
