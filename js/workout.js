@@ -3,8 +3,9 @@
 // ==========================================
 import { getProgramById } from './state.js';
 import { logActivityForStreak } from './state.js';
+import { getSessionSourceDay, loadSessionIntoDay, resetSessionForDay } from './state.js';
 import { CONFIG } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs } from './engine.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast } from './state.js'; 
@@ -53,7 +54,12 @@ export function renderWorkout() {
   const weekData = appState.weeks[wk];
 
   const activeProgram = getProgramById(appState.activeProgramId);
-  const homeBlueprint = activeProgram.days?.[selectedDay] || { lifts: [], runs: "Rest" };
+  // The session running in this slot may be a different day's template (the
+  // user can train any session on any day). Resolve targets/labels from the
+  // SOURCE template, while logged data stays under the real calendar day.
+  const sessionSourceDay = getSessionSourceDay(wk, selectedDay);
+  const isMovedSession = sessionSourceDay !== selectedDay;
+  const homeBlueprint = activeProgram.days?.[sessionSourceDay] || { lifts: [], runs: "Rest" };
 
   // --- RUN METRICS ---
   const runContext = weekData.runs[selectedDay] || { dist: '', time: '', rpe: '', avgHR: '', maxHR: '', elev: '', cals: '' };
@@ -233,6 +239,28 @@ export function renderWorkout() {
     });
   }
 
+  // Session selector — run any day's session in this slot (decoupled from day).
+  const sessionSelect = document.getElementById('cockpitSessionSelect');
+  if (sessionSelect) {
+    sessionSelect.innerHTML = _getDays().map(dk => {
+      const dd = activeProgram.days?.[dk];
+      const label = (dd?.badge || dd?.title || dk).toString();
+      const short = dk.charAt(0).toUpperCase() + dk.slice(1, 3);
+      const sel = dk === sessionSourceDay ? ' selected' : '';
+      return `<option value="${dk}"${sel}>${short} · ${label}</option>`;
+    }).join('');
+  }
+  const movedBadge = document.getElementById('cockpitSessionMoved');
+  if (movedBadge) {
+    if (isMovedSession) {
+      const srcLabel = activeProgram.days?.[sessionSourceDay]?.badge || activeProgram.days?.[sessionSourceDay]?.title || sessionSourceDay;
+      movedBadge.textContent = `↪ Running "${srcLabel}" here (moved from its usual day)`;
+      movedBadge.style.display = '';
+    } else {
+      movedBadge.style.display = 'none';
+    }
+  }
+
   if (!exercisesContainer) return;
 
   const currentScrollY = window.scrollY;
@@ -292,34 +320,26 @@ export function renderWorkout() {
       }
     } catch(e) { console.warn(e); }
 
-    let historicalLineText = 'Baseline Loading Profile Verified';
+    // Per-exercise history: the most recent time this lift was done ANYWHERE
+    // (day-independent), so the reference stays correct when sessions move.
+    const lastPerf = findLastPerformance(appState, liftName, {
+      excludeWeek: wk, excludeDay: selectedDay, days: _getDays()
+    });
+
+    let historicalLineText = 'No history yet — log your first session.';
     if (appState.exerciseStats && appState.exerciseStats[displayLiftName]) {
       historicalLineText = 'Global PR: ' + Math.round(appState.exerciseStats[displayLiftName].allTimeMax || 0) + 'kg (Est. 1RM)';
     }
-
-    let historicalSetData = null;
-    const pastWkNum = parseInt(wk, 10) - 1;
-    if (pastWkNum >= 1 && appState.weeks) {
-      const pastWeekData = appState.weeks[pastWkNum.toString()];
-      if (pastWeekData && pastWeekData.lifts?.[selectedDay]?.[liftName]) {
-        const finishedHistoricalSets = pastWeekData.lifts[selectedDay][liftName].filter(s => s && s.c && s.w && s.r);
-        if (finishedHistoricalSets.length > 0) {
-          historicalLineText = 'Last Session: [ ' + finishedHistoricalSets.map(s => s.w + 'kg × ' + s.r).join(', ') + ' ]';
-        }
-      }
+    if (lastPerf) {
+      historicalLineText = 'Last time: [ ' + lastPerf.sets.map(s => s.w + 'kg × ' + s.r).join(', ') + ' ]'
+        + (lastPerf.e1rm ? ` · e1RM ${lastPerf.e1rm}kg` : '');
     }
 
     const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     const setsMarkup = setsArr.map((sData, sIdx) => {
-      let linkedGhostSet = null;
-      if (pastWkNum >= 1 && appState.weeks) {
-        const historicalList = appState.weeks[pastWkNum.toString()]?.lifts?.[selectedDay]?.[liftName];
-        if (historicalList && historicalList[sIdx] && historicalList[sIdx].w && historicalList[sIdx].r) {
-          linkedGhostSet = historicalList[sIdx];
-        }
-      }
+      const linkedGhostSet = (lastPerf && lastPerf.sets[sIdx]) ? lastPerf.sets[sIdx] : null;
       return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet);
     }).join('');
 
@@ -629,6 +649,43 @@ export function toggleQuickPad(rowEl) {
   rowEl.classList.toggle('pad-visible');
 }
 
+// Load the chosen day's session into the currently-selected calendar slot.
+// Non-destructive: refuses (and reverts) if the slot already has logged work.
+export function handleSessionChange(selectEl) {
+  if (!selectEl) return;
+  const appState = _getState();
+  const selectedDay = _getSelectedDay();
+  const sourceDay = selectEl.value;
+  if (sourceDay === getSessionSourceDay(appState.currentWeek, selectedDay)) return;
+
+  const ok = loadSessionIntoDay(selectedDay, sourceDay);
+  if (!ok) {
+    showToast('This day already has logged work — reset it first.');
+    renderWorkout(); // revert the dropdown to the actual state
+    return;
+  }
+  showToast('Session loaded for today');
+  renderWorkout();
+}
+
+// Fill an exercise's sets from the last time it was performed (anywhere).
+export function repeatLastForExercise(liftName) {
+  if (!liftName) return;
+  const appState = _getState();
+  const selectedDay = _getSelectedDay();
+  const wk = appState.currentWeek;
+  const last = findLastPerformance(appState, liftName, {
+    excludeWeek: wk, excludeDay: selectedDay, days: _getDays()
+  });
+  if (!last || !last.sets.length) { showToast('No previous performance for this lift'); return; }
+
+  if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
+  appState.weeks[wk].lifts[selectedDay][liftName] = last.sets.map(s => ({ w: String(s.w), r: String(s.r), c: false }));
+  _saveState(true);
+  renderWorkout();
+  showToast('Filled from last time');
+}
+
 export function appendCustomSetRow(btnNode, liftName) {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
@@ -698,6 +755,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'execute-reset') executeResetActiveDayMetrics();
   else if (action === 'open-finish-modal') openFinishSessionModal();
   else if (action === 'close-finish-modal') closeFinishSessionModal();
+  else if (action === 'repeat-last') repeatLastForExercise(liftName);
 });
 
 document.addEventListener('change', (e) => {
@@ -708,6 +766,8 @@ document.addEventListener('change', (e) => {
     toggleGymCheckLoggingState(target);
   } else if (target.id === 'newExerciseSelect') {
     handleExerciseDropdownSelectionChange();
+  } else if (target.id === 'cockpitSessionSelect') {
+    handleSessionChange(target);
   }
 });
 
