@@ -2,6 +2,7 @@
 // WORKOUT VIEW
 // ==========================================
 import { getProgramById } from './state.js';
+import { logActivityForStreak } from './state.js';
 import { CONFIG } from './constants.js';
 import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
@@ -386,6 +387,8 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   appState.weeks[wk].lifts[selectedDay][liftName][sIdx] = { w: targetW, r: targetR, c: true };
 
   parentRow.classList.add('is-complete');
+
+  try { logActivityForStreak(); } catch (e) { console.warn(e); }
   
   try {
     const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
@@ -449,6 +452,9 @@ export function commitWorkoutUIState() {
         elev: elevEl ? elevEl.value : '',
         cals: calsEl ? calsEl.value : ''
     };
+    if ((parseFloat(distEl.value) || 0) > 0) {
+      try { logActivityForStreak(); } catch (e) { console.warn(e); }
+    }
   }
 
   if (!weekData.gymStats) weekData.gymStats = {};
