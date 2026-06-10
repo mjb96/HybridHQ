@@ -6,10 +6,17 @@ import { getProgramById, saveStateToLocalStorage } from './state.js';
 
 let _getState;
 let _getDays;
+let _analyticsContext = 'overview';
 
 export function initAnalytics(getStateFn, getDaysFn) {
   _getState = getStateFn;
   _getDays = getDaysFn;
+}
+
+// Which analytics view to show on next render. Set by openAnalyticsView()
+// before switching tabs (replaces the former analytics-context window global).
+export function setAnalyticsContext(context) {
+  _analyticsContext = context || 'overview';
 }
 
 // ==========================================
@@ -744,7 +751,7 @@ export function renderAnalytics() {
   if (!_getState || !_getDays) return;
 
   const data = collectAnalyticsData();
-  const context = window.analyticsContext || 'overview';
+  const context = _analyticsContext || 'overview';
 
   document.querySelectorAll('.analytics-section').forEach(sec => sec.classList.remove('active'));
 
