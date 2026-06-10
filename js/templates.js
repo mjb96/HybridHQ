@@ -29,24 +29,32 @@ export function buildEmptyWorkoutCard() {
   return '<div class="card-dark text-xs-muted empty-state-card">No lifting scheduled today.</div>';
 }
 
-export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null) {
+// INCREMENT WARMUP: Added displayIndex to decouple visual numbering from flat array index
+export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null, displayIndex = sIdx) {
   const ghostWeight = historicalSetData && historicalSetData.w ? historicalSetData.w : 'kg';
   const ghostReps = historicalSetData && historicalSetData.r ? historicalSetData.r : 'reps';
 
-  // Increment 2/3 Feature Retained: Visible History Micro-Label
   const hasHistory = historicalSetData && historicalSetData.w && historicalSetData.r;
   const historyMarkup = hasHistory 
     ? `<div style="flex-basis: 100%; grid-column: 1 / -1; text-align: center; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45); margin-top: 4px; margin-bottom: 2px; font-weight: 500; letter-spacing: 0.02em;">Last: ${historicalSetData.w}kg × ${historicalSetData.r}</div>`
     : '';
 
-  return `<div class="cockpit-set-row ${sData.c ? 'is-complete' : ''}" data-set-index="${sIdx}">
+  // INCREMENT WARMUP: Apply visual distinction and distinct CSS class
+  const isW = sData.isWarmup;
+  const badgeText = isW ? 'W' : `S${displayIndex + 1}`;
+  const badgeStyle = isW 
+    ? 'background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: var(--accent-amber);' 
+    : 'background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3);';
+  const rowClass = isW ? 'is-warmup' : '';
+
+  return `<div class="cockpit-set-row ${rowClass} ${sData.c ? 'is-complete' : ''}" data-set-index="${sIdx}">
     <div class="set-num-lbl tactile-scale" 
          data-action="quick-log" 
          data-liftname="${safeLiftName}" 
          data-sidx="${sIdx}"
-         title="One-Tap Quick Log (Uses Ghost Targets)" 
-         style="cursor:pointer; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); text-align: center;">
-         S${sIdx + 1}
+         title="One-Tap Quick Log" 
+         style="cursor:pointer; ${badgeStyle} text-align: center;">
+         ${badgeText}
     </div>
     <div>
       <input type="number" class="input-weight-node" placeholder="${ghostWeight}" value="${sData.w || ''}">
@@ -100,6 +108,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
     <div class="set-rows-list">${setsMarkup}</div>
     <div class="flex gap-2">
       <button class="btn-pad-append tactile-scale" data-action="repeat-last" data-liftname="${safeLiftName}" style="flex:1;">⟲ Repeat Last</button>
+      <button class="btn-pad-append tactile-scale" data-action="append-warmup-set" data-liftname="${safeLiftName}" style="flex:1; border-color: rgba(245, 158, 11, 0.3); color: var(--accent-amber);">+ Warmup</button>
       <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}" style="flex:1;">+ Add Set</button>
     </div>
   </div>`;
