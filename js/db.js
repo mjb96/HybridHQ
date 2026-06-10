@@ -7,9 +7,25 @@ const STREAM_STORE = 'fitStreams';
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = (e) => reject('Database error: ' + e.target.errorCode);
-    request.onsuccess = (e) => resolve(e.target.result);
+    let request;
+    try {
+      request = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    request.onerror = (e) => reject(e.target.error || new Error('IndexedDB open failed'));
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      // If another tab later triggers a version change, close this connection
+      // so we never block that tab's upgrade (and vice-versa).
+      db.onversionchange = () => { try { db.close(); } catch {} };
+      resolve(db);
+    };
+    // Fires when this open is blocked by an existing connection (e.g. another
+    // tab still on the old DB version). Reject instead of hanging forever so
+    // callers fail fast and the UI is never wedged waiting on a dead promise.
+    request.onblocked = () => reject(new Error('IndexedDB upgrade blocked by another open tab'));
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
