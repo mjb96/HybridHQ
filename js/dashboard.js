@@ -27,6 +27,8 @@
 //   state:       'loaded'|'empty'|'error'
 // }
 
+import { computeBig3Maxes } from './engine.js';
+
 // ==========================================
 // TILE TYPE ENUM
 // ==========================================
@@ -230,45 +232,15 @@ export const TILE_REGISTRY = [
     order:     4,
     renderData(appState) {
       try {
-        // Inline 1RM estimation — mirrors computeEstimated1RMs logic
-        let sq = 0, bp = 0, dl = 0;
-        const sqNames = ['back squat', 'squat', 'front squat'];
-        const bpNames = ['bench press', 'incline bench press', 'incline barbell press'];
-        const dlNames = ['deadlift', 'romanian deadlift', 'deficit deadlift'];
-
-        const check = (name, weight, reps) => {
-          const e1rm = weight * (1 + reps / 30);
-          const n = name.toLowerCase();
-          if (sqNames.some(k => n.includes(k))) { if (e1rm > sq) sq = e1rm; }
-          else if (bpNames.some(k => n.includes(k))) { if (e1rm > bp) bp = e1rm; }
-          else if (dlNames.some(k => n.includes(k))) { if (e1rm > dl) dl = e1rm; }
-        };
-
-        for (const wk in appState.weeks || {}) {
-          const lifts = appState.weeks[wk]?.lifts || {};
-          for (const day in lifts) {
-            for (const lift in lifts[day]) {
-              if (Array.isArray(lifts[day][lift])) {
-                lifts[day][lift].forEach(s => {
-                  if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) {
-                    const w = parseFloat(s.w) || 0;
-                    const r = parseInt(s.r, 10) || 0;
-                    if (w > 0 && r > 0) check(lift, w, r);
-                  }
-                });
-              }
-            }
-          }
-        }
-
+        const m = computeBig3Maxes(appState);
         const fmt = v => v > 0 ? `${Math.round(v)} kg` : '-- kg';
         return {
           rows: [
-            { label: 'SQ', value: fmt(sq) },
-            { label: 'BP', value: fmt(bp) },
-            { label: 'DL', value: fmt(dl) },
+            { label: 'SQ', value: fmt(m.squat) },
+            { label: 'BP', value: fmt(m.bench) },
+            { label: 'DL', value: fmt(m.deadlift) },
           ],
-          state: (sq > 0 || bp > 0 || dl > 0) ? 'loaded' : 'empty',
+          state: (m.squat > 0 || m.bench > 0 || m.deadlift > 0) ? 'loaded' : 'empty',
         };
       } catch {
         return { rows: [{ label: 'SQ', value: '--' }, { label: 'BP', value: '--' }, { label: 'DL', value: '--' }], state: 'error' };
