@@ -3,7 +3,7 @@
 // ==========================================
 import { getProgramById } from './state.js';
 import { CONFIG, EXERCISE_LIBRARY } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription, prescribeSetsForLift } from './engine.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, prescribeSetsForLift, computeExercisePRs } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise, dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast, saveNewCustomExerciseToLibrary } from './state.js'; 
@@ -495,45 +495,7 @@ export function commitWorkoutUIState() {
 export function updateExercisePRs() {
   const appState = _getState();
   if (!appState.exerciseStats) appState.exerciseStats = {};
-
-  for (let wKey in appState.weeks) {
-    const weekObj = appState.weeks[wKey];
-    if (!weekObj || !weekObj.lifts) continue;
-
-    for (let dKey in weekObj.lifts) {
-      const dayLifts = weekObj.lifts[dKey];
-      if (!dayLifts) continue;
-
-      for (let lift in dayLifts) {
-        let maxEstimated1RM = 0;
-        const setsArr = dayLifts[lift];
-        if (!Array.isArray(setsArr)) continue;
-
-        setsArr.forEach(set => {
-          if (set && set.c && set.w && set.r) {
-            const weight = parseFloat(set.w);
-            const reps = parseInt(set.r);
-            const e1RM = weight * (1 + (reps / 30));
-            if (e1RM > maxEstimated1RM) maxEstimated1RM = e1RM;
-          }
-        });
-
-        if (maxEstimated1RM > 0) {
-          if (!appState.exerciseStats[lift]) {
-            appState.exerciseStats[lift] = { allTimeMax: 0, currentEstimatedMax: 0 };
-          }
-          if (maxEstimated1RM > appState.exerciseStats[lift].allTimeMax) {
-            appState.exerciseStats[lift].allTimeMax = maxEstimated1RM;
-          }
-          if (wKey === appState.currentWeek) {
-            if (maxEstimated1RM > (appState.exerciseStats[lift].currentEstimatedMax || 0)) {
-              appState.exerciseStats[lift].currentEstimatedMax = maxEstimated1RM;
-            }
-          }
-        }
-      }
-    }
-  }
+  computeExercisePRs(appState, appState.exerciseStats);
 }
 
 export function toggleGymCheckLoggingState(checkboxNode) {
