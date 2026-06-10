@@ -27,7 +27,8 @@
 //   state:       'loaded'|'empty'|'error'
 // }
 
-import { computeBig3Maxes, computeStreakView, computeRecoveryScore } from './engine.js';
+import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
+         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence } from './engine.js';
 
 // ==========================================
 // TILE TYPE ENUM
@@ -118,26 +119,19 @@ export const TILE_REGISTRY = [
     accentVar: '--color-green',
     navTarget: 'recovery',
     order:     1,
-    renderData(appState, defaultDays) {
+    renderData(appState, defaultDays, activeProgram) {
       try {
-        const wk = appState.currentWeek || '1';
-        const weekData = appState.weeks?.[wk];
-        if (!weekData) return { hero: 'Adpt', sub: 'Log workouts for score.', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
-
-        let totalRpe = 0, rpeCount = 0;
-        defaultDays.forEach(d => {
-          const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-          const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-          if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
-          if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
-        });
-
-        if (rpeCount === 0) return { hero: 'Adpt', sub: 'Log workouts for score.', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
-
-        const avg = totalRpe / rpeCount;
-        if (avg < 6)   return { hero: 'High', sub: 'Well rested. Push intensity.', ringPct: 100, ringColor: 'var(--color-green)',  state: 'loaded' };
-        if (avg < 8)   return { hero: 'Fair', sub: 'Fatigue building. Sleep well.', ringPct: 65,  ringColor: 'var(--color-amber)',  state: 'loaded' };
-        return             { hero: 'Warn', sub: 'High fatigue. Drop volume.',    ringPct: 30,  ringColor: 'var(--color-red)',    state: 'loaded' };
+        const maxWeek = activeProgram?.totalWeeks || 12;
+        const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
+        const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
+        const r = computeReadiness(totalByWeek, appState.currentWeek);
+        if (!r.hasData) {
+          return { hero: '--', sub: 'Log RPE + duration', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
+        }
+        let ringColor = 'var(--color-green)';
+        if (r.score < 50) ringColor = 'var(--color-red)';
+        else if (r.score < 75) ringColor = 'var(--color-amber)';
+        return { hero: `${r.score}`, sub: `ACWR ${r.acwr.toFixed(2)}`, ringPct: r.score, ringColor, state: 'loaded' };
       } catch {
         return { hero: '--', sub: 'Unavailable', ringPct: 0, ringColor: 'var(--color-blue)', state: 'error' };
       }
@@ -232,15 +226,23 @@ export const TILE_REGISTRY = [
     order:     4,
     renderData(appState) {
       try {
-        const m = computeBig3Maxes(appState);
-        const fmt = v => v > 0 ? `${Math.round(v)} kg` : '-- kg';
+        const p = computeBig3Progression(appState);
+        // Show current-block best; mark ★ when it's also the all-time PR. If the
+        // lift hasn't been trained this block, fall back to the all-time PR.
+        const fmt = (cat) => {
+          const { current, allTime } = p[cat];
+          if (current > 0) return current >= allTime ? `${Math.round(current)} kg ★` : `${Math.round(current)} kg`;
+          if (allTime > 0) return `${Math.round(allTime)} (PR)`;
+          return '-- kg';
+        };
+        const anyData = p.squat.allTime > 0 || p.bench.allTime > 0 || p.deadlift.allTime > 0;
         return {
           rows: [
-            { label: 'SQ', value: fmt(m.squat) },
-            { label: 'BP', value: fmt(m.bench) },
-            { label: 'DL', value: fmt(m.deadlift) },
+            { label: 'SQ', value: fmt('squat') },
+            { label: 'BP', value: fmt('bench') },
+            { label: 'DL', value: fmt('deadlift') },
           ],
-          state: (m.squat > 0 || m.bench > 0 || m.deadlift > 0) ? 'loaded' : 'empty',
+          state: anyData ? 'loaded' : 'empty',
         };
       } catch {
         return { rows: [{ label: 'SQ', value: '--' }, { label: 'BP', value: '--' }, { label: 'DL', value: '--' }], state: 'error' };
@@ -477,42 +479,17 @@ export const TILE_REGISTRY = [
     order:     11,
     renderData(appState, defaultDays, activeProgram) {
       try {
-        const wk     = parseInt(appState.currentWeek, 10) || 1;
-        const total  = activeProgram?.totalWeeks || 12;
-        const pct    = Math.round((wk / total) * 100);
-
-        // Compute weekly completion as the "next milestone"
-        const weekData = appState.weeks?.[appState.currentWeek];
-        let weekDone = 0, weekTotal = 0;
-        if (weekData) {
-          defaultDays.forEach(dKey => {
-            const bp = activeProgram?.days?.[dKey];
-            const isRunScheduled = bp?.runs && !bp.runs.toLowerCase().includes('no structured') && bp.runs.toLowerCase() !== 'rest';
-            if (isRunScheduled) weekTotal++;
-            const rDist = parseFloat(weekData.runs?.[dKey]?.dist) || 0;
-            if (isRunScheduled && rDist > 0) weekDone++;
-
-            const dayLifts = weekData.lifts?.[dKey] || {};
-            for (const lift in dayLifts) {
-              if (Array.isArray(dayLifts[lift])) {
-                dayLifts[lift].forEach(s => {
-                  weekTotal++;
-                  if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) weekDone++;
-                });
-              }
-            }
-          });
-        }
-
-        const weekPct = weekTotal > 0 ? Math.round((weekDone / weekTotal) * 100) : 0;
-        const remaining = total - wk;
-
+        const wk    = parseInt(appState.currentWeek, 10) || 1;
+        const total = activeProgram?.totalWeeks || 12;
+        // Hero = real adherence (work actually done vs scheduled, through now),
+        // not raw calendar position. Calendar week is shown as context.
+        const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk);
         return {
-          hero:  `${pct}%`,
-          sub:   `Wk ${wk}/${total} · ${remaining} wk${remaining !== 1 ? 's' : ''} left`,
-          tag:   `This week: ${weekPct}%`,
-          tagColor: weekPct >= 80 ? 'var(--color-green)' : weekPct >= 50 ? 'var(--color-amber)' : 'var(--color-blue)',
-          state: 'loaded',
+          hero:  `${a.pct}%`,
+          sub:   `Wk ${wk}/${total} · ${a.done}/${a.total} done`,
+          tag:   `${a.pct}% adherence`,
+          tagColor: a.pct >= 80 ? 'var(--color-green)' : a.pct >= 50 ? 'var(--color-amber)' : 'var(--color-red)',
+          state: a.total > 0 ? 'loaded' : 'empty',
         };
       } catch {
         return { hero: '--', sub: 'Unavailable', state: 'error' };
