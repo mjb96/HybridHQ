@@ -797,8 +797,6 @@ export function renderAnalytics() {
   }
 }
 
-export function updateCompoundAnalyticsBarItem(valNodeId, barNodeId, currentVal, maxVal) {}
-
 function renderRecoveryScoreDetail(data) {
   const appState = _getState();
   const defaultDays = _getDays();
