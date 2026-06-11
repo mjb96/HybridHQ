@@ -3,6 +3,7 @@
 // ==========================================
 import { PROGRAMS } from './constants.js';
 import { prescribeSetsForLift } from './engine.js';
+import { getDayV2, dayLiftEntries } from './schema.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -189,13 +190,16 @@ export function verifyWeekStorageSchema(wk) {
     const activeProgram = getProgramById(appState.activeProgramId);
 
     DEFAULT_DAYS.forEach(d => {
-      const dayBlueprint = activeProgram.days[d];
-      if (dayBlueprint && dayBlueprint.lifts && dayBlueprint.lifts.length > 0) {
-        const weekModifier = activeProgram.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: "Working Sets" };
-
-        dayBlueprint.lifts.forEach(liftName => {
-          appState.weeks[wk].lifts[d][liftName] =
-            prescribeSetsForLift(wk, d, liftName, dayBlueprint.desc, weekModifier);
+      // SCHEMA v2: resolve the day's blueprint as a v2 view (migrate-on-read)
+      // and seed from its structured lift entries. Stored key stays the lift
+      // NAME, so all downstream logging / PR / analytics keying is unchanged.
+      const dayV2 = getDayV2(activeProgram, wk, d);
+      const entries = dayLiftEntries(dayV2?.day);
+      if (entries.length > 0) {
+        const weekContext = { label: dayV2?.label || '' };
+        entries.forEach(entry => {
+          appState.weeks[wk].lifts[d][entry.name] =
+            prescribeSetsForLift(wk, d, entry, weekContext);
         });
       }
     });
@@ -238,18 +242,20 @@ export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {})
   if (!force && dayHasLoggedWork(wk, targetDay)) return false;
 
   const activeProgram = getProgramById(appState.activeProgramId);
-  const blueprint = activeProgram?.days?.[sourceDay];
-  const weekModifier = activeProgram?.weeklyVolModifiers?.[wk] || { sets: 4, reps: 5, intensityLabel: 'Working Sets' };
+  // SCHEMA v2: resolve the source day's blueprint as a v2 view (migrate-on-read).
+  const dayV2 = getDayV2(activeProgram, wk, sourceDay);
+  const entries = dayLiftEntries(dayV2?.day);
 
   if (!weekData.sessionType) weekData.sessionType = {};
   weekData.sessionType[targetDay] = sourceDay;
 
   // Reseed the target slot's lifts from the source template.
   weekData.lifts[targetDay] = {};
-  if (blueprint?.lifts?.length) {
-    blueprint.lifts.forEach(liftName => {
-      weekData.lifts[targetDay][liftName] =
-        prescribeSetsForLift(wk, sourceDay, liftName, blueprint.desc, weekModifier);
+  if (entries.length) {
+    const weekContext = { label: dayV2?.label || '' };
+    entries.forEach(entry => {
+      weekData.lifts[targetDay][entry.name] =
+        prescribeSetsForLift(wk, sourceDay, entry, weekContext);
     });
   }
   saveStateToLocalStorage(true);
