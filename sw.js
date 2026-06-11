@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v44';
+const CACHE_NAME = 'hybrid-training-v45';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -32,7 +32,15 @@ const ASSETS_TO_CACHE = [
   './js/builder-exercise-row.js',
   './js/builder-run-editor.js',
   './js/builder-progression.js',
-  './js/builder-preview.js'
+  './js/builder-preview.js',
+
+  // Hybrid Brain — intelligence layer
+  './js/brain/constants_brain.js',
+  './js/brain/load_models.js',
+  './js/brain/analysis.js',
+  './js/brain/insights.js',
+  './js/brain/core.js',
+  './js/brain/brain_dashboard.js'
 ];
 
 self.addEventListener('install', (event) => {
