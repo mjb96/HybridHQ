@@ -96,6 +96,19 @@ export function insightsForContext(report, context) {
   return all.filter(i => domains.includes(i.domain));
 }
 
+// One-word "read" for a set of insights, most-actionable first. Drives the
+// verdict chip on each analytics view's Brain banner.
+export function contextVerdict(insights) {
+  if (!insights || !insights.length) return null;
+  const cats = new Set(insights.map(i => i.category));
+  if (cats.has('risk'))        return { label: 'Watch',       tone: 'risk' };
+  if (cats.has('opportunity')) return { label: 'Opportunity', tone: 'opportunity' };
+  if (cats.has('progress'))    return { label: 'On track',    tone: 'progress' };
+  if (cats.has('recovery'))    return { label: 'Recovering',  tone: 'recovery' };
+  if (cats.has('goal'))        return { label: 'Goal',        tone: 'goal' };
+  return null;
+}
+
 // Convenience: counts of surfaced insights by category (for tile badges etc).
 export function insightCounts(report) {
   const out = {};
