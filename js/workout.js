@@ -30,9 +30,6 @@ export function initWorkout(getStateFn, getSelectedDayFn, getDaysFn, saveStateFn
   initSessionModals(getStateFn, getSelectedDayFn, saveStateFn, switchTabFn, renderWorkout, updateExercisePRs);
 }
 
-// ==========================================
-// INCREMENT 4: HISTORY MODAL LOGIC
-// ==========================================
 export function openExerciseHistoryModal(liftName) {
   const modal = document.getElementById('exerciseHistoryModal');
   const titleEl = document.getElementById('historyModalTitle');
@@ -82,9 +79,6 @@ export function closeExerciseHistoryModal() {
   if (modal) modal.classList.remove('active');
 }
 
-// ==========================================
-// RENDER
-// ==========================================
 export function renderWorkout() {
   if (!_getState || !_getSelectedDay) return;
   
@@ -94,7 +88,7 @@ export function renderWorkout() {
   const wk = appState.currentWeek || "1";
   
   if (!appState.weeks) appState.weeks = {};
-  if (!appState.weeks[wk]) appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {} };
+  if (!appState.weeks[wk]) appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {}, supersets: {} };
   
   if (!appState.weeks[wk].runs) appState.weeks[wk].runs = {};
   if (!appState.weeks[wk].lifts) appState.weeks[wk].lifts = {};
@@ -102,6 +96,7 @@ export function renderWorkout() {
   if (!appState.weeks[wk].gymRpe) appState.weeks[wk].gymRpe = {};
   if (!appState.weeks[wk].bodyWeight) appState.weeks[wk].bodyWeight = {};
   if (!appState.weeks[wk].gymStats) appState.weeks[wk].gymStats = {};
+  if (!appState.weeks[wk].supersets) appState.weeks[wk].supersets = {};
 
   const weekData = appState.weeks[wk];
 
@@ -320,13 +315,33 @@ export function renderWorkout() {
     exercisesContainer.innerHTML = buildEmptyWorkoutCard();
   }
 
+  // PHASE 1 SUPERSETS: Orphan Cleanup Logic
+  if (!weekData.supersets[selectedDay]) weekData.supersets[selectedDay] = {};
+  const supersetMap = weekData.supersets[selectedDay];
+  
+  const groupCounts = {};
+  for (const lift in supersetMap) {
+    if (loggedLiftsData[lift]) {
+      const gid = supersetMap[lift];
+      groupCounts[gid] = (groupCounts[gid] || 0) + 1;
+    } else {
+      delete supersetMap[lift];
+    }
+  }
+  for (const lift in supersetMap) {
+    if (groupCounts[supersetMap[lift]] < 2) {
+      delete supersetMap[lift]; 
+    }
+  }
+
   let isFirstAccordionField = true;
+  let currentSupersetContainer = null;
+  let currentGroupId = null;
 
   for (let liftName in loggedLiftsData) {
     const setsArr = loggedLiftsData[liftName];
     if (!Array.isArray(setsArr)) continue;
     
-    // INCREMENT WARMUP: Exercise "DONE" status strictly ignores warmups
     const workingSetsArr = setsArr.filter(s => !s.isWarmup);
     const isCompleted = workingSetsArr.length > 0 && workingSetsArr.every(s => s && s.c);
     const isCompletedClass = isCompleted ? 'completed' : '';
@@ -371,7 +386,6 @@ export function renderWorkout() {
       historicalLineText = 'Global PR: ' + Math.round(appState.exerciseStats[displayLiftName].allTimeMax || 0) + 'kg (Est. 1RM)';
     }
     
-    // INCREMENT WARMUP: Historical summary explicitly reads from workingSets array
     if (lastPerf && lastPerf.workingSets && lastPerf.workingSets.length > 0) {
       historicalLineText = 'Last time: [ ' + lastPerf.workingSets.map(s => s.w + 'kg × ' + s.r).join(', ') + ' ]'
         + (lastPerf.e1rm ? ` · e1RM ${lastPerf.e1rm}kg` : '');
@@ -380,7 +394,6 @@ export function renderWorkout() {
     const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    // INCREMENT WARMUP: Dual-Stream Indexing Implementation
     let warmupIndex = 0;
     let workingIndex = 0;
 
@@ -415,7 +428,30 @@ export function renderWorkout() {
       exCard.innerHTML = `<div class="card-dark p-3 text-inverse">${displaySafeName} (Render Error)</div>`;
     }
 
-    exercisesContainer.appendChild(exCard);
+    // PHASE 1 SUPERSETS: Visual wrapper container logic
+    const groupId = supersetMap[liftName];
+    if (groupId) {
+      if (groupId !== currentGroupId) {
+        currentSupersetContainer = document.createElement('div');
+        currentSupersetContainer.className = 'superset-container';
+        currentSupersetContainer.dataset.groupId = groupId;
+        
+        // Inline styles ensuring visual boundaries for Phase 1
+        currentSupersetContainer.style.borderLeft = '4px solid var(--accent-blue)';
+        currentSupersetContainer.style.paddingLeft = '10px';
+        currentSupersetContainer.style.marginBottom = '20px';
+        currentSupersetContainer.style.background = 'rgba(59, 130, 246, 0.03)';
+        currentSupersetContainer.style.borderRadius = '4px';
+        
+        exercisesContainer.appendChild(currentSupersetContainer);
+        currentGroupId = groupId;
+      }
+      currentSupersetContainer.appendChild(exCard);
+    } else {
+      currentGroupId = null;
+      currentSupersetContainer = null;
+      exercisesContainer.appendChild(exCard);
+    }
   }
 
   try {
@@ -441,7 +477,6 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   let targetW = wInput.value;
   let targetR = rInput.value;
 
-  // INCREMENT WARMUP: Safely calculate dual-stream indices for quick logging
   if (!targetW || !targetR) {
     const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
     if (lastPerf) {
@@ -622,7 +657,6 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
       
       if (liftName) {
-        // INCREMENT WARMUP: Dual-stream index routing
         const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
         if (lastPerf) {
           const sets = appState.weeks[wk].lifts[selectedDay][liftName];
@@ -662,7 +696,6 @@ export function evaluateAccordionAutoFlowTransitions() {
   const expandedCard = document.querySelector('.cockpit-exercise:not(.collapsed)');
   if (!expandedCard) return;
   
-  // INCREMENT WARMUP: Accordion auto-flow strictly evaluates working sets
   const rows = Array.from(expandedCard.querySelectorAll('.cockpit-set-row:not(.is-warmup)'));
   if (rows.length === 0) return; 
   
@@ -706,7 +739,6 @@ export function applyQuickFillModifier(btnNode, typeModifier, sIdx) {
       const liftName = exCard.getAttribute('data-liftname');
       const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
       
-      // INCREMENT WARMUP: Dual-stream index routing
       if (lastPerf) {
         const sets = appState.weeks[wk].lifts[selectedDay][liftName];
         if (sets && sets[sIdx]) {
@@ -772,7 +804,6 @@ export function repeatLastForExercise(liftName) {
 
   if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
   
-  // INCREMENT WARMUP: Reconstructs array by sequentially pushing historical warmups then working sets
   const newSets = [];
   if (last.warmupSets) last.warmupSets.forEach(s => newSets.push({ w: String(s.w), r: String(s.r), c: false, isWarmup: true }));
   if (last.workingSets) last.workingSets.forEach(s => newSets.push({ w: String(s.w), r: String(s.r), c: false }));
@@ -797,7 +828,6 @@ export function appendCustomSetRow(btnNode, liftName) {
   renderWorkout();
 }
 
-// INCREMENT WARMUP: Bulletproofed Splice Function
 export function appendWarmupSet(liftName) {
   try {
     const appState = _getState();
@@ -861,7 +891,6 @@ document.addEventListener('click', (e) => {
 
   const action = target.getAttribute('data-action');
   
-  // Context extractors
   const exCard = target.closest('.cockpit-exercise');
   const row = target.closest('.cockpit-set-row');
   const liftName = exCard ? exCard.getAttribute('data-liftname') : target.getAttribute('data-liftname');
@@ -871,7 +900,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'quick-modifier') applyQuickFillModifier(target, target.getAttribute('data-modifier'), sIdx);
   else if (action === 'toggle-pad') toggleQuickPad(row);
   else if (action === 'append-set') appendCustomSetRow(target, liftName);
-  else if (action === 'append-warmup-set') appendWarmupSet(liftName); // <--- ENSURE THIS LINE EXISTS
+  else if (action === 'append-warmup-set') appendWarmupSet(liftName); 
   else if (action === 'remove-set') removeCustomSetRow(liftName, sIdx);
   else if (action === 'toggle-accordion') toggleAccordionManual(exCard);
   else if (action === 'open-exercise-history') {
