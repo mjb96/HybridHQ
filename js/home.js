@@ -9,6 +9,7 @@ import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, is
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
+import { renderBrainInsights } from './brain/brain_dashboard.js';
 
 let _getState;
 let _getSelectedDay;
@@ -562,6 +563,10 @@ export function renderHome() {
   }
 
   renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay);
+
+  // Hybrid Brain — read-only coaching insights below the glance grid.
+  try { renderBrainInsights(appState, DEFAULT_DAYS, activeProgram); }
+  catch (e) { console.warn('[hybrid-brain] render skipped:', e); }
 
   const progressPercentage = (() => {
     let total = 0, done = 0;
