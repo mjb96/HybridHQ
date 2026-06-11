@@ -251,7 +251,7 @@ export function renderWorkout() {
   if (runSpecsEl) runSpecsEl.textContent = blueprintRun || 'Rest';
   
   if (runPanel) {
-    runPanel.classList.toggle('dimmed', !isRunScheduled);
+    runPanel.classList.remove('dimmed'); // Never grey out the aerobic tile
   }
 
   if (runPanel && exercisesContainer) {
@@ -442,14 +442,19 @@ export function renderWorkout() {
         currentSupersetContainer.style.marginBottom = '20px';
         currentSupersetContainer.style.background = 'rgba(168, 85, 247, 0.05)';
         currentSupersetContainer.style.borderRadius = '4px';
+        currentSupersetContainer.style.paddingTop = '10px';
+        currentSupersetContainer.style.paddingBottom = '2px';
         
         exercisesContainer.appendChild(currentSupersetContainer);
         currentGroupId = groupId;
       }
+      // Tighten up the cards to feel like a cohesive block
+      exCard.style.marginBottom = '8px'; 
       currentSupersetContainer.appendChild(exCard);
     } else {
       currentGroupId = null;
       currentSupersetContainer = null;
+      exCard.style.marginBottom = ''; 
       exercisesContainer.appendChild(exCard);
     }
   }
@@ -515,7 +520,6 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
 
   try { logActivityForStreak(); } catch (e) { console.warn(e); }
   
-  // PHASE 3 SUPERSETS: Timer Suppression Logic
   try {
     const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
     const setRpe = gymRpeEl && gymRpeEl.value ? parseFloat(gymRpeEl.value) : null;
@@ -696,7 +700,6 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       if (!rInput.value) rInput.value = "10";
     }
 
-    // PHASE 3 SUPERSETS: Timer Suppression Logic
     try {
       const appState = _getState();
       const wk = appState.currentWeek;
