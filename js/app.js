@@ -35,7 +35,6 @@ import {
   toggleAccordionManual, toggleQuickPad
 } from './workout.js';
 
-import { renderIntelligenceBriefing } from './dashboard.js'; // HYBRID BRAIN IMPORT
 import { startWorkoutTimer, dismissRestTimer, checkActiveTimerOnLoad } from './timers.js';
 import { saveMapToDB, saveStreamToDB } from './db.js';
 import { initGarminRunImport, initGarminGymImport } from './garmin.js';
@@ -218,10 +217,7 @@ export function handleMacroWeekSwitch() {
 export function hydrateCurrentView() {
   verifyWeekStorageSchema(appState.currentWeek);
   
-  if (activeTab === 'home') {
-    safeRenderExecution(renderHome, "Home Dashboard Render");
-    safeRenderExecution(renderIntelligenceBriefing, "Intelligence Briefing Render");
-  }
+  if (activeTab === 'home') safeRenderExecution(renderHome, "Home Dashboard Render");
   else if (activeTab === 'workout') safeRenderExecution(renderWorkout, "Workout Cockpit Render");
   else if (activeTab === 'analytics') safeRenderExecution(renderAnalytics, "Performance Matrix Render");
   else if (activeTab === 'program') {
