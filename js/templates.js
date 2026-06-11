@@ -29,7 +29,6 @@ export function buildEmptyWorkoutCard() {
   return '<div class="card-dark text-xs-muted empty-state-card">No lifting scheduled today.</div>';
 }
 
-// INCREMENT WARMUP: Added displayIndex to decouple visual numbering from flat array index
 export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null, displayIndex = sIdx) {
   const ghostWeight = historicalSetData && historicalSetData.w ? historicalSetData.w : 'kg';
   const ghostReps = historicalSetData && historicalSetData.r ? historicalSetData.r : 'reps';
@@ -39,7 +38,6 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null,
     ? `<div style="flex-basis: 100%; grid-column: 1 / -1; text-align: center; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45); margin-top: 4px; margin-bottom: 2px; font-weight: 500; letter-spacing: 0.02em;">Last: ${historicalSetData.w}kg × ${historicalSetData.r}</div>`
     : '';
 
-  // INCREMENT WARMUP: Apply visual distinction and distinct CSS class
   const isW = sData.isWarmup;
   const badgeText = isW ? 'W' : `S${displayIndex + 1}`;
   const badgeStyle = isW 
@@ -84,9 +82,16 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null,
   </div>`;
 }
 
-export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, diagnostic, blueprintLabel, historicalLineText, setsMarkup }) {
+// PHASE 2 SUPERSETS: Destructured isGrouped, added unlinkBtn and supersetBtn
+export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, diagnostic, blueprintLabel, historicalLineText, setsMarkup, isGrouped }) {
   const stalledBadge = diagnostic.isStalled ? `<span class="badge-stall-indicator">STALLED</span>` : '';
   const targetStyle = diagnostic.isStalled ? 'color: var(--accent-red); font-weight: 800;' : '';
+
+  const unlinkBtn = isGrouped 
+    ? `<button class="tactile-scale" style="background:none; border:none; padding: 0 0 0 8px; font-size:1.1rem; cursor:pointer; color:var(--accent-red);" data-action="unlink-superset" data-liftname="${safeLiftName}" title="Unlink Exercise">🔗</button>` 
+    : '';
+
+  const supersetBtnText = isGrouped ? '+ Add to Group' : '+ Superset';
 
   return `<div class="cockpit-header">
     <div class="drag-handle-grip">☰</div>
@@ -95,6 +100,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
         <div class="title-badge-row" style="display:flex; align-items:center;">
           <span class="cockpit-ex-name">${displaySafeName}</span>
           <button class="tactile-scale" style="background:none; border:none; padding: 0 0 0 8px; font-size:1.1rem; cursor:pointer; color:var(--text-muted);" data-action="open-exercise-history" data-liftname="${safeLiftName}" title="Exercise History">📊</button>
+          ${unlinkBtn}
           ${stalledBadge}
         </div>
         <div class="cockpit-ex-target" style="${targetStyle}">${blueprintLabel}</div>
@@ -106,10 +112,11 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
     <div class="local-timer-placeholder"></div>
     <span class="cockpit-history-line">⚡ ${historicalLineText}</span>
     <div class="set-rows-list">${setsMarkup}</div>
-    <div class="flex gap-2">
-      <button class="btn-pad-append tactile-scale" data-action="repeat-last" data-liftname="${safeLiftName}" style="flex:1;">⟲ Repeat Last</button>
-      <button class="btn-pad-append tactile-scale" data-action="append-warmup-set" data-liftname="${safeLiftName}" style="flex:1; border-color: rgba(245, 158, 11, 0.3); color: var(--accent-amber);">+ Warmup</button>
-      <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}" style="flex:1;">+ Add Set</button>
+    <div class="flex gap-2" style="flex-wrap: wrap;">
+      <button class="btn-pad-append tactile-scale" data-action="repeat-last" data-liftname="${safeLiftName}" style="flex:1; min-width: calc(50% - 0.5rem);">⟲ Repeat Last</button>
+      <button class="btn-pad-append tactile-scale" data-action="append-warmup-set" data-liftname="${safeLiftName}" style="flex:1; min-width: calc(50% - 0.5rem); border-color: rgba(245, 158, 11, 0.3); color: var(--accent-amber);">+ Warmup</button>
+      <button class="btn-pad-append tactile-scale" data-action="open-add-superset" data-liftname="${safeLiftName}" style="flex:1; min-width: calc(50% - 0.5rem); border-color: rgba(168, 85, 247, 0.3); color: var(--accent-purple);">${supersetBtnText}</button>
+      <button class="btn-pad-append tactile-scale" data-action="append-set" data-liftname="${safeLiftName}" style="flex:1; min-width: calc(50% - 0.5rem);">+ Add Set</button>
     </div>
   </div>`;
 }
