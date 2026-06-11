@@ -1523,3 +1523,107 @@ td {
   border-color: var(--accent-blue);
   outline: none;
 }
+/* ==========================================
+   PROGRAM BUILDER v2 (schema-unified builder)
+   ========================================== */
+.builder-week-head { cursor: pointer; gap: 8px; }
+.builder-week-label {
+  width: auto !important; flex: 1; min-width: 0;
+  text-align: left !important; font-weight: 700 !important;
+  font-size: 0.8rem !important; padding: 5px 8px !important;
+  color: var(--color-cyan) !important;
+  background: var(--overlay-sm) !important; border: 1px dashed var(--glass-border) !important;
+}
+.builder-week-body { display: flex; flex-direction: column; gap: 10px; }
+
+.builder-day {
+  border: 1px solid var(--overlay-md);
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+.builder-day-head { gap: 8px; margin-bottom: 8px; }
+.builder-day-tag {
+  font-size: 0.65rem; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-secondary);
+  background: var(--overlay-sm); padding: 3px 7px; border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.builder-day-title {
+  width: auto !important; flex: 1; min-width: 0;
+  text-align: left !important; font-weight: 700 !important;
+  font-size: 0.82rem !important; padding: 6px 8px !important;
+  color: var(--accent-blue, var(--color-blue)) !important;
+}
+.builder-copy-select {
+  width: auto !important; flex-shrink: 0;
+  font-size: 0.7rem !important; font-weight: 700 !important;
+  padding: 5px 6px !important; text-align: left !important;
+  color: var(--text-secondary) !important; background: var(--bg-input) !important;
+  border: 1px solid var(--glass-border) !important; border-radius: var(--radius-sm) !important;
+}
+.builder-day-block { display: flex; flex-direction: column; gap: 6px; }
+.builder-empty {
+  padding: 8px 4px; color: var(--text-secondary);
+  font-style: italic; font-size: 0.78rem;
+}
+
+.builder-row {
+  display: flex; gap: 6px; align-items: flex-start;
+  padding: 8px; background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm); border: 1px solid var(--overlay-sm);
+}
+.builder-reorder { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.builder-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.builder-name-wrap { display: flex; flex-direction: column; gap: 2px; }
+.builder-name-input {
+  width: 100% !important; text-align: left !important;
+  font-size: 0.85rem !important; font-weight: 700 !important; padding: 7px 8px !important;
+}
+.builder-name-input.builder-invalid {
+  border-color: var(--color-red) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18) !important;
+}
+.builder-name-meta { min-height: 13px; font-size: 0.65rem; padding-left: 2px; }
+.builder-canon-ok { color: var(--color-green); font-weight: 800; }
+.builder-canon-custom { color: var(--color-amber); font-weight: 700; }
+.builder-err { color: var(--color-red); font-weight: 700; }
+
+.builder-scheme { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.builder-scheme input {
+  text-align: center !important; font-size: 0.8rem !important;
+  font-weight: 700 !important; padding: 6px 4px !important;
+}
+.builder-num  { width: 46px !important; }
+.builder-reps { width: 60px !important; }
+.builder-rpe  { width: 54px !important; }
+.builder-x { color: var(--text-secondary); font-size: 0.8rem; }
+
+.builder-row-actions { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.builder-mini {
+  min-width: 0 !important; padding: 5px 8px !important;
+  font-size: 0.72rem !important; line-height: 1 !important;
+}
+.builder-danger { color: var(--color-red) !important; }
+.builder-add {
+  font-size: 0.76rem !important; font-weight: 700;
+  color: var(--color-cyan); border-color: rgba(34, 211, 238, 0.25);
+}
+
+.builder-run-row {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  padding: 8px; background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm); border: 1px solid var(--overlay-sm);
+}
+.builder-run-chip {
+  font-size: 0.68rem; font-weight: 800; color: #fff;
+  padding: 3px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+}
+.builder-run-input {
+  flex: 1; min-width: 140px; text-align: left !important;
+  font-size: 0.8rem !important; font-weight: 600 !important; padding: 6px 8px !important;
+}
+.builder-run-detail {
+  font-size: 0.68rem; color: var(--color-cyan);
+  font-variant-numeric: tabular-nums; flex-basis: 100%;
+}
