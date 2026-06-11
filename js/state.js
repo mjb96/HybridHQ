@@ -3,7 +3,7 @@
 // ==========================================
 import { PROGRAMS } from './constants.js';
 import { prescribeSetsForLift } from './engine.js';
-import { getDayV2, dayLiftEntries } from './schema.js';
+import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2 } from './schema.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -75,23 +75,15 @@ export function getProgramById(id) {
 // ==========================================
 export function createCustomProgram(name, totalWeeks, focus, philosophy) {
   const id = 'prog_' + Date.now();
-  const newProg = {
+  // SCHEMA v2: new custom programs are authored directly in the unified
+  // weeks[] → days{mon..sun} → block[] tree the builder + engine share.
+  const newProg = createEmptyV2Program({
     id,
-    name: name || "New Custom Program",
-    totalWeeks: parseInt(totalWeeks, 10) || 12,
-    dossier: { creator: "You", focus: focus || "Custom Focus", philosophy: philosophy || "A custom built training block." },
-    days: {},
-    weeklyVolModifiers: {}
-  };
-  
-  ['mon','tue','wed','thu','fri','sat','sun'].forEach(d => {
-    newProg.days[d] = { title: "Rest", badge: "Rest", color: "var(--text-muted)", desc: "", runs: "Rest", lifts: [] };
+    name: name || 'New Custom Program',
+    totalWeeks,
+    dossier: { creator: 'You', focus: focus || 'Custom Focus', philosophy: philosophy || 'A custom built training block.' },
   });
-  
-  for(let i = 1; i <= newProg.totalWeeks; i++) {
-    newProg.weeklyVolModifiers[i.toString()] = { sets: 3, reps: 10, intensityLabel: "Custom Block" };
-  }
-  
+
   if (!appState.customPrograms) appState.customPrograms = [];
   appState.customPrograms.push(newProg);
   saveStateToLocalStorage(true);
@@ -362,6 +354,26 @@ export async function pullEngineDataFromStorage() {
   if (appState.deloadApplied === undefined) appState.deloadApplied = null;
   if (!appState.streakData) appState.streakData = { current: 0, longest: 0, lastActivityDate: null };
   if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0 };
+
+  // SCHEMA v2: one-time, idempotent migration of stored custom programs to the
+  // unified weeks[] → days{mon..sun} → block[] tree. Already-v2 programs are
+  // skipped. The pre-migration JSON export remains a full backup. A discarded
+  // non-empty orphaned positional weeks[] is logged so nothing vanishes silently.
+  let _migratedAnyProgram = false;
+  appState.customPrograms = (appState.customPrograms || []).map(prog => {
+    if (!prog || prog.schemaVersion === 2) return prog;
+    const orphanCount = Array.isArray(prog.weeks)
+      ? prog.weeks.reduce((n, w) => n + (w?.days || []).reduce((m, d) => m + (d?.exercises || []).length, 0), 0)
+      : 0;
+    const migrated = migrateCustomProgramToV2(prog);
+    const daysHadLifts = prog.days && Object.values(prog.days).some(d => (d?.lifts || []).length > 0);
+    if (orphanCount > 0 && daysHadLifts) {
+      console.warn(`[hybrid] Program "${prog.name}": migrated from days{} (executed source); ${orphanCount} exercise(s) in the old orphaned builder draft were not the executed plan and were not carried over.`);
+    }
+    _migratedAnyProgram = true;
+    return migrated;
+  });
+  if (_migratedAnyProgram) saveStateToLocalStorage(true);
 
   const weeksToDelete = [];
   for (const wk in appState.weeks) {
