@@ -357,16 +357,33 @@ export function mountFocusDragAndDrop() {
   const carousel = document.querySelector('.in-focus-carousel');
   if (!carousel) return;
   carousel.querySelectorAll('.carousel-card').forEach(card => {
+    ensureGrip(card);
     if (card.dataset.focusDragBound === '1') return;
     card.dataset.focusDragBound = '1';
-    card.addEventListener('mousedown', onFocusMouseDown);
     card.addEventListener('dragstart', onFocusDragStart);
     card.addEventListener('dragover',  onFocusDragOver);
     card.addEventListener('dragend',   onFocusDragEnd);
-    card.addEventListener('touchstart', onFocusTouchStart, { passive: true });
     card.addEventListener('touchmove',  onFocusTouchMove,  { passive: false });
     card.addEventListener('touchend',   onFocusTouchEnd);
   });
+}
+
+// Visible drag handle so reordering is discoverable. Tapping the card still
+// navigates; pressing and dragging the grip reorders.
+function ensureGrip(card) {
+  if (card.querySelector('.focus-drag-grip')) return;
+  if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
+  const grip = document.createElement('span');
+  grip.className = 'focus-drag-grip';
+  grip.title = 'Drag to reorder';
+  grip.setAttribute('aria-label', 'Drag to reorder');
+  grip.textContent = '⠿'; // ⠿
+  grip.style.cssText = 'position:absolute;top:6px;right:8px;z-index:3;font-size:0.95rem;line-height:1;color:var(--text-muted,rgba(255,255,255,0.4));cursor:grab;padding:2px 5px;border-radius:6px;touch-action:none;user-select:none;';
+  grip.addEventListener('mousedown', (e) => { e.stopPropagation(); enterFocusEditMode(); card.setAttribute('draggable', 'true'); focusDragSource = card; });
+  grip.addEventListener('mouseup', () => { card.setAttribute('draggable', 'false'); exitFocusEditMode(); });
+  grip.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+  grip.addEventListener('touchstart', (e) => { e.stopPropagation(); enterFocusEditMode(); focusTouchActive = true; focusDragSource = card; card.classList.add('tile-dragging'); }, { passive: true });
+  card.appendChild(grip);
 }
 
 function enterFocusEditMode() {
@@ -389,10 +406,6 @@ function commitFocusOrder() {
   showToast('Order saved ✓');
 }
 
-function onFocusMouseDown(e) {
-  const card = e.currentTarget;
-  focusLongPressTimer = setTimeout(() => { enterFocusEditMode(); card.setAttribute('draggable', 'true'); }, 450);
-}
 function onFocusDragStart(e) {
   clearTimeout(focusLongPressTimer);
   if (!focusEditMode) { e.preventDefault(); return; }
@@ -414,12 +427,6 @@ function onFocusDragEnd(e) {
   e.currentTarget.classList.remove('tile-dragging');
   e.currentTarget.setAttribute('draggable', 'false');
   if (focusEditMode) { commitFocusOrder(); exitFocusEditMode(); }
-}
-function onFocusTouchStart(e) {
-  const card = e.currentTarget;
-  focusLongPressTimer = setTimeout(() => {
-    enterFocusEditMode(); focusTouchActive = true; focusDragSource = card; card.classList.add('tile-dragging');
-  }, 450);
 }
 function onFocusTouchMove(e) {
   clearTimeout(focusLongPressTimer);
