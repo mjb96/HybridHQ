@@ -2,7 +2,7 @@
 // CLOUD-CONNECTED STATE MANAGER (state.js)
 // ==========================================
 import { PROGRAMS } from './constants.js';
-import { prescribeSetsForLift } from './engine.js';
+import { prescribeSetsForLift, isCompletedSet } from './engine.js';
 import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2, migrateProgramToV2 } from './schema.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
@@ -246,7 +246,7 @@ function dayHasLoggedWork(wk, day) {
   if ((parseFloat(wd.runs?.[day]?.dist) || 0) > 0) return true;
   const lifts = wd.lifts?.[day] || {};
   for (const l in lifts) {
-    if (Array.isArray(lifts[l]) && lifts[l].some(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1))) return true;
+    if (Array.isArray(lifts[l]) && lifts[l].some(s => isCompletedSet(s))) return true;
   }
   return false;
 }

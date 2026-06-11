@@ -9,6 +9,7 @@ import {
   computeWeeklyCaloriesSeries, computeWeeklyLoadSeries, computeWeeklyCompletionSeries,
   computeReadiness, computeGoalAdherence, computeDynamicMilestones,
   computeWeeklyHrSeries, computeWeeklyTrainingEffectSeries,
+  epley1RM, isCompletedSet, paceSecondsPerKm, formatPace,
 } from './engine.js';
 import { getStreamFromDB } from './db.js';
 
@@ -65,23 +66,6 @@ export function logBodyWeight() {
 // ==========================================
 // HELPERS
 // ==========================================
-function parsePaceSeconds(distKm, timeStr) {
-  if (!distKm || !timeStr || parseFloat(distKm) === 0) return 0;
-  const parts = timeStr.split(':').map(Number);
-  let totalSecs = 0;
-  if (parts.length === 2) totalSecs = parts[0] * 60 + parts[1];
-  else if (parts.length === 3) totalSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (totalSecs === 0) return 0;
-  return totalSecs / parseFloat(distKm); 
-}
-
-function formatPace(secsPerKm) {
-  if (!secsPerKm || secsPerKm === 0) return '--';
-  const m = Math.floor(secsPerKm / 60);
-  const s = Math.round(secsPerKm % 60).toString().padStart(2, '0');
-  return `${m}:${s}/km`;
-}
-
 function rpeColour(rpe) {
   if (rpe === 0) return '#3b82f6'; 
   if (rpe < 6)  return '#10b981'; 
@@ -497,12 +481,12 @@ function collectAnalyticsData() {
           const prevWeek = (parseInt(appState.currentWeek, 10) - 1).toString();
 
           dayLifts[lift].forEach(s => {
-            const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+            const isCompleted = isCompletedSet(s);
             const weight = parseFloat(s.w) || 0;
             const reps = parseInt(s.r, 10) || 0;
-            
+
             if (isCompleted && weight > 0 && reps > 0) {
-              const e1rm = weight * (1 + reps / 30);
+              const e1rm = epley1RM(weight, reps);
               if (e1rm > data.dynamicStats[lift].allTimeMax) {
                  data.dynamicStats[lift].allTimeMax = e1rm;
               }
@@ -547,7 +531,7 @@ function collectAnalyticsData() {
       const cals = parseFloat(run.cals) || 0;
       weekDist += dist; weekElev += elev; weekCals += cals;
 
-      const paceS = parsePaceSeconds(dist, run.time || '');
+      const paceS = paceSecondsPerKm(dist, run.time || '');
       if (paceS > 0 && dist > 0) { weekRunTime += paceS * dist; weekRunDist += dist; }
 
       const runRpe = parseFloat(run.rpe) || 0;
@@ -570,7 +554,7 @@ function collectAnalyticsData() {
       for (const lift in dayLifts) {
         if (!Array.isArray(dayLifts[lift])) continue;
         dayLifts[lift].forEach(s => {
-          const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+          const isCompleted = isCompletedSet(s);
           if (isCompleted) {
             weekVol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
             data.globalTotalSets++;
@@ -1215,7 +1199,7 @@ function renderWeeklyVolumeDetail(data) {
       for (const lift in dayLifts) {
         if (Array.isArray(dayLifts[lift])) {
           dayLifts[lift].forEach(s => {
-            if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) {
+            if (isCompletedSet(s)) {
               const w = parseFloat(s.w) || 0;
               const r = parseInt(s.r, 10) || 0;
               totalVol  += w * r;

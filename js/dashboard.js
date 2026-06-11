@@ -28,7 +28,8 @@
 // }
 
 import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
-         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence } from './engine.js';
+         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence,
+         isCompletedSet, parseDurationToMinutes } from './engine.js';
 
 // ==========================================
 // TILE TYPE ENUM
@@ -44,13 +45,7 @@ export const DashboardTileType = Object.freeze({
 // ==========================================
 // HELPER — parse run time string → total minutes
 // ==========================================
-function parseTimeToMinutes(timeStr) {
-  if (!timeStr) return 0;
-  const parts = timeStr.split(':').map(Number);
-  if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
-  if (parts.length === 2) return parts[0] + parts[1] / 60;
-  return parseFloat(timeStr) || 0;
-}
+// Run-time parsing now uses engine.parseDurationToMinutes (single source).
 
 // ==========================================
 // TILE REGISTRY
@@ -81,7 +76,7 @@ export const TILE_REGISTRY = [
         let completedSets = 0;
         for (const lift in todayLifts) {
           if (Array.isArray(todayLifts[lift])) {
-            completedSets += todayLifts[lift].filter(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
+            completedSets += todayLifts[lift].filter(s => isCompletedSet(s)).length;
           }
         }
         const runDist = parseFloat(todayRun.dist) || 0;
@@ -166,7 +161,7 @@ export const TILE_REGISTRY = [
             if (Array.isArray(dayLifts[lift])) {
               dayLifts[lift].forEach(s => {
                 total++;
-                if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) done++;
+                if (isCompletedSet(s)) done++;
               });
             }
           }
@@ -296,7 +291,7 @@ export const TILE_REGISTRY = [
             const r = weekData.runs?.[d];
             if (!r) return;
             const dist = parseFloat(r.dist) || 0;
-            const mins = parseTimeToMinutes(r.time);
+            const mins = parseDurationToMinutes(r.time);
             if (dist > 0 && mins > 0) { totalDist += dist; totalMins += mins; }
           });
         }
@@ -334,7 +329,7 @@ export const TILE_REGISTRY = [
             const dayLifts = weekData.lifts?.[d] || {};
             for (const lift in dayLifts) {
               if (Array.isArray(dayLifts[lift])) {
-                completedSets += dayLifts[lift].filter(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
+                completedSets += dayLifts[lift].filter(s => isCompletedSet(s)).length;
               }
             }
             gymTSS += completedSets * (gRpe > 0 ? gRpe : 6);
@@ -413,7 +408,7 @@ export const TILE_REGISTRY = [
           for (const lift in dayLifts) {
             if (Array.isArray(dayLifts[lift])) {
               dayLifts[lift].forEach(s => {
-                if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) {
+                if (isCompletedSet(s)) {
                   const w = parseFloat(s.w) || 0;
                   const r = parseInt(s.r, 10) || 0;
                   totalVol  += w * r;

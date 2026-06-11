@@ -5,7 +5,7 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
@@ -21,14 +21,6 @@ export function initHome(getStateFn, getSelectedDayFn, getDaysFn) {
   _getState = getStateFn;
   _getSelectedDay = getSelectedDayFn;
   _getDays = getDaysFn;
-}
-
-function parseTimeToMinutes(timeStr) {
-  if (!timeStr) return 0;
-  const parts = timeStr.split(':').map(Number);
-  if (parts.length === 3) return (parts[0] * 60) + parts[1] + (parts[2] / 60);
-  if (parts.length === 2) return parts[0] + (parts[1] / 60);
-  return parseFloat(timeStr) || 0;
 }
 
 function formatMinutesToHoursMins(totalMins) {
@@ -362,7 +354,7 @@ export function renderHome() {
     if (Array.isArray(todayLifts[lift])) {
       todayLifts[lift].forEach(s => {
         if (s) {
-          const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+          const isCompleted = isCompletedSet(s);
           if (isCompleted) {
             todaySets++;
             todayVol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
@@ -496,7 +488,7 @@ export function renderHome() {
         if (Array.isArray(weekData.lifts[dKey][lift])) {
           weekData.lifts[dKey][lift].forEach(s => {
             if (s) {
-              const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+              const isCompleted = isCompletedSet(s);
               if (isCompleted) dailyCompletedSets++;
             }
           });
@@ -506,7 +498,7 @@ export function renderHome() {
 
     const gStats = weekData.gymStats?.[dKey];
     let dailyGymTime = 0;
-    if (gStats && gStats.time) dailyGymTime = parseTimeToMinutes(gStats.time);
+    if (gStats && gStats.time) dailyGymTime = parseDurationToMinutes(gStats.time);
     if (dailyGymTime === 0 && dailyCompletedSets > 0) dailyGymTime = dailyCompletedSets * 3;
     currentWeekGymTimeSum += dailyGymTime;
     dailyGymTimes.push(dailyGymTime);
@@ -584,7 +576,7 @@ export function renderHome() {
         if (Array.isArray(dayLifts[lift])) {
           dayLifts[lift].forEach(s => {
             total++;
-            if (s && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1)) done++;
+            if (isCompletedSet(s)) done++;
           });
         }
       }
@@ -638,7 +630,7 @@ export function renderHome() {
           if (Array.isArray(pLifts[l])) {
             pLifts[l].forEach(s => { 
               if (s) {
-                const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+                const isCompleted = isCompletedSet(s);
                 if (isCompleted) prevVol += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
               }
             });
@@ -649,7 +641,7 @@ export function renderHome() {
           if (Array.isArray(cLifts[l])) {
             cLifts[l].forEach(s => { 
               if (s) {
-                const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
+                const isCompleted = isCompletedSet(s);
                 if (isCompleted) currentWeekVolSum += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
               }
             });
