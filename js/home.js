@@ -1,14 +1,15 @@
 // ==========================================
 // FULLY REFACTORED HOME DASHBOARD (home.js)
+// Now powered by the Hybrid Brain intelligence layer.
 // ==========================================
 import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
+import { evaluateState } from './brain/core.js';
 
 let _getState;
 let _getSelectedDay;
@@ -39,117 +40,72 @@ function formatMinutesToHoursMins(totalMins) {
   return `${m}m`;
 }
 
-// ==========================================
-// TILE RENDERERS
-// Each function returns the inner HTML for a .glance-card
-// ==========================================
+export function closeTileCustomiser(apply) {
+  const sheet = document.getElementById('tileCustomiserSheet');
+  if (!sheet) return;
 
-function renderTileLoading() {
-  return `
-    <div class="tile-skeleton-line" style="width:60%;height:12px;border-radius:4px;background:rgba(255,255,255,0.07);margin-bottom:8px;"></div>
-    <div class="tile-skeleton-line" style="width:40%;height:22px;border-radius:4px;background:rgba(255,255,255,0.07);margin-bottom:6px;"></div>
-    <div class="tile-skeleton-line" style="width:80%;height:10px;border-radius:4px;background:rgba(255,255,255,0.05);"></div>
-  `;
-}
-
-function renderTileError(label) {
-  return `
-    <div class="card-icon-title text-muted"><span>⚠️</span> ${label}</div>
-    <div class="font-heavy" style="font-size:1.1rem;color:var(--color-red);">Error</div>
-    <div class="text-muted" style="font-size:0.6rem;">Could not load data</div>
-  `;
-}
-
-function renderMetricTile(config, data) {
-  const accentColor = `var(${config.accentVar})`;
-  const tagHTML = data.tag
-    ? `<div class="tile-tag font-bold mb-1" style="font-size:0.75rem;color:${data.tagColor || accentColor};">${data.tag}</div>`
-    : '';
-  const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
-  return `
-    <div class="card-icon-title" style="color:${accentColor};"><span>${config.icon}</span> ${config.label}</div>
-    <div>
-      ${tagHTML}
-      <div class="font-heavy tile-hero" style="font-size:1.3rem;line-height:1.1;color:${heroColor};">${data.hero || '--'}</div>
-      <div class="text-muted tile-sub" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
-    </div>
-  `;
-}
-
-function renderRingTile(config, data) {
-  const ringColor = data.ringColor || 'var(--color-blue)';
-  const pct = data.ringPct || 0;
-  const grad = `conic-gradient(${ringColor} ${pct}%, rgba(255,255,255,0.1) 0)`;
-  return `
-    <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
-    <div class="readiness-ring-container">
-      <div class="readiness-ring green" style="background:${grad};">
-        <div class="readiness-ring-inner">
-          <span class="font-heavy text-inverse" style="font-size:0.75rem;">${data.hero || '--'}</span>
-        </div>
-      </div>
-    </div>
-    <div class="text-muted text-center" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
-  `;
-}
-
-function renderSplit3Tile(config, data) {
-  const accentColor = `var(${config.accentVar})`;
-  const rows = (data.rows || []).map(r => `
-    <div class="flex-between mb-1" style="font-size:0.75rem;">
-      <span class="text-muted">${r.label}</span>
-      <strong class="text-inverse">${r.value}</strong>
-    </div>
-  `).join('');
-  return `
-    <div class="card-icon-title" style="color:${accentColor};"><span>${config.icon}</span> ${config.label}</div>
-    <div>${rows}</div>
-  `;
-}
-
-function renderRatioBarTile(config, data) {
-  return `
-    <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
-    <div>
-      <div class="font-heavy text-inverse mb-1" style="font-size:0.95rem;">${data.label || '0% / 0%'}</div>
-      <div class="ratio-bar-track mb-1" style="height:5px;border-radius:3px;">
-        <div class="ratio-fill-blue" id="tileRatioLiftBar" style="width:${data.liftPct || 50}%;background:#3b82f6;"></div>
-        <div class="ratio-fill-pink" id="tileRatioRunBar" style="width:${data.runPct || 50}%;background:#ec4899;"></div>
-      </div>
-      <div class="text-muted" style="font-size:0.6rem;">${data.advice || 'Lift / Run bias'}</div>
-    </div>
-  `;
-}
-
-function renderProgressTile(config, data) {
-  const accentColor = `var(${config.accentVar})`;
-  return `
-    <div class="card-icon-title" style="color:${accentColor};"><span>${config.icon}</span> ${config.label}</div>
-    <div>
-      <div class="font-heavy text-inverse mb-1" style="font-size:1.3rem;line-height:1.1;">
-        ${data.done || 0} <span class="text-muted" style="font-size:0.9rem;">/ ${data.total || 0}</span>
-      </div>
-      <div class="text-muted" style="font-size:0.6rem;">${data.sub || ''}</div>
-    </div>
-  `;
-}
-
-function renderTileContent(config, data) {
-  if (data.state === 'error') return renderTileError(config.label);
-  switch (config.type) {
-    case DashboardTileType.RING:      return renderRingTile(config, data);
-    case DashboardTileType.SPLIT_3:   return renderSplit3Tile(config, data);
-    case DashboardTileType.RATIO_BAR: return renderRatioBarTile(config, data);
-    case DashboardTileType.PROGRESS:  return renderProgressTile(config, data);
-    default:                          return renderMetricTile(config, data);
+  if (apply) {
+    const hidden = new Set();
+    sheet.querySelectorAll('.tile-picker-check').forEach(cb => {
+      if (!cb.checked) hidden.add(cb.dataset.tileId);
+    });
+    saveHiddenTiles(hidden);
+    sheet.classList.remove('active');
+    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
+    
+    renderHome();
+  } else {
+    sheet.classList.remove('active');
+    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
   }
 }
 
-// ==========================================
-// GLANCE GRID RENDERER
-// Builds / updates the .glance-grid dynamically from TILE_REGISTRY
-// ==========================================
-function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
+export function resetTileCustomiser() {
+  resetTileOrder();
+  resetHiddenTiles();
+  document.getElementById('tileCustomiserSheet')?.classList.remove('active');
+  document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
+  renderHome();
+}
+
+function openTileCustomiser() {
+  const sheet = document.getElementById('tileCustomiserSheet');
+  const list  = document.getElementById('tileCustomiserList');
+  if (!sheet || !list) return;
+
+  const hidden     = loadHiddenTiles();
+  const savedOrder = loadTileOrder();
+  const sorted = [...TILE_REGISTRY].sort((a, b) => {
+    if (savedOrder) {
+      const ai = savedOrder.indexOf(a.id);
+      const bi = savedOrder.indexOf(b.id);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    }
+    return a.order - b.order;
+  });
+
+  list.innerHTML = sorted.map(config => `
+    <div class="tile-picker-item${hidden.has(config.id) ? ' tile-picker-hidden' : ''}" data-tile-id="${config.id}">
+      <span class="tile-picker-icon">${config.icon}</span>
+      <span class="tile-picker-label">${config.label}</span>
+      <input type="checkbox" class="tile-picker-check" data-tile-id="${config.id}" ${hidden.has(config.id) ? '' : 'checked'}>
+      <span class="tile-picker-toggle"></span>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.tile-picker-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const cb = item.querySelector('.tile-picker-check');
+      cb.checked = !cb.checked;
+      item.classList.toggle('tile-picker-hidden', !cb.checked);
+    });
+  });
+
+  sheet.classList.add('active');
+  document.getElementById('tileCustomiserBackdrop')?.classList.add('active');
+}
+
+function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
   const grid = document.getElementById('glanceGrid');
   if (!grid) return;
 
@@ -203,12 +159,83 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
 
     let data;
     try {
-      data = config.renderData(appState, defaultDays, activeProgram, selectedDay);
+      data = config.renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload);
     } catch (e) {
       data = { state: 'error' };
     }
 
-    article.innerHTML = renderTileContent(config, data);
+    if (data.state === 'error') {
+      article.innerHTML = `
+        <div class="card-icon-title text-muted"><span>⚠️</span> ${config.label}</div>
+        <div class="font-heavy" style="font-size:1.1rem;color:var(--color-red);">Error</div>
+        <div class="text-muted" style="font-size:0.6rem;">Could not load data</div>
+      `;
+    } else {
+      switch (config.type) {
+        case DashboardTileType.RING:
+          const grad = `conic-gradient(${data.ringColor || 'var(--color-blue)'} ${data.ringPct || 0}%, rgba(255,255,255,0.1) 0)`;
+          article.innerHTML = `
+            <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
+            <div class="readiness-ring-container">
+              <div class="readiness-ring green" style="background:${grad};">
+                <div class="readiness-ring-inner">
+                  <span class="font-heavy text-inverse" style="font-size:0.75rem;">${data.hero || '--'}</span>
+                </div>
+              </div>
+            </div>
+            <div class="text-muted text-center" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
+          `;
+          break;
+        case DashboardTileType.SPLIT_3:
+          const rows = (data.rows || []).map(r => `
+            <div class="flex-between mb-1" style="font-size:0.75rem;">
+              <span class="text-muted">${r.label}</span>
+              <strong class="text-inverse">${r.value}</strong>
+            </div>
+          `).join('');
+          article.innerHTML = `
+            <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
+            <div>${rows}</div>
+            ${data.tag ? `<div class="text-muted mt-1" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${data.tagColor || 'var(--color-blue)'};">${data.tag}</div>` : ''}
+          `;
+          break;
+        case DashboardTileType.RATIO_BAR:
+          article.innerHTML = `
+            <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
+            <div>
+              <div class="font-heavy text-inverse mb-1" style="font-size:0.95rem;">${data.label || '0% / 0%'}</div>
+              <div class="ratio-bar-track mb-1" style="height:5px;border-radius:3px;">
+                <div class="ratio-fill-blue" style="width:${data.liftPct || 50}%;background:#3b82f6;"></div>
+                <div class="ratio-fill-pink" style="width:${data.runPct || 50}%;background:#ec4899;"></div>
+              </div>
+              <div class="text-muted" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.advice || 'Lift / Run bias'}</div>
+            </div>
+          `;
+          break;
+        case DashboardTileType.PROGRESS:
+          article.innerHTML = `
+            <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
+            <div>
+              <div class="font-heavy text-inverse mb-1" style="font-size:1.3rem;line-height:1.1;">
+                ${data.done || 0} <span class="text-muted" style="font-size:0.9rem;">/ ${data.total || 0}</span>
+              </div>
+              <div class="text-muted" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${data.tagColor || 'var(--text-muted)'};">${data.sub || ''}</div>
+            </div>
+          `;
+          break;
+        default:
+          const tagHTML = data.tag ? `<div class="tile-tag font-bold mb-1" style="font-size:0.75rem;color:${data.tagColor || `var(${config.accentVar})`};">${data.tag}</div>` : '';
+          const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
+          article.innerHTML = `
+            <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
+            <div>
+              ${tagHTML}
+              <div class="font-heavy tile-hero" style="font-size:1.3rem;line-height:1.1;color:${heroColor};">${data.hero || '--'}</div>
+              <div class="text-muted tile-sub" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
+            </div>
+          `;
+      }
+    }
   });
 
   sorted.forEach(config => {
@@ -220,81 +247,9 @@ function renderGlanceGrid(appState, defaultDays, activeProgram, selectedDay) {
   mountTileDragAndDrop();
 }
 
-// ==========================================
-// TILE CUSTOMISER
-// ==========================================
-function openTileCustomiser() {
-  const sheet = document.getElementById('tileCustomiserSheet');
-  const list  = document.getElementById('tileCustomiserList');
-  if (!sheet || !list) return;
-
-  const hidden     = loadHiddenTiles();
-  const savedOrder = loadTileOrder();
-  const sorted = [...TILE_REGISTRY].sort((a, b) => {
-    if (savedOrder) {
-      const ai = savedOrder.indexOf(a.id);
-      const bi = savedOrder.indexOf(b.id);
-      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
-    }
-    return a.order - b.order;
-  });
-
-  list.innerHTML = sorted.map(config => `
-    <div class="tile-picker-item${hidden.has(config.id) ? ' tile-picker-hidden' : ''}" data-tile-id="${config.id}">
-      <span class="tile-picker-icon">${config.icon}</span>
-      <span class="tile-picker-label">${config.label}</span>
-      <input type="checkbox" class="tile-picker-check" data-tile-id="${config.id}" ${hidden.has(config.id) ? '' : 'checked'}>
-      <span class="tile-picker-toggle"></span>
-    </div>
-  `).join('');
-
-  list.querySelectorAll('.tile-picker-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const cb = item.querySelector('.tile-picker-check');
-      cb.checked = !cb.checked;
-      item.classList.toggle('tile-picker-hidden', !cb.checked);
-    });
-  });
-
-  sheet.classList.add('active');
-  document.getElementById('tileCustomiserBackdrop')?.classList.add('active');
-}
-
-export function closeTileCustomiser(apply) {
-  const sheet = document.getElementById('tileCustomiserSheet');
-  if (!sheet) return;
-
-  if (apply) {
-    const hidden = new Set();
-    sheet.querySelectorAll('.tile-picker-check').forEach(cb => {
-      if (!cb.checked) hidden.add(cb.dataset.tileId);
-    });
-    saveHiddenTiles(hidden);
-    sheet.classList.remove('active');
-    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
-    
-    const appState      = _getState();
-    const DEFAULT_DAYS  = _getDays();
-    const activeProgram = getProgramById(appState.activeProgramId);
-    renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
-  } else {
-    sheet.classList.remove('active');
-    document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
-  }
-}
-
-export function resetTileCustomiser() {
-  resetTileOrder();
-  resetHiddenTiles();
-  document.getElementById('tileCustomiserSheet')?.classList.remove('active');
-  document.getElementById('tileCustomiserBackdrop')?.classList.remove('active');
-  const appState      = _getState();
-  const DEFAULT_DAYS  = _getDays();
-  const activeProgram = getProgramById(appState.activeProgramId);
-  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
-}
-
 export function renderHome() {
+  if (!_getState || !_getSelectedDay || !_getDays) return;
+
   const appState = _getState();
   const selectedDay = _getSelectedDay();
   const DEFAULT_DAYS = _getDays(); 
@@ -302,6 +257,10 @@ export function renderHome() {
   const wk = appState?.currentWeek || "1";
   const weekData = appState?.weeks?.[wk] || {};
 
+  // 1. Evaluate Hybrid Brain
+  const brainPayload = evaluateState(appState, DEFAULT_DAYS);
+
+  // 2. Render Header & Indicators
   const indicatorEl = document.getElementById('homeWeekBlockIndicator');
   const labelEl = document.getElementById('homeBlockTypeLabel');
   if (indicatorEl) indicatorEl.textContent = 'Week ' + wk;
@@ -326,31 +285,52 @@ export function renderHome() {
   if (focusTitle) focusTitle.textContent = homeBlueprint.title || 'Rest Day';
   if (focusDesc) focusDesc.textContent = homeBlueprint.desc || '';
 
-  const engineAlertCard = document.getElementById('homeEngineAlertCard');
-  const engineAlertDesc = document.getElementById('homeEngineAlertDesc');
-  const globalStallAlertsFound = [];
-
-  DEFAULT_DAYS.forEach(dKey => {
-    const dayLifts = weekData.lifts?.[dKey] || {};
-    for (let liftName in dayLifts) {
-      try {
-        const diag = computeDiagnosticForLift(wk, dKey, liftName);
-        if (diag && (diag.isStalled || diag.isFatigueOverload)) {
-          globalStallAlertsFound.push(diag.message);
-        }
-      } catch (e) {
-        console.warn("Defensive shield caught diagnostic breakdown:", e);
-      }
+  // 3. Inject Brain Analyst Panel (Replaces old Engine Alerts)
+  let analystPanel = document.getElementById('brainAnalystPanel');
+  if (!analystPanel) {
+    analystPanel = document.createElement('div');
+    analystPanel.id = 'brainAnalystPanel';
+    analystPanel.className = 'mb-5 mt-2';
+    
+    const focusHeader = document.querySelector('#view-home .focus-header-text');
+    if (focusHeader && focusHeader.parentNode) {
+      focusHeader.parentNode.insertBefore(analystPanel, focusHeader);
     }
-  });
-
-  if (globalStallAlertsFound.length > 0) {
-    if (engineAlertCard) engineAlertCard.style.display = 'block';
-    if (engineAlertDesc) engineAlertDesc.textContent = globalStallAlertsFound[0];
-  } else {
-    if (engineAlertCard) engineAlertCard.style.display = 'none';
   }
 
+  if (brainPayload.primaryFocus) {
+    const focus = brainPayload.primaryFocus;
+    
+    let insightsHtml = '';
+    // Pull the highest priority insight or risk to add context
+    const topItems = [...brainPayload.risks, ...brainPayload.insights, ...brainPayload.opportunities].slice(0, 2);
+    if (topItems.length > 0) {
+      insightsHtml = topItems.map(item => `<div class="text-xs text-muted mt-2 pl-3" style="border-left: 2px solid rgba(255,255,255,0.15);">💡 ${item.text}</div>`).join('');
+    }
+
+    let readinessBadgeColor = 'var(--color-green)';
+    if (brainPayload.readiness.score <= 40) readinessBadgeColor = 'var(--color-red)';
+    else if (brainPayload.readiness.score < 75) readinessBadgeColor = 'var(--color-amber)';
+
+    analystPanel.innerHTML = `
+      <article class="card-dark p-4" style="border: 1px solid rgba(59, 130, 246, 0.35); background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, var(--bg-card) 100%);">
+        <div class="flex-between mb-3">
+          <span class="badge-primary" style="background: ${readinessBadgeColor}; color: #fff; padding: 4px 10px;">
+            Readiness: ${brainPayload.readiness.label} (${brainPayload.readiness.score}%)
+          </span>
+          <span class="text-xs-bold text-accent-blue tracking-wide uppercase">Analyst Report</span>
+        </div>
+        <h3 class="text-xl font-heavy text-inverse mb-2" style="letter-spacing: -0.5px;">🎯 ${focus.theme}</h3>
+        <p class="text-sm text-primary leading-snug mb-3">${focus.description}</p>
+        ${insightsHtml}
+      </article>
+    `;
+    analystPanel.style.display = 'block';
+  } else {
+    analystPanel.style.display = 'none';
+  }
+
+  // 4. Render Session Preview / Logging Status
   const previewContainer = document.getElementById('homeDrillPreviewContainer');
   const todayLifts = weekData.lifts?.[selectedDay] || {};
   const todayRun = weekData.runs?.[selectedDay] || {};
@@ -363,7 +343,7 @@ export function renderHome() {
       todayLifts[lift].forEach(s => {
         if (s) {
           const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
-          if (isCompleted) {
+          if (isCompleted && !s.isWarmup) {
             todaySets++;
             todayVol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
           }
@@ -379,8 +359,7 @@ export function renderHome() {
     previewContainer.innerHTML = '';
 
     if (isSessionStarted) {
-      if (hBadge) hBadge.textContent = "✓ Completed";
-      if (hBadge) hBadge.style.color = "var(--accent-green)";
+      if (hBadge) { hBadge.textContent = "✓ Completed"; hBadge.style.color = "var(--accent-green)"; }
       if (dAccent) dAccent.style.background = "var(--accent-green)";
       if (focusTitle) focusTitle.textContent = "Session Logged";
       if (focusDesc) focusDesc.textContent = "Great work. Tap below to edit or add notes.";
@@ -399,9 +378,7 @@ export function renderHome() {
       `;
 
       const todayGym = weekData.gymStats?.[selectedDay] || {};
-      const hasGymStats = todayGym.time || todayGym.avgHR || todayGym.maxHR || todayGym.cals;
-
-      if (hasGymStats) {
+      if (todayGym.time || todayGym.avgHR || todayGym.maxHR || todayGym.cals) {
         summaryHTML += `
           <div class="card-dark p-2 mb-1" style="border: 1px solid rgba(255,255,255,0.12);">
             <div class="flex-between">
@@ -475,9 +452,9 @@ export function renderHome() {
     }
   }
 
+  // 5. Render Weekly Volume Carousels
   let currentWeekGymTimeSum = 0; 
   let currentWeekRunDistSum = 0;
-
   const dailyGymTimes = []; 
   const dailyDists = [];
 
@@ -495,9 +472,8 @@ export function renderHome() {
       for (let lift in weekData.lifts[dKey]) {
         if (Array.isArray(weekData.lifts[dKey][lift])) {
           weekData.lifts[dKey][lift].forEach(s => {
-            if (s) {
-              const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
-              if (isCompleted) dailyCompletedSets++;
+            if (s && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1) && !s.isWarmup) {
+              dailyCompletedSets++;
             }
           });
         }
@@ -522,13 +498,10 @@ export function renderHome() {
 
   if (strengthChartContainer && runChartContainer) {
     const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    
     const safeGymTimes = dailyGymTimes.map(t => isNaN(t) ? 0 : t);
     const safeDists = dailyDists.map(d => isNaN(d) ? 0 : d);
-    
     const maxGymTime = Math.max(...safeGymTimes, 1);
     const maxDist = Math.max(...safeDists, 1);
-    
     const BAR_AREA_PX = 47;
     const MIN_PX = 4;
 
@@ -569,8 +542,10 @@ export function renderHome() {
     runChartContainer.innerHTML = runHTML;
   }
 
-  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay);
+  // 6. Render Dashboard Tiles with Brain Augmentation
+  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay, brainPayload);
 
+  // 7. Calculate overall weekly completion percentage
   const progressPercentage = (() => {
     let total = 0, done = 0;
     DEFAULT_DAYS.forEach(dKey => {
@@ -583,8 +558,10 @@ export function renderHome() {
       for (const lift in dayLifts) {
         if (Array.isArray(dayLifts[lift])) {
           dayLifts[lift].forEach(s => {
-            total++;
-            if (s && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1)) done++;
+            if (!s.isWarmup) {
+              total++;
+              if (s && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1)) done++;
+            }
           });
         }
       }
@@ -597,31 +574,7 @@ export function renderHome() {
   if (progressPctEl) progressPctEl.textContent = progressPercentage + '% WEEK DONE';
   if (progressBarEl) progressBarEl.style.width = progressPercentage + '%';
 
-  const nextRunTitle = document.getElementById('homeNextRunTitle');
-  const nextRunDesc = document.getElementById('homeNextRunDesc');
-  if (nextRunTitle && nextRunDesc) {
-    const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-    const todayIdx = dayKeys.indexOf(selectedDay);
-    let foundNextRun = false;
-    for (let offset = 1; offset <= 7; offset++) {
-      const checkDay = dayKeys[(todayIdx + offset) % 7];
-      const checkBlueprint = getDisplayBlueprint(activeProgram, wk, checkDay);
-      if (checkBlueprint && checkBlueprint.runs &&
-          checkBlueprint.runs.toLowerCase() !== 'rest' &&
-          !checkBlueprint.runs.toLowerCase().includes('no running') &&
-          !checkBlueprint.runs.toLowerCase().includes('no structured')) {
-        nextRunTitle.textContent = checkBlueprint.title || 'Run Day';
-        nextRunDesc.textContent = checkBlueprint.runs;
-        foundNextRun = true;
-        break;
-      }
-    }
-    if (!foundNextRun) {
-      nextRunTitle.textContent = 'No Run Scheduled';
-      nextRunDesc.textContent = 'No aerobic sessions in the current program.';
-    }
-  }
-
+  // 8. Weekly Comparison Calculation
   const compareCard = document.getElementById('homeWeekCompareCard');
   const compareGrid = document.getElementById('homeWeekCompareGrid');
   const prevWkNum = parseInt(wk, 10) - 1;
@@ -637,9 +590,8 @@ export function renderHome() {
         for (const l in pLifts) {
           if (Array.isArray(pLifts[l])) {
             pLifts[l].forEach(s => { 
-              if (s) {
-                const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
-                if (isCompleted) prevVol += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
+              if (s && !s.isWarmup && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1)) {
+                prevVol += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
               }
             });
           }
@@ -648,9 +600,8 @@ export function renderHome() {
         for (const l in cLifts) {
           if (Array.isArray(cLifts[l])) {
             cLifts[l].forEach(s => { 
-              if (s) {
-                const isCompleted = s.c === true || s.c === "true" || s.c === "on" || s.c === 1;
-                if (isCompleted) currentWeekVolSum += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
+              if (s && !s.isWarmup && (s.c === true || s.c === "true" || s.c === "on" || s.c === 1)) {
+                currentWeekVolSum += (parseFloat(s.w)||0)*(parseInt(s.r,10)||0); 
               }
             });
           }
@@ -685,28 +636,6 @@ export function renderHome() {
     }
   } else if (compareCard) {
     compareCard.style.display = 'none';
-  }
-
-  const deloadCard = document.getElementById('homeDeloadSuggestionCard');
-  const deloadReason = document.getElementById('homeDeloadReason');
-  if (deloadCard) {
-    const alreadyDismissed = appState._deloadDismissedWeek === appState.currentWeek;
-    const alreadyApplied   = appState.deloadApplied === appState.currentWeek;
-    if (!alreadyDismissed && !alreadyApplied) {
-      try {
-        const deloadSignal = shouldSuggestDeload();
-        if (deloadSignal.suggest) {
-          if (deloadReason) deloadReason.textContent = deloadSignal.reason;
-          deloadCard.style.display = 'block';
-        } else {
-          deloadCard.style.display = 'none';
-        }
-      } catch(e) {
-        deloadCard.style.display = 'none';
-      }
-    } else {
-      deloadCard.style.display = 'none';
-    }
   }
 }
 
