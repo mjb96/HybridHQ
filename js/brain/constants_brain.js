@@ -4,10 +4,12 @@
 // ==========================================
 
 export const DOMAINS = Object.freeze({
-  STRENGTH:  'strength',
-  AEROBIC:   'aerobic',
-  ADHERENCE: 'adherence',
-  RECOVERY:  'recovery',
+  STRENGTH:   'strength',
+  AEROBIC:    'aerobic',
+  ADHERENCE:  'adherence',
+  RECOVERY:   'recovery',
+  BODYWEIGHT: 'bodyweight',
+  FUEL:       'fuel',
 });
 
 export const ENGINES = Object.freeze({
@@ -15,6 +17,8 @@ export const ENGINES = Object.freeze({
   RUNNING:   'running',
   ADHERENCE: 'adherence',
   RECOVERY:  'recovery',
+  BODYCOMP:  'bodycomp',
+  FUEL:      'fuel',
 });
 
 export const FINDING_TYPES = Object.freeze({
@@ -26,6 +30,9 @@ export const FINDING_TYPES = Object.freeze({
   LOAD_SPIKE:   'load_spike',
   CONSISTENCY:  'consistency',
   INTERFERENCE: 'interference',
+  BODYWEIGHT_TREND: 'bodyweight_trend',
+  FUEL_TREND:       'fuel_trend',
+  RECOVERY_STATUS:  'recovery_status',
 });
 
 export const DIRECTION = Object.freeze({ UP: 'up', DOWN: 'down', FLAT: 'flat' });

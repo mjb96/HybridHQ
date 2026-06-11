@@ -13,6 +13,8 @@ import {
   computeBig3Progression,
   computeGoalAdherence,
   computeWeeklyCompletionSeries,
+  computeWeeklyCaloriesSeries,
+  computeRecoveryScore,
   paceSecondsPerKm,
 } from '../engine.js';
 import { strengthLoadSeries, enduranceLoadSeries } from './load_models.js';
@@ -204,6 +206,65 @@ export function analyzeAdherence(state, program, days, currentWeek, maxWeek) {
 }
 
 // ------------------------------------------------------------------
+// BODY-COMP ENGINE — body-weight direction (goal-neutral).
+// ------------------------------------------------------------------
+export function analyzeBodyComp(state) {
+  const log = (state?.bodyWeightLog || []).filter(e => e && e.date && e.weight > 0);
+  if (log.length < 3) return [];
+  const sorted = [...log].sort((a, b) => a.date.localeCompare(b.date));
+  const first = sorted[0].weight, last = sorted[sorted.length - 1].weight;
+  const pct = first > 0 ? (last - first) / first : 0;
+  let direction = 'flat';
+  if (pct >= 0.01) direction = 'up';
+  else if (pct <= -0.01) direction = 'down';
+  if (direction === 'flat') return [];
+  return [makeFinding({
+    engine: ENGINES.BODYCOMP, domain: DOMAINS.BODYWEIGHT, type: FINDING_TYPES.BODYWEIGHT_TREND,
+    subject: 'bodyweight', direction, magnitude: round1(last - first), unit: 'kg',
+    window: { fromDate: sorted[0].date, toDate: sorted[sorted.length - 1].date },
+    evidence: [{ metric: 'bw_first', value: first }, { metric: 'bw_last', value: last }],
+    dataPoints: sorted.length, severity: clamp01(Math.abs(pct) / 0.05),
+  })];
+}
+
+// ------------------------------------------------------------------
+// FUEL ENGINE — weekly active-calorie trend.
+// ------------------------------------------------------------------
+export function analyzeFuel(state, days, maxWeek) {
+  const t = trend(computeWeeklyCaloriesSeries(state, days, maxWeek));
+  if (t.points < THRESHOLDS.MIN_POINTS_LOW || !t.direction || t.direction === 'flat') return [];
+  return [makeFinding({
+    engine: ENGINES.FUEL, domain: DOMAINS.FUEL, type: FINDING_TYPES.FUEL_TREND,
+    subject: 'global', direction: t.direction, magnitude: round1(t.pct * 100), unit: '%',
+    window: { fromWeek: t.fromWeek, toWeek: t.toWeek },
+    evidence: [{ metric: 'cals_first', value: t.first }, { metric: 'cals_last', value: t.last }],
+    dataPoints: t.points, severity: clamp01(Math.abs(t.pct) / 0.4),
+  })];
+}
+
+// ------------------------------------------------------------------
+// RECOVERY ENGINE — current recovery-status snapshot (RPE + rest blend).
+// ------------------------------------------------------------------
+export function analyzeRecovery(state, days) {
+  const r = computeRecoveryScore(state, days);
+  if (!r.hasData) return [];
+  let direction = 'flat', severity = 0.3;
+  if (r.score < 40) { direction = 'down'; severity = 0.8; }
+  else if (r.score >= 75) { direction = 'up'; severity = 0.3; }
+  return [makeFinding({
+    engine: ENGINES.RECOVERY, domain: DOMAINS.RECOVERY, type: FINDING_TYPES.RECOVERY_STATUS,
+    subject: 'global', direction, magnitude: r.score, unit: '%',
+    window: { toWeek: parseInt(state?.currentWeek, 10) || 1 },
+    evidence: [
+      { metric: 'fatigue', value: r.fatigueScore },
+      { metric: 'rest',    value: r.restScore },
+      { metric: 'avg_rpe', value: Math.round(r.avgRpe * 10) / 10 },
+    ],
+    dataPoints: r.activeDays || 1, severity,
+  })];
+}
+
+// ------------------------------------------------------------------
 // ORCHESTRATION — run every engine, return the combined Finding list.
 // ------------------------------------------------------------------
 export function runAnalysis(state, ctx = {}) {
@@ -215,5 +276,8 @@ export function runAnalysis(state, ctx = {}) {
     ...analyzeStrength(state, days, maxWeek),
     ...analyzeRunning(state, days, maxWeek),
     ...analyzeAdherence(state, program, days, currentWeek, maxWeek),
+    ...analyzeBodyComp(state),
+    ...analyzeFuel(state, days, maxWeek),
+    ...analyzeRecovery(state, days),
   ];
 }
