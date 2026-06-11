@@ -2,7 +2,20 @@
 // FATIGUE MODELS (fatigue_models.js)
 // Pure, stateless functions to calculate 3D fatigue.
 // ==========================================
-import { exerciseCategory } from '../schema.js';
+import { EXERCISE_LIBRARY } from '../constants.js';
+
+// Local helper to replace the missing schema.js export
+function getExerciseCategory(liftName) {
+  if (!liftName) return 'Uncategorized';
+  const searchName = liftName.toLowerCase().trim();
+  
+  for (const cat in EXERCISE_LIBRARY) {
+    if (EXERCISE_LIBRARY[cat].some(ex => ex.toLowerCase().trim() === searchName)) {
+      return cat;
+    }
+  }
+  return 'Uncategorized';
+}
 
 function parseDurationMin(timeStr) {
   if (!timeStr) return 0;
@@ -28,8 +41,9 @@ export function calculateLocalFatigue(weeksState, currentWeekString, defaultDays
       if (!dayLifts) return;
 
       for (const liftName in dayLifts) {
-        const cat = exerciseCategory(liftName) || 'Uncategorized';
+        const cat = getExerciseCategory(liftName);
         const setsArr = dayLifts[liftName];
+        
         if (Array.isArray(setsArr)) {
           const completedWorkingSets = setsArr.filter(s => 
             s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1) && !s.isWarmup
