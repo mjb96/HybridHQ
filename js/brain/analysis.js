@@ -15,6 +15,7 @@ import {
   computeWeeklyCaloriesSeries,
   computeRecoveryScore,
   paceSecondsPerKm,
+  formatPace,
   epley1RM,
   isCompletedSet,
 } from '../engine.js';
@@ -112,6 +113,45 @@ function liftE1rmByWeekAll(state, days, maxWeek) {
   return out;
 }
 
+// Current-week descriptive rollups — the "what you did this week" base layer
+// that works from a SINGLE logged week (trends need 2–3 weeks to appear).
+function strengthWeekSummary(state, days, cw) {
+  const wk = state?.weeks?.[String(cw)];
+  if (!wk?.lifts) return null;
+  let sets = 0, vol = 0;
+  const sessions = new Set();
+  (days || []).forEach(d => {
+    const dl = wk.lifts[d] || {};
+    let dayHas = false;
+    for (const lift in dl) {
+      const arr = dl[lift];
+      if (!Array.isArray(arr)) continue;
+      arr.forEach(s => { if (isCompletedSet(s) && !s.isWarmup) { sets++; vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0); dayHas = true; } });
+    }
+    if (dayHas) sessions.add(d);
+  });
+  return sets > 0 ? { sessions: sessions.size, sets, vol: Math.round(vol) } : null;
+}
+
+function runningWeekSummary(state, days, cw) {
+  const wk = state?.weeks?.[String(cw)];
+  if (!wk?.runs) return null;
+  let runs = 0, dist = 0, pwTime = 0, pDist = 0, elev = 0;
+  (days || []).forEach(d => {
+    const r = wk.runs[d];
+    if (!r) return;
+    const dd = parseFloat(r.dist) || 0;
+    if (dd > 0) {
+      runs++; dist += dd; elev += parseFloat(r.elev) || 0;
+      const p = paceSecondsPerKm(dd, r.time || '');
+      if (p > 0) { pwTime += p * dd; pDist += dd; }
+    }
+  });
+  if (runs === 0) return null;
+  const avgPace = pDist > 0 ? pwTime / pDist : 0;
+  return { runs, dist: Math.round(dist * 10) / 10, avgPaceFmt: avgPace > 0 ? formatPace(avgPace) : '—', elev: Math.round(elev) };
+}
+
 // ------------------------------------------------------------------
 // STRENGTH ENGINE — e1RM trend / plateau per main compound, volume trend,
 // and a concrete weekly highlight (standout lift / new estimated-1RM best).
@@ -176,14 +216,42 @@ export function analyzeStrength(state, days, maxWeek, currentWeek) {
       dataPoints: vt.points, severity: clamp01(Math.abs(vt.pct) / 0.3),
     }));
   }
+
+  // Single-week strength rollup (always available with logged sets).
+  const sSum = strengthWeekSummary(state, days, cw);
+  if (sSum) {
+    findings.push(makeFinding({
+      engine: ENGINES.STRENGTH, domain: DOMAINS.STRENGTH, type: FINDING_TYPES.STRENGTH_SUMMARY,
+      subject: 'week', direction: null, magnitude: sSum.vol, unit: 'kg', window: { toWeek: cw },
+      evidence: [{ metric: 'sessions', value: sSum.sessions }, { metric: 'sets', value: sSum.sets }, { metric: 'volume', value: sSum.vol }],
+      dataPoints: sSum.sessions, severity: 0.15,
+    }));
+  }
+
   return findings;
 }
 
 // ------------------------------------------------------------------
-// RUNNING ENGINE — pace trend, endurance-load trend, load spike
+// RUNNING ENGINE — single-week rollup, pace trend, endurance-load trend, spike
 // ------------------------------------------------------------------
-export function analyzeRunning(state, days, maxWeek) {
+export function analyzeRunning(state, days, maxWeek, currentWeek) {
   const findings = [];
+
+  // Single-week running rollup (always available with a logged run) — the base
+  // that makes running show up before multi-week trends exist.
+  const cw = parseInt(currentWeek ?? state?.currentWeek, 10) || 1;
+  const rSum = runningWeekSummary(state, days, cw);
+  if (rSum) {
+    findings.push(makeFinding({
+      engine: ENGINES.RUNNING, domain: DOMAINS.AEROBIC, type: FINDING_TYPES.RUNNING_SUMMARY,
+      subject: 'week', direction: null, magnitude: rSum.dist, unit: 'km', window: { toWeek: cw },
+      evidence: [
+        { metric: 'runs', value: rSum.runs }, { metric: 'dist', value: rSum.dist },
+        { metric: 'avg_pace', value: rSum.avgPaceFmt }, { metric: 'elev', value: rSum.elev },
+      ],
+      dataPoints: rSum.runs, severity: 0.15,
+    }));
+  }
 
   const pace = weeklyPaceSeries(state, days, maxWeek);
   const pt = trend(pace);
@@ -327,7 +395,7 @@ export function runAnalysis(state, ctx = {}) {
   const program = ctx.program || null;
   return [
     ...analyzeStrength(state, days, maxWeek, currentWeek),
-    ...analyzeRunning(state, days, maxWeek),
+    ...analyzeRunning(state, days, maxWeek, currentWeek),
     ...analyzeAdherence(state, program, days, currentWeek, maxWeek),
     ...analyzeBodyComp(state),
     ...analyzeFuel(state, days, maxWeek),

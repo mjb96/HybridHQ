@@ -34,6 +34,8 @@ export const FINDING_TYPES = Object.freeze({
   FUEL_TREND:       'fuel_trend',
   RECOVERY_STATUS:  'recovery_status',
   STRENGTH_HIGHLIGHT: 'strength_highlight',
+  STRENGTH_SUMMARY:   'strength_summary',
+  RUNNING_SUMMARY:    'running_summary',
 });
 
 export const DIRECTION = Object.freeze({ UP: 'up', DOWN: 'down', FLAT: 'flat' });

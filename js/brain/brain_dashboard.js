@@ -51,18 +51,23 @@ export function renderBrainInsights(appState, days, program) {
 
   tile.style.display = '';
   const { focus, counts } = summarizeReport(report);
-  body.innerHTML = renderTileBody(focus, contextVerdict(insights), counts, insights.length);
+  // Surface a second line from a DIFFERENT domain (so e.g. strength focus still
+  // shows a running read), falling back to the next insight.
+  const secondary = insights.find(i => i !== focus && i.domain !== focus?.domain) || insights[1] || null;
+  body.innerHTML = renderTileBody(focus, secondary, contextVerdict(insights), counts, insights.length);
 }
 
-function renderTileBody(focus, verdict, counts, total) {
+function renderTileBody(focus, secondary, verdict, counts, total) {
   const vm = verdict ? meta(verdict.tone) : meta('progress');
   const chips = CHIP_ORDER.filter(c => counts[c] > 0).map(c => {
     const m = meta(c);
     return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:0.58rem;font-weight:700;color:${m.color};">${m.icon}${counts[c]}</span>`;
   }).join(' ');
+  const sm = secondary ? meta(secondary.category) : null;
   return `
     ${verdict ? `<div class="font-heavy mb-1" style="font-size:1.15rem;line-height:1.1;color:${vm.color};">${verdict.label}</div>` : ''}
-    <div class="text-inverse mb-2" style="font-size:0.8rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(focus ? focus.observation : '')}</div>
+    <div class="text-inverse mb-1" style="font-size:0.8rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(focus ? focus.observation : '')}</div>
+    ${secondary ? `<div class="text-muted mb-2 flex gap-1 align-center" style="font-size:0.66rem;line-height:1.25;"><span style="color:${sm.color};">${sm.icon}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(secondary.observation)}</span></div>` : '<div class="mb-2"></div>'}
     <div class="flex-between align-center">
       <div class="flex gap-2" style="flex-wrap:wrap;">${chips}</div>
       <span class="text-muted" style="font-size:0.6rem;white-space:nowrap;">${total} insight${total !== 1 ? 's' : ''} →</span>

@@ -211,6 +211,29 @@ function template(f) {
     };
   }
 
+  if (f.type === 'strength_summary') {
+    const sessions = ev(f, 'sessions');
+    return {
+      category: CAT.PROGRESS,
+      observation: `This week: ${sessions} lifting session${sessions !== 1 ? 's' : ''} · ${ev(f, 'sets')} sets · ${Math.round(ev(f, 'volume')).toLocaleString()} kg lifted.`,
+      explanation: `Your completed working sets logged so far this week.`,
+      whyItMatters: `This is your current strength workload — the base the week-over-week trends build on.`,
+      suggestedAction: `Keep logging; e1RM and volume trends unlock once you have a couple of weeks.`,
+    };
+  }
+
+  if (f.type === 'running_summary') {
+    const runs = ev(f, 'runs');
+    const elev = ev(f, 'elev');
+    return {
+      category: CAT.PROGRESS,
+      observation: `This week: ${runs} run${runs !== 1 ? 's' : ''} · ${ev(f, 'dist')} km · avg pace ${ev(f, 'avg_pace')}.`,
+      explanation: `Your logged runs so far this week${elev > 0 ? `, +${elev} m elevation` : ''}.`,
+      whyItMatters: `This is your current running load — pace and load trends build on it.`,
+      suggestedAction: `Log a few more runs to unlock pace and load trends.`,
+    };
+  }
+
   if (f.type === 'recovery_status') {
     const score = mag;
     const detail = `Fatigue score ${ev(f, 'fatigue')}, rest score ${ev(f, 'rest')}, avg RPE ${ev(f, 'avg_rpe')} this week.`;
