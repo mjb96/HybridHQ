@@ -14,7 +14,6 @@ import {
   verifyWeekStorageSchema,
   saveStateToLocalStorage,
   pullEngineDataFromStorage,
-  triggerTextSummaryExport,
   triggerEngineExport,
   triggerCSVExport,
   triggerEngineImport,
@@ -476,7 +475,6 @@ document.addEventListener('click', (e) => {
   else if (action === 'duplicate-program') executeDuplicateProgram(progId);
   
   // Export & Data
-  else if (action === 'export-text') triggerTextSummaryExport();
   else if (action === 'export-json') triggerEngineExport();
   else if (action === 'export-csv') triggerCSVExport();
   
