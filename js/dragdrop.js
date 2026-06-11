@@ -16,14 +16,20 @@ export function initDragDrop(getStateFn, getSelectedDayFn, saveStateFn) {
 
 export function mountExerciseDragAndDropSystems() {
   const container = document.getElementById('cockpitExercisesContainer');
+  if (!container) return;
   const elements = container.querySelectorAll('.cockpit-exercise');
 
   elements.forEach(element => {
     const grip = element.querySelector('.drag-handle-grip');
     if (!grip) return;
 
-    grip.addEventListener('mousedown', () => element.setAttribute('draggable', 'true'));
-    grip.addEventListener('mouseup', () => element.setAttribute('draggable', 'false'));
+    // Remove old listeners to prevent duplication on re-render
+    const clone = grip.cloneNode(true);
+    grip.parentNode.replaceChild(clone, grip);
+    const newGrip = clone;
+
+    newGrip.addEventListener('mousedown', () => element.setAttribute('draggable', 'true'));
+    newGrip.addEventListener('mouseup', () => element.setAttribute('draggable', 'false'));
 
     element.addEventListener('dragstart', (e) => {
       sourceDraggedElementNode = element;
@@ -41,23 +47,24 @@ export function mountExerciseDragAndDropSystems() {
       if (element === sourceDraggedElementNode) return;
       const bounding = element.getBoundingClientRect();
       const offset = e.clientY - bounding.top;
+      // Implicit DOM sorting: dropping next to a grouped item places it into the group container
       if (offset > bounding.height / 2) element.after(sourceDraggedElementNode);
       else element.before(sourceDraggedElementNode);
     });
 
-    grip.addEventListener('touchstart', () => {
+    newGrip.addEventListener('touchstart', () => {
       sourceDraggedElementNode = element;
       element.classList.add('is-dragging');
       if (navigator.vibrate) navigator.vibrate(10);
     }, { passive: true });
 
-    grip.addEventListener('touchmove', (e) => {
+    newGrip.addEventListener('touchmove', (e) => {
       e.preventDefault();
       const touchLocation = e.touches[0];
       const targetNode = document.elementFromPoint(touchLocation.clientX, touchLocation.clientY);
       if (!targetNode) return;
       const closestCard = targetNode.closest('.cockpit-exercise');
-      if (closestCard && closestCard !== sourceDraggedElementNode && closestCard.parentNode === container) {
+      if (closestCard && closestCard !== sourceDraggedElementNode) {
         const bounding = closestCard.getBoundingClientRect();
         const offset = touchLocation.clientY - bounding.top;
         if (offset > bounding.height / 2) closestCard.after(sourceDraggedElementNode);
@@ -65,7 +72,7 @@ export function mountExerciseDragAndDropSystems() {
       }
     }, { passive: false });
 
-    grip.addEventListener('touchend', () => {
+    newGrip.addEventListener('touchend', () => {
       if (sourceDraggedElementNode) {
         sourceDraggedElementNode.classList.remove('is-dragging');
         sourceDraggedElementNode = null;
@@ -75,22 +82,37 @@ export function mountExerciseDragAndDropSystems() {
   });
 }
 
+// PHASE 3 SUPERSETS: Nested DOM syncing logic
 export function commitReorderedDOMStateToStorage() {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
   const container = document.getElementById('cockpitExercisesContainer');
   const cards = container.querySelectorAll('.cockpit-exercise');
   const wk = appState.currentWeek;
+  
   const newOrderedLiftsMap = {};
+  const newSupersetsMap = {};
+
   cards.forEach(card => {
     const liftName = card.getAttribute('data-liftname');
     if (appState.weeks[wk].lifts[selectedDay][liftName]) {
       newOrderedLiftsMap[liftName] = appState.weeks[wk].lifts[selectedDay][liftName];
+      
+      // Inherit group if dropped into a container, otherwise unlink it natively
+      const parent = card.parentElement;
+      if (parent && parent.classList.contains('superset-container')) {
+        newSupersetsMap[liftName] = parent.dataset.groupId;
+      }
     }
   });
+
   appState.weeks[wk].lifts[selectedDay] = newOrderedLiftsMap;
+  appState.weeks[wk].supersets[selectedDay] = newSupersetsMap;
   _saveState(true);
+  
   showToast('Order Updated ✓');
+  // Dispatch decoupled event to instantly redraw superset visual borders
+  document.dispatchEvent(new CustomEvent('workout:force-rerender'));
 }
 
 // ==========================================
@@ -121,7 +143,6 @@ export function resetTileOrder() {
 
 // ==========================================
 // TILE DRAG AND DROP
-// Long-press to enter edit mode, then drag to reorder.
 // ==========================================
 let tileDragSource   = null;
 let tileDragEditMode = false;
@@ -139,7 +160,6 @@ export function mountTileDragAndDrop() {
     if (tile.dataset.tileDragBound === '1') return;
     tile.dataset.tileDragBound = '1';
 
-    // --- Mouse ---
     tile.addEventListener('mousedown', onTileMouseDown);
     tile.addEventListener('dragstart', onTileDragStart);
     tile.addEventListener('dragover',  onTileDragOver);
@@ -147,7 +167,6 @@ export function mountTileDragAndDrop() {
     tile.addEventListener('drop',      onTileDrop);
     tile.addEventListener('dragend',   onTileDragEnd);
 
-    // --- Touch ---
     tile.addEventListener('touchstart', onTileTouchStart, { passive: true });
     tile.addEventListener('touchmove',  onTileTouchMove,  { passive: false });
     tile.addEventListener('touchend',   onTileTouchEnd);
@@ -180,7 +199,6 @@ function commitTileOrder() {
   showToast('Tile order saved ✓');
 }
 
-// Mouse handlers
 function onTileMouseDown(e) {
   const tile = e.currentTarget;
   tileLongPressTimer = setTimeout(() => {
@@ -235,7 +253,6 @@ function onTileDragEnd(e) {
   if (tileDragEditMode) commitTileOrder();
 }
 
-// Touch handlers
 function onTileTouchStart(e) {
   const tile = e.currentTarget;
   tileLongPressTimer = setTimeout(() => {
@@ -277,9 +294,6 @@ function onTileTouchEnd() {
   }
 }
 
-// ==========================================
-// HIDDEN TILES PERSISTENCE
-// ==========================================
 const TILE_HIDDEN_KEY = 'dashboardTilesHidden';
 
 export function loadHiddenTiles() {
