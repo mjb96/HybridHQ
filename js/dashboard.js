@@ -27,8 +27,9 @@
 //   state:       'loaded'|'empty'|'error'
 // }
 
+import { appState } from './state.js';
 import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
-         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence } from './engine.js';
+         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence, computeHybridInsights } from './engine.js';
 
 // ==========================================
 // TILE TYPE ENUM
@@ -509,4 +510,69 @@ export function resolveTileNavigation(navTarget) {
   return () => document.dispatchEvent(
     new CustomEvent('app:navigate', { detail: { target: navTarget } })
   );
+}
+
+// ==========================================
+// DAILY INTELLIGENCE BRIEFING CONTROLLER
+// ==========================================
+export function renderIntelligenceBriefing() {
+  const container = document.getElementById('intelligenceBriefingContainer');
+  if (!container) return;
+
+  // Read raw entries from the hybrid brain engine
+  const insights = computeHybridInsights(appState);
+  
+  // Check for dismissed items stored in session memory to prevent spam
+  const dismissedIds = JSON.parse(sessionStorage.getItem('dismissed_insights') || '[]');
+  const activeInsights = insights.filter(ins => !dismissedIds.includes(ins.id));
+
+  if (activeInsights.length === 0) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="briefing-wrapper" style="margin-bottom: 20px;">
+      ${activeInsights.map(ins => {
+        let borderStroke = 'var(--accent-blue)';
+        if (ins.type === 'warning') borderStroke = 'var(--accent-amber, #f59e0b)';
+        if (ins.type === 'danger') borderStroke = 'var(--accent-red, #ef4444)';
+        if (ins.type === 'success') borderStroke = 'var(--accent-green, #10b981)';
+
+        return `
+          <div class="card-dark p-3 mb-2 intelligence-brief-card" id="card_${ins.id}" 
+               style="border-left: 4px solid ${borderStroke}; position: relative; background: linear-gradient(90deg, #0d1527 0%, var(--bg-card) 100%);">
+            <button class="dismiss-brief-btn" 
+                    data-id="${ins.id}"
+                    style="position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; font-weight: 700;">
+              ✕ Dismiss
+            </button>
+            <div class="text-sm font-heavy text-inverse mb-1" style="padding-right: 60px;">${ins.title}</div>
+            <p class="text-xs text-muted leading-relaxed m-0">${ins.text}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  // Attach interactive dismissal click event routing
+  container.querySelectorAll('.dismiss-brief-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      const currentDismissed = JSON.parse(sessionStorage.getItem('dismissed_insights') || '[]');
+      currentDismissed.push(id);
+      sessionStorage.setItem('dismissed_insights', JSON.stringify(currentDismissed));
+      
+      // Clean, seamless exit animation execution
+      const card = document.getElementById(`card_${id}`);
+      if (card) {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(-10px)';
+        card.style.transition = 'all 0.3s ease';
+        setTimeout(() => { renderIntelligenceBriefing(); }, 300);
+      }
+    });
+  });
 }
