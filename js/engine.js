@@ -611,6 +611,34 @@ export function computeWeeklyLoadSeries(state, days, maxWeek) {
   return { lift, run };
 }
 
+// Weekly strength volume (tonnage) series — sum of weight·reps over completed
+// working sets (warmups excluded), per week 1..maxWeek. The shared "Strength
+// Load" descriptive series; mirrors the other computeWeekly* signatures.
+export function weeklyStrengthVolumeSeries(state, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let vol = 0;
+    if (wkData) {
+      dayList.forEach(d => {
+        const dayLifts = wkData.lifts?.[d] || {};
+        for (const lift in dayLifts) {
+          const arr = dayLifts[lift];
+          if (!Array.isArray(arr)) continue;
+          arr.forEach(s => {
+            if (isCompletedSet(s) && !s.isWarmup) {
+              vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
+            }
+          });
+        }
+      });
+    }
+    out.push(Math.round(vol));
+  }
+  return out;
+}
+
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
   const acute = loadByWeek[cw - 1] || 0;
