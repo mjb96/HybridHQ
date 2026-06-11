@@ -129,7 +129,6 @@ export function openAddExerciseModal() {
   if (modal) modal.classList.add('active');
 }
 
-// PHASE 2 SUPERSETS: Clear attribute to prevent accidental groupings
 export function closeAddExerciseModal() {
   const modal = document.getElementById('addExerciseModal');
   if (modal) {
@@ -154,7 +153,6 @@ export function confirmAddExercise() {
       showToast('Please type an exercise name.', true);
       return;
     }
-
     saveNewCustomExerciseToLibrary(liftName);
   }
 
@@ -165,14 +163,30 @@ export function confirmAddExercise() {
     appState.weeks[wk].lifts[selectedDay] = {};
   }
 
-  if (!appState.weeks[wk].lifts[selectedDay][liftName]) {
-    appState.weeks[wk].lifts[selectedDay][liftName] = [{ w: '', r: '10', c: false }];
+  const modal = document.getElementById('addExerciseModal');
+  const isSuperset = modal && modal.hasAttribute('data-source-lift');
+  const sourceLift = isSuperset ? modal.getAttribute('data-source-lift') : null;
+
+  // 1. REBUILD DICTIONARY: Force DOM contiguity by injecting immediately after the source lift
+  const currentLifts = appState.weeks[wk].lifts[selectedDay];
+  if (!currentLifts[liftName]) {
+    if (isSuperset && currentLifts[sourceLift]) {
+      const reorderedLifts = {};
+      for (const key in currentLifts) {
+        reorderedLifts[key] = currentLifts[key];
+        // Inject the new lift immediately after its superset partner
+        if (key === sourceLift) {
+          reorderedLifts[liftName] = [{ w: '', r: '10', c: false }];
+        }
+      }
+      appState.weeks[wk].lifts[selectedDay] = reorderedLifts;
+    } else {
+      currentLifts[liftName] = [{ w: '', r: '10', c: false }];
+    }
   }
 
-  // PHASE 2 SUPERSETS: Handle grouping intercept logic
-  const modal = document.getElementById('addExerciseModal');
-  if (modal && modal.hasAttribute('data-source-lift')) {
-    const sourceLift = modal.getAttribute('data-source-lift');
+  // 2. COMPANION MAP LOGIC
+  if (isSuperset) {
     if (!appState.weeks[wk].supersets) appState.weeks[wk].supersets = {};
     if (!appState.weeks[wk].supersets[selectedDay]) appState.weeks[wk].supersets[selectedDay] = {};
 
@@ -194,10 +208,12 @@ export function confirmAddExercise() {
     _rerender();
   }
 
+  // 3. TARGETED SCROLL: Snap to the specific exercise instead of the bottom of the page
   setTimeout(() => {
-    const cards = document.querySelectorAll('.cockpit-exercise');
-    if (cards.length > 0) {
-      cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const safeSelectorName = liftName.replace(/"/g, '\\"');
+    const targetCard = document.querySelector(`.cockpit-exercise[data-liftname="${safeSelectorName}"]`);
+    if (targetCard) {
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, 100);
 }
