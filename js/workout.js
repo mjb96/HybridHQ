@@ -315,7 +315,6 @@ export function renderWorkout() {
     exercisesContainer.innerHTML = buildEmptyWorkoutCard();
   }
 
-  // PHASE 1 SUPERSETS: Orphan Cleanup Logic
   if (!weekData.supersets[selectedDay]) weekData.supersets[selectedDay] = {};
   const supersetMap = weekData.supersets[selectedDay];
   
@@ -414,6 +413,9 @@ export function renderWorkout() {
       return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet, displayIndex);
     }).join('');
 
+    // PHASE 2 SUPERSETS: Pass isGrouped to template
+    const isGrouped = !!supersetMap[liftName];
+
     try {
       exCard.innerHTML = buildExerciseCard({
         displaySafeName,
@@ -422,13 +424,13 @@ export function renderWorkout() {
         diagnostic: computeDiagnosticForLift(wk, selectedDay, liftName),
         blueprintLabel,
         historicalLineText,
-        setsMarkup
+        setsMarkup,
+        isGrouped
       });
     } catch(e) {
       exCard.innerHTML = `<div class="card-dark p-3 text-inverse">${displaySafeName} (Render Error)</div>`;
     }
 
-    // PHASE 1 SUPERSETS: Visual wrapper container logic
     const groupId = supersetMap[liftName];
     if (groupId) {
       if (groupId !== currentGroupId) {
@@ -436,11 +438,10 @@ export function renderWorkout() {
         currentSupersetContainer.className = 'superset-container';
         currentSupersetContainer.dataset.groupId = groupId;
         
-        // Inline styles ensuring visual boundaries for Phase 1
-        currentSupersetContainer.style.borderLeft = '4px solid var(--accent-blue)';
+        currentSupersetContainer.style.borderLeft = '4px solid var(--accent-purple)';
         currentSupersetContainer.style.paddingLeft = '10px';
         currentSupersetContainer.style.marginBottom = '20px';
-        currentSupersetContainer.style.background = 'rgba(59, 130, 246, 0.03)';
+        currentSupersetContainer.style.background = 'rgba(168, 85, 247, 0.05)';
         currentSupersetContainer.style.borderRadius = '4px';
         
         exercisesContainer.appendChild(currentSupersetContainer);
@@ -882,6 +883,19 @@ export function toggleAccordionManual(elementNode) {
   try { moveRestTimerToActiveExercise(); } catch(e) { console.warn(e); }
 }
 
+// PHASE 2 SUPERSETS: New Unlink Logic
+export function unlinkSuperset(liftName) {
+  const appState = _getState();
+  const selectedDay = _getSelectedDay();
+  const wk = appState.currentWeek;
+  if (appState.weeks[wk].supersets && appState.weeks[wk].supersets[selectedDay]) {
+    delete appState.weeks[wk].supersets[selectedDay][liftName];
+    _saveState(true);
+    renderWorkout();
+    showToast('Exercise unlinked.');
+  }
+}
+
 // ==========================================
 // EVENT DELEGATION ROUTER
 // ==========================================
@@ -908,7 +922,20 @@ document.addEventListener('click', (e) => {
     openExerciseHistoryModal(liftName);
   }
   else if (action === 'close-exercise-history') closeExerciseHistoryModal();
-  else if (action === 'open-add-exercise') openAddExerciseModal();
+  
+  // PHASE 2 SUPERSETS: Router Hooks
+  else if (action === 'open-add-superset') {
+    const modal = document.getElementById('addExerciseModal');
+    if (modal) modal.setAttribute('data-source-lift', liftName);
+    openAddExerciseModal();
+  }
+  else if (action === 'unlink-superset') unlinkSuperset(liftName);
+  else if (action === 'open-add-exercise') {
+    const modal = document.getElementById('addExerciseModal');
+    if (modal) modal.removeAttribute('data-source-lift'); // Clear to prevent contamination
+    openAddExerciseModal();
+  }
+
   else if (action === 'close-add-exercise') closeAddExerciseModal();
   else if (action === 'confirm-add-exercise') confirmAddExercise();
   else if (action === 'open-reset-modal') openConfirmResetModal();
