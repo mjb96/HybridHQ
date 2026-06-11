@@ -2,6 +2,7 @@
 // FULLY REFACTORED HOME DASHBOARD (home.js)
 // ==========================================
 import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
+import { getDisplayBlueprint } from './schema.js';
 import { getProgramById } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload } from './engine.js';
@@ -307,7 +308,7 @@ export function renderHome() {
   if (labelEl) labelEl.textContent = WEEK_PHASE_NAMES[wk] || 'Active Phase';
 
   const activeProgram = getProgramById(appState.activeProgramId);
-  const homeBlueprint = activeProgram.days?.[selectedDay] || { title: "Rest Day", badge: "Rest", color: "#6b7280", desc: "No specific template found.", runs: "Rest", lifts: [] };
+  const homeBlueprint = getDisplayBlueprint(activeProgram, wk, selectedDay);
 
   const hBadge = document.getElementById('homeFocusBadge');
   const dAccent = document.getElementById('homeDayAccentBar');
@@ -573,7 +574,7 @@ export function renderHome() {
   const progressPercentage = (() => {
     let total = 0, done = 0;
     DEFAULT_DAYS.forEach(dKey => {
-      const bp = activeProgram.days?.[dKey];
+      const bp = getDisplayBlueprint(activeProgram, wk, dKey);
       const isRunScheduled = bp?.runs && !bp.runs.toLowerCase().includes('no structured') && bp.runs.toLowerCase() !== 'rest';
       if (isRunScheduled) total++;
       const rDist = parseFloat(weekData.runs?.[dKey]?.dist) || 0;
@@ -604,7 +605,7 @@ export function renderHome() {
     let foundNextRun = false;
     for (let offset = 1; offset <= 7; offset++) {
       const checkDay = dayKeys[(todayIdx + offset) % 7];
-      const checkBlueprint = activeProgram.days?.[checkDay];
+      const checkBlueprint = getDisplayBlueprint(activeProgram, wk, checkDay);
       if (checkBlueprint && checkBlueprint.runs &&
           checkBlueprint.runs.toLowerCase() !== 'rest' &&
           !checkBlueprint.runs.toLowerCase().includes('no running') &&
