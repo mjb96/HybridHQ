@@ -1,10 +1,6 @@
 // ==========================================
 // WORKOUT SESSION MODALS (workout-session-modals.js)
-// Owns the reset-day and finish-session modals. Extracted verbatim from
-// workout.js; the only changes are dependencies that pointed back into
-// workout.js, now injected: renderWorkout() -> _rerender(),
-// updateExercisePRs() -> _recomputePRs(), and _switchTab.
-// ==========================================\
+// ==========================================
 import { getProgramById, showToast } from './state.js';
 import { prescribeSetsForLift } from './engine.js';
 import { dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
@@ -41,6 +37,11 @@ export function executeResetActiveDayMetrics() {
   appState.weeks[wk].gymRpe[selectedDay] = '';
   appState.weeks[wk].bodyWeight[selectedDay] = '';
   appState.weeks[wk].gymStats[selectedDay] = { time: '', avgHR: '', maxHR: '', cals: '', trainingEffect: '', anaerobicTE: '', gymSets: [] };
+
+  // PHASE 1 SUPERSETS: Clear companion map
+  if (appState.weeks[wk].supersets) {
+    appState.weeks[wk].supersets[selectedDay] = {};
+  }
 
   const dayLifts = appState.weeks[wk].lifts[selectedDay] || {};
   for (const lift in dayLifts) {
@@ -79,7 +80,6 @@ export function openFinishSessionModal() {
     const arr = dayLifts[lift];
     if (Array.isArray(arr)) {
       arr.forEach(s => {
-        // INCREMENT WARMUP: Exclude warmups from volume and completion totals
         if (s && s.c && !s.isWarmup) {
           setsDone++;
           vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
