@@ -300,7 +300,6 @@ export function renderWorkout() {
 
   const currentScrollY = window.scrollY;
 
-  // PHASE 3 SUPERSETS: Group-aware accordion state mapping
   const previouslyExpandedCard = document.querySelector('.cockpit-exercise:not(.collapsed)');
   let previouslyExpandedLift = previouslyExpandedCard ? previouslyExpandedCard.getAttribute('data-liftname') : null;
   
@@ -350,7 +349,6 @@ export function renderWorkout() {
 
     const groupId = supersetMap[liftName];
 
-    // PHASE 3 SUPERSETS: Multi-card expansion evaluation
     let expandThis = false;
     if (previouslyExpandedLift) {
       if (liftName === previouslyExpandedLift || (groupId && groupId === forceExpandGroupId)) {
@@ -359,7 +357,7 @@ export function renderWorkout() {
     } else if (isFirstAccordionField && !isCompleted) {
       expandThis = true;
       isFirstAccordionField = false;
-      if (groupId) forceExpandGroupId = groupId; // Snap remainder of group open
+      if (groupId) forceExpandGroupId = groupId;
     }
 
     let isCollapsedClass = expandThis ? '' : 'collapsed';
@@ -475,6 +473,22 @@ export function renderWorkout() {
   } catch(e) { console.warn(e); }
 }
 
+// INCREMENT 7 & 8: Gamified PR Detection
+export function checkAndTriggerPR(appState, liftName, weight, reps) {
+  if (!appState || !liftName || !weight || !reps) return;
+  const w = parseFloat(weight);
+  const r = parseInt(reps, 10);
+  if (w <= 0 || r <= 0) return;
+  
+  const currentE1RM = w * (1 + r / 30);
+  const stats = appState.exerciseStats && appState.exerciseStats[liftName];
+  const historicalMax = stats ? (stats.allTimeMax || 0) : 0;
+  
+  if (historicalMax > 0 && currentE1RM > historicalMax) {
+    showToast(`🏆 New PR! ${Math.round(currentE1RM)}kg (Est. 1RM)`, false);
+  }
+}
+
 export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   if (!labelNode) return;
   const appState = _getState();
@@ -528,6 +542,15 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
   parentRow.classList.add('is-complete');
 
   try { logActivityForStreak(); } catch (e) { console.warn(e); }
+  
+  // INCREMENT 7/8: Gamified PR gamification intercept
+  try {
+    const isWarmup = appState.weeks[wk].lifts[selectedDay][liftName][sIdx].isWarmup;
+    if (!isWarmup) {
+      checkAndTriggerPR(appState, liftName, targetW, targetR);
+      updateExercisePRs(); 
+    }
+  } catch(e) { console.warn(e); }
   
   try {
     const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
@@ -709,6 +732,23 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       if (!rInput.value) rInput.value = "10";
     }
 
+    // INCREMENT 7/8: Gamified PR gamification intercept
+    try {
+      const appState = _getState();
+      const wk = appState.currentWeek;
+      const selectedDay = _getSelectedDay();
+      const liftNameAttr = exCard ? exCard.getAttribute('data-liftname') : null;
+      const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
+      const wInputNode = parentRow.querySelector('.input-weight-node');
+      const rInputNode = parentRow.querySelector('.input-reps-node');
+      
+      const isWarmup = appState.weeks[wk].lifts[selectedDay]?.[liftNameAttr]?.[sIdx]?.isWarmup;
+      if (!isWarmup && wInputNode && rInputNode && liftNameAttr) {
+        checkAndTriggerPR(appState, liftNameAttr, wInputNode.value, rInputNode.value);
+        updateExercisePRs(); 
+      }
+    } catch(e) { console.warn(e); }
+
     try {
       const appState = _getState();
       const wk = appState.currentWeek;
@@ -743,7 +783,6 @@ export function toggleGymCheckLoggingState(checkboxNode) {
   evaluateAccordionAutoFlowTransitions();
 }
 
-// PHASE 3 SUPERSETS: Group-aware auto-flow transitions
 export function evaluateAccordionAutoFlowTransitions() {
   const expandedCards = document.querySelectorAll('.cockpit-exercise:not(.collapsed)');
   if (expandedCards.length === 0) return;
@@ -774,11 +813,9 @@ export function evaluateAccordionAutoFlowTransitions() {
 
   if (newlyFinishedCount > 0) showToast('Exercise Complete! ✓');
 
-  // Only collapse and advance if ALL currently opened exercises (i.e. the whole superset) are completely checked off
   if (allFinished && lastCard) {
     expandedCards.forEach(c => c.classList.add('collapsed'));
     
-    // Jump the container if necessary to find the next valid exercise target
     let nextTarget = lastCard.nextElementSibling;
     if (!nextTarget && lastCard.parentElement.classList.contains('superset-container')) {
       nextTarget = lastCard.parentElement.nextElementSibling;
@@ -958,7 +995,6 @@ export function removeCustomSetRow(liftName, setIndex) {
   }
 }
 
-// PHASE 3 SUPERSETS: Group-aware accordion toggling
 export function toggleAccordionManual(elementNode) {
   if (!elementNode) return;
   const wasCollapsed = elementNode.classList.contains('collapsed');
@@ -990,8 +1026,6 @@ export function unlinkSuperset(liftName) {
 // ==========================================
 // EVENT DELEGATION ROUTER
 // ==========================================
-
-// Intercept the drag-drop system's decoupled render request
 document.addEventListener('workout:force-rerender', () => {
   renderWorkout();
 });
