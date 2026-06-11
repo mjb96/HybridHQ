@@ -41,8 +41,8 @@ const opts = { days: DAYS, currentWeek: '3', maxWeek: 3, program, topN: 8, now: 
 
 test('squat decline insight gains an evidence-backed causal clause + tradeoff', () => {
   const r = generateInsights(fixture(), opts);
-  const sq = r.insights.find(i => i.id === 'insight.strength.e1rm_trend:Squat')
-          || r.insights.find(i => i.id === 'insight.strength.plateau:Squat');
+  const sq = r.insights.find(i => i.id === 'insight.strength.e1rm_trend:Back Squat')
+          || r.insights.find(i => i.id === 'insight.strength.plateau:Back Squat');
   assert.ok(sq, 'expected a squat strength insight');
   assert.ok(sq.attribution, 'should carry an attribution block');
   assert.match(sq.explanation, /lower-body recovery demand|recovery demand|running/i);

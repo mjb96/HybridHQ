@@ -193,6 +193,24 @@ function template(f) {
     };
   }
 
+  if (f.type === 'strength_highlight') {
+    const isPR = (f.evidence.find(e => e.metric === 'is_pr') || {}).value === 1;
+    const e = ev(f, 'e1rm');
+    return isPR ? {
+      category: CAT.PROGRESS,
+      observation: `New estimated-1RM best on ${f.subject} — about ${e} kg. 🎉`,
+      explanation: `Your best working set this week edged past your previous estimated 1RM for ${f.subject}.`,
+      whyItMatters: `A fresh estimated-1RM is concrete proof the training is working.`,
+      suggestedAction: `Bank it — keep progression steady rather than chasing another max right away.`,
+    } : {
+      category: CAT.PROGRESS,
+      observation: `${f.subject} was your standout lift this week — est. 1RM about ${e} kg.`,
+      explanation: `It posted the highest estimated 1RM among your logged lifts this week.`,
+      whyItMatters: `Knowing your strongest movement helps you anchor the rest of the session around it.`,
+      suggestedAction: `Make sure it gets your freshest effort in the session.`,
+    };
+  }
+
   if (f.type === 'recovery_status') {
     const score = mag;
     const detail = `Fatigue score ${ev(f, 'fatigue')}, rest score ${ev(f, 'rest')}, avg RPE ${ev(f, 'avg_rpe')} this week.`;

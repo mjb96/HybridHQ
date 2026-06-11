@@ -33,6 +33,7 @@ export const FINDING_TYPES = Object.freeze({
   BODYWEIGHT_TREND: 'bodyweight_trend',
   FUEL_TREND:       'fuel_trend',
   RECOVERY_STATUS:  'recovery_status',
+  STRENGTH_HIGHLIGHT: 'strength_highlight',
 });
 
 export const DIRECTION = Object.freeze({ UP: 'up', DOWN: 'down', FLAT: 'flat' });

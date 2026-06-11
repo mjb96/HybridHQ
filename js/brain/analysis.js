@@ -10,12 +10,13 @@
 // Pure module: safe under `node --test`.
 // ==========================================
 import {
-  computeBig3Progression,
   computeGoalAdherence,
   computeWeeklyCompletionSeries,
   computeWeeklyCaloriesSeries,
   computeRecoveryScore,
   paceSecondsPerKm,
+  epley1RM,
+  isCompletedSet,
 } from '../engine.js';
 import { strengthLoadSeries, enduranceLoadSeries } from './load_models.js';
 import { DOMAINS, ENGINES, FINDING_TYPES, THRESHOLDS } from './constants_brain.js';
@@ -78,18 +79,49 @@ function weeklyPaceSeries(state, days, maxWeek) {
   return out;
 }
 
-// ------------------------------------------------------------------
-// STRENGTH ENGINE — e1RM trend / plateau per big-3 lift + volume trend
-// ------------------------------------------------------------------
-export function analyzeStrength(state, days, maxWeek) {
-  const findings = [];
-  const prog = computeBig3Progression(state);
-  const lifts = [['squat', 'Squat'], ['bench', 'Bench Press'], ['deadlift', 'Deadlift']];
+// Main compound lifts we track for e1RM trends (excludes isolation work, where
+// estimated-1RM is noisy and low-signal).
+const TRACKED_LIFT_PATTERNS = [
+  /squat/i, /bench press/i, /incline (?:db |dumbbell |barbell )?press|incline bench/i,
+  /deadlift/i, /overhead press|standing .*press|\bohp\b|seated .*shoulder press/i,
+  /barbell .*row|bent-?over row|pendlay/i, /pull-?up|chin-?up/i, /lat pulldown/i, /leg press/i,
+];
+const isTrackedLift = (name) => TRACKED_LIFT_PATTERNS.some(re => re.test(name || ''));
 
-  lifts.forEach(([key, label]) => {
-    const series = [];
-    for (let w = 1; w <= maxWeek; w++) series.push(prog[key]?.byWeek?.[String(w)] || 0);
-    const t = trend(series);
+// Best completed-working-set e1RM per lift, per week (warmups excluded). One
+// pass; feeds both trends and the weekly highlight.
+function liftE1rmByWeekAll(state, days, maxWeek) {
+  const out = {};
+  for (let w = 1; w <= maxWeek; w++) {
+    const wk = state?.weeks?.[String(w)];
+    if (!wk?.lifts) continue;
+    (days || []).forEach(d => {
+      const dl = wk.lifts[d] || {};
+      for (const lift in dl) {
+        const arr = dl[lift];
+        if (!Array.isArray(arr)) continue;
+        let best = 0;
+        arr.forEach(s => { if (isCompletedSet(s) && !s.isWarmup) { const e = epley1RM(s.w, s.r); if (e > best) best = e; } });
+        if (best > 0) {
+          if (!out[lift]) out[lift] = new Array(maxWeek).fill(0);
+          if (best > out[lift][w - 1]) out[lift][w - 1] = best;
+        }
+      }
+    });
+  }
+  return out;
+}
+
+// ------------------------------------------------------------------
+// STRENGTH ENGINE — e1RM trend / plateau per main compound, volume trend,
+// and a concrete weekly highlight (standout lift / new estimated-1RM best).
+// ------------------------------------------------------------------
+export function analyzeStrength(state, days, maxWeek, currentWeek) {
+  const findings = [];
+  const e1rmAll = liftE1rmByWeekAll(state, days, maxWeek);
+
+  Object.keys(e1rmAll).filter(isTrackedLift).forEach(lift => {
+    const t = trend(e1rmAll[lift]);
     if (t.points < THRESHOLDS.MIN_POINTS_TREND) return;
 
     const evidence = [
@@ -101,17 +133,38 @@ export function analyzeStrength(state, days, maxWeek) {
     if (t.direction === 'flat') {
       findings.push(makeFinding({
         engine: ENGINES.STRENGTH, domain: DOMAINS.STRENGTH, type: FINDING_TYPES.PLATEAU,
-        subject: label, direction: 'flat', magnitude: round1(t.pct * 100), unit: '%',
+        subject: lift, direction: 'flat', magnitude: round1(t.pct * 100), unit: '%',
         window, evidence, dataPoints: t.points, severity: 0.5,
       }));
     } else {
       findings.push(makeFinding({
         engine: ENGINES.STRENGTH, domain: DOMAINS.STRENGTH, type: FINDING_TYPES.E1RM_TREND,
-        subject: label, direction: t.direction, magnitude: round1(t.pct * 100), unit: '%',
+        subject: lift, direction: t.direction, magnitude: round1(t.pct * 100), unit: '%',
         window, evidence, dataPoints: t.points, severity: clamp01(Math.abs(t.pct) / 0.15),
       }));
     }
   });
+
+  // Weekly highlight — the standout lift this week, flagged as a PR when it
+  // matches the all-time estimated-1RM best. Gives the coach something concrete
+  // to say even from a single logged week.
+  const cw = parseInt(currentWeek ?? state?.currentWeek, 10) || 1;
+  let bestLift = null, bestE = 0;
+  for (const lift in e1rmAll) {
+    const e = e1rmAll[lift][cw - 1] || 0;
+    if (e > bestE) { bestE = e; bestLift = lift; }
+  }
+  if (bestLift && bestE > 0) {
+    const allTime = Math.max(...e1rmAll[bestLift]);
+    const isPR = bestE >= allTime - 0.5;
+    findings.push(makeFinding({
+      engine: ENGINES.STRENGTH, domain: DOMAINS.STRENGTH, type: FINDING_TYPES.STRENGTH_HIGHLIGHT,
+      subject: bestLift, direction: isPR ? 'up' : 'flat', magnitude: Math.round(bestE), unit: 'kg',
+      window: { toWeek: cw },
+      evidence: [{ metric: 'e1rm', value: Math.round(bestE) }, { metric: 'is_pr', value: isPR ? 1 : 0 }],
+      dataPoints: 1, severity: isPR ? 0.5 : 0.2,
+    }));
+  }
 
   const vt = trend(strengthLoadSeries(state, days, maxWeek));
   if (vt.points >= THRESHOLDS.MIN_POINTS_LOW && vt.direction && vt.direction !== 'flat') {
@@ -273,7 +326,7 @@ export function runAnalysis(state, ctx = {}) {
   const currentWeek = ctx.currentWeek || state?.currentWeek || '1';
   const program = ctx.program || null;
   return [
-    ...analyzeStrength(state, days, maxWeek),
+    ...analyzeStrength(state, days, maxWeek, currentWeek),
     ...analyzeRunning(state, days, maxWeek),
     ...analyzeAdherence(state, program, days, currentWeek, maxWeek),
     ...analyzeBodyComp(state),
