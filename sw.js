@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v45';
+const CACHE_NAME = 'hybrid-training-v46';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -38,6 +38,7 @@ const ASSETS_TO_CACHE = [
   './js/brain/constants_brain.js',
   './js/brain/load_models.js',
   './js/brain/analysis.js',
+  './js/brain/attribution.js',
   './js/brain/insights.js',
   './js/brain/core.js',
   './js/brain/brain_dashboard.js'
