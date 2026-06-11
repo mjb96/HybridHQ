@@ -14,6 +14,7 @@ export const ENGINES = Object.freeze({
   STRENGTH:  'strength',
   RUNNING:   'running',
   ADHERENCE: 'adherence',
+  RECOVERY:  'recovery',
 });
 
 export const FINDING_TYPES = Object.freeze({
@@ -24,6 +25,7 @@ export const FINDING_TYPES = Object.freeze({
   LOAD_TREND:   'load_trend',
   LOAD_SPIKE:   'load_spike',
   CONSISTENCY:  'consistency',
+  INTERFERENCE: 'interference',
 });
 
 export const DIRECTION = Object.freeze({ UP: 'up', DOWN: 'down', FLAT: 'flat' });

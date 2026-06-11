@@ -26,7 +26,7 @@ const round1 = (v) => Math.round(v * 10) / 10;
 // Finding factory + a small trend helper over a weekly numeric series
 // (index 0 = week 1). Zero entries are treated as "not logged" gaps.
 // ------------------------------------------------------------------
-function makeFinding(p) {
+export function makeFinding(p) {
   return {
     id:        `${p.engine}.${p.type}${p.subject ? ':' + p.subject : ''}`,
     engine:    p.engine,
