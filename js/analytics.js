@@ -12,6 +12,8 @@ import {
   epley1RM, isCompletedSet, paceSecondsPerKm, formatPace,
 } from './engine.js';
 import { getStreamFromDB } from './db.js';
+import { generateInsights } from './brain/core.js';
+import { renderContextBanner } from './brain/analytics_brain.js';
 
 let _getState;
 let _getDays;
@@ -1102,6 +1104,17 @@ export function renderAnalytics() {
   const data = collectAnalyticsData();
   const context = _analyticsContext || 'overview';
 
+  // Compute the Brain report once per render; the per-section banner reuses it.
+  let _brainReport = null;
+  try {
+    const appState = _getState();
+    const program = getProgramById(appState.activeProgramId);
+    _brainReport = generateInsights(appState, {
+      days: _getDays(), program,
+      currentWeek: appState.currentWeek, maxWeek: program?.totalWeeks,
+    });
+  } catch (e) { _brainReport = null; }
+
   document.querySelectorAll('.analytics-section').forEach(sec => sec.classList.remove('active'));
 
   switch(context) {
@@ -1160,6 +1173,11 @@ export function renderAnalytics() {
     default:
       document.getElementById('analytics-strength').classList.add('active');
       renderStrengthAnalytics(data);
+  }
+
+  if (_brainReport) {
+    try { renderContextBanner(context, _brainReport); }
+    catch (e) { console.warn('[hybrid-brain] context banner skipped:', e); }
   }
 }
 

@@ -13,7 +13,7 @@
 import { generateInsights, summarizeReport } from './core.js';
 import { escapeHtml } from '../util.js';
 
-const CATEGORY_META = {
+export const CATEGORY_META = {
   progress:    { icon: '📈', label: 'Progress',    color: 'var(--accent-green, #10b981)' },
   recovery:    { icon: '🛌', label: 'Recovery',    color: 'var(--accent-blue, #3b82f6)' },
   risk:        { icon: '⚠️', label: 'Risk',        color: 'var(--accent-red, #ef4444)' },
