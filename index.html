@@ -865,10 +865,15 @@
   <div class="modal-overlay" id="createProgramModal" role="dialog" aria-modal="true" aria-labelledby="createProgramTitle">
     <div class="modal-content">
       <h2 id="createProgramTitle" class="text-2xl font-heavy text-inverse mb-1">Create Custom Program</h2>
-      <p class="text-sm text-muted mb-4">Scaffold a new blank program schema.</p>
+      <p class="text-sm text-muted mb-4">Scaffold a new program — blank, or pre-filled from a template you can then edit.</p>
       
       <label class="text-xs-bold block mb-1 text-muted">PROGRAM NAME</label>
       <input type="text" id="cpInputName" placeholder="e.g. Winter Bulk Split" class="mb-3">
+
+      <label class="text-xs-bold block mb-1 text-muted">START FROM</label>
+      <select id="cpInputTemplate" class="native-select mb-3" style="text-align:left; font-weight:700;">
+        <option value="">Blank program</option>
+      </select>
       
       <div class="flex gap-2 mb-3">
         <div class="flex-1">
