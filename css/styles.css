@@ -1693,3 +1693,10 @@ td {
 .prev-line { display: flex; justify-content: space-between; gap: 10px; font-size: 0.76rem; padding: 1px 0; }
 .prev-name { color: var(--text-white); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prev-rx { color: var(--text-secondary); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Builder superset grouping */
+.builder-ss-btn.active { color: var(--accent-purple) !important; }
+.builder-row-grouped {
+  border-left: 3px solid var(--accent-purple) !important;
+  background: rgba(168, 85, 247, 0.06) !important;
+}
