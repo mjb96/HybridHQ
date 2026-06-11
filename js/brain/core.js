@@ -76,3 +76,15 @@ export function insightCounts(report) {
   (report?.insights || []).forEach(i => { out[i.category] = (out[i.category] || 0) + 1; });
   return out;
 }
+
+// Presentation summary for the home Brain area: the single highest-priority
+// "Today's Focus", a separate goal-alignment slot (a goal insight that isn't
+// already the focus), the remaining items as compact indicators, and category
+// counts for the header. Pure — the renderer stays thin.
+export function summarizeReport(report) {
+  const insights = report?.insights || [];
+  const focus = insights[0] || null;
+  const goal = insights.find((i, idx) => idx > 0 && i.category === 'goal') || null;
+  const rest = insights.filter(i => i !== focus && i !== goal);
+  return { focus, goal, rest, counts: insightCounts(report), total: insights.length };
+}
