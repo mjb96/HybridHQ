@@ -168,7 +168,8 @@ export function verifyWeekStorageSchema(wk) {
   if (!appState.weeks) appState.weeks = {};
   
   if (!appState.weeks[wk]) {
-    appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {}, sessionType: {} };
+    // PHASE 1 SUPERSETS: Added supersets initialization
+    appState.weeks[wk] = { runs: {}, lifts: {}, notes: {}, gymRpe: {}, bodyWeight: {}, gymStats: {}, sessionType: {}, supersets: {} };
     DEFAULT_DAYS.forEach(d => {
       appState.weeks[wk].runs[d] = { dist: '', time: '', rpe: '' };
       appState.weeks[wk].notes[d] = '';
@@ -176,15 +177,13 @@ export function verifyWeekStorageSchema(wk) {
       appState.weeks[wk].bodyWeight[d] = '';
       appState.weeks[wk].gymStats[d] = { time: '', avgHR: '', maxHR: '', cals: '' };
       appState.weeks[wk].lifts[d] = {};
-      appState.weeks[wk].sessionType[d] = d; // default: each slot runs its own day's session
+      appState.weeks[wk].sessionType[d] = d; 
+      appState.weeks[wk].supersets[d] = {}; // Initialize companion map
     });
 
     const activeProgram = getProgramById(appState.activeProgramId);
 
     DEFAULT_DAYS.forEach(d => {
-      // SCHEMA v2: resolve the day's blueprint as a v2 view (migrate-on-read)
-      // and seed from its structured lift entries. Stored key stays the lift
-      // NAME, so all downstream logging / PR / analytics keying is unchanged.
       const dayV2 = getDayV2(activeProgram, wk, d);
       const entries = dayLiftEntries(dayV2?.day);
       if (entries.length > 0) {
@@ -196,22 +195,21 @@ export function verifyWeekStorageSchema(wk) {
       }
     });
   }
+
+  // PHASE 1 SUPERSETS: Patch existing weeks that predate supersets architecture
+  if (!appState.weeks[wk].supersets) appState.weeks[wk].supersets = {};
+  DEFAULT_DAYS.forEach(d => {
+    if (!appState.weeks[wk].supersets[d]) appState.weeks[wk].supersets[d] = {};
+  });
 }
 
 // ==========================================
 // SESSION ↔ DAY DECOUPLING
-// A calendar day-slot can run any day's session template. sessionType[day]
-// records the SOURCE template day (defaults to the day itself). Logged data
-// still lives under the real day key, so streak / "today" / analytics are
-// unaffected — only which template/targets/labels a slot shows changes.
 // ==========================================
-
-// The source-template day for a given calendar slot (back-compatible default).
 export function getSessionSourceDay(wk, day) {
   return appState.weeks?.[wk]?.sessionType?.[day] || day;
 }
 
-// True if a calendar slot has any logged work (completed sets or a run dist).
 function dayHasLoggedWork(wk, day) {
   const wd = appState.weeks?.[wk];
   if (!wd) return false;
@@ -223,9 +221,6 @@ function dayHasLoggedWork(wk, day) {
   return false;
 }
 
-// Load a different day's session template into the target calendar slot. Reseeds
-// the slot's lifts from the source day's blueprint and records the marker.
-// Returns false if the slot already has logged work (caller should confirm).
 export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {}) {
   const wk = appState.currentWeek;
   verifyWeekStorageSchema(wk);
@@ -234,7 +229,6 @@ export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {})
   if (!force && dayHasLoggedWork(wk, targetDay)) return false;
 
   const activeProgram = getProgramById(appState.activeProgramId);
-  // SCHEMA v2: resolve the source day's blueprint as a v2 view (migrate-on-read).
   const dayV2 = getDayV2(activeProgram, wk, sourceDay);
   const entries = dayLiftEntries(dayV2?.day);
 
@@ -243,18 +237,24 @@ export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {})
 
   // Reseed the target slot's lifts from the source template.
   weekData.lifts[targetDay] = {};
+  weekData.supersets[targetDay] = {}; // PHASE 1 SUPERSETS: Reset the target map
+  
   if (entries.length) {
     const weekContext = { label: dayV2?.label || '' };
     entries.forEach(entry => {
       weekData.lifts[targetDay][entry.name] =
         prescribeSetsForLift(wk, sourceDay, entry, weekContext);
+        
+      // PHASE 1 SUPERSETS: Copy superset relationships if they exist in source
+      if (weekData.supersets[sourceDay] && weekData.supersets[sourceDay][entry.name]) {
+         weekData.supersets[targetDay][entry.name] = weekData.supersets[sourceDay][entry.name];
+      }
     });
   }
   saveStateToLocalStorage(true);
   return true;
 }
 
-// Reset a slot back to its own native day's session.
 export function resetSessionForDay(targetDay) {
   return loadSessionIntoDay(targetDay, targetDay, { force: true });
 }
@@ -355,10 +355,6 @@ export async function pullEngineDataFromStorage() {
   if (!appState.streakData) appState.streakData = { current: 0, longest: 0, lastActivityDate: null };
   if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0 };
 
-  // SCHEMA v2: one-time, idempotent migration of stored custom programs to the
-  // unified weeks[] → days{mon..sun} → block[] tree. Already-v2 programs are
-  // skipped. The pre-migration JSON export remains a full backup. A discarded
-  // non-empty orphaned positional weeks[] is logged so nothing vanishes silently.
   let _migratedAnyProgram = false;
   appState.customPrograms = (appState.customPrograms || []).map(prog => {
     if (!prog || prog.schemaVersion === 2) return prog;
