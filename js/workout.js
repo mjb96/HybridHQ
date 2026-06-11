@@ -251,7 +251,7 @@ export function renderWorkout() {
   if (runSpecsEl) runSpecsEl.textContent = blueprintRun || 'Rest';
   
   if (runPanel) {
-    runPanel.classList.remove('dimmed'); // Never grey out the aerobic tile
+    runPanel.classList.remove('dimmed');
   }
 
   if (runPanel && exercisesContainer) {
@@ -299,7 +299,13 @@ export function renderWorkout() {
   if (!exercisesContainer) return;
 
   const currentScrollY = window.scrollY;
-  const previouslyExpandedLift = document.querySelector('.cockpit-exercise:not(.collapsed)')?.getAttribute('data-liftname');
+
+  // PHASE 3 SUPERSETS: Group-aware accordion state mapping
+  const previouslyExpandedCard = document.querySelector('.cockpit-exercise:not(.collapsed)');
+  let previouslyExpandedLift = previouslyExpandedCard ? previouslyExpandedCard.getAttribute('data-liftname') : null;
+  
+  const supersetMap = weekData.supersets?.[selectedDay] || {};
+  let forceExpandGroupId = previouslyExpandedLift ? (supersetMap[previouslyExpandedLift] || null) : null;
 
   const timerBar = document.getElementById('cockpitTimerBar');
   const viewWorkoutEl = document.getElementById('view-workout');
@@ -315,9 +321,6 @@ export function renderWorkout() {
     exercisesContainer.innerHTML = buildEmptyWorkoutCard();
   }
 
-  if (!weekData.supersets[selectedDay]) weekData.supersets[selectedDay] = {};
-  const supersetMap = weekData.supersets[selectedDay];
-  
   const groupCounts = {};
   for (const lift in supersetMap) {
     if (loggedLiftsData[lift]) {
@@ -345,13 +348,21 @@ export function renderWorkout() {
     const isCompleted = workingSetsArr.length > 0 && workingSetsArr.every(s => s && s.c);
     const isCompletedClass = isCompleted ? 'completed' : '';
 
-    let isCollapsedClass = 'collapsed';
+    const groupId = supersetMap[liftName];
+
+    // PHASE 3 SUPERSETS: Multi-card expansion evaluation
+    let expandThis = false;
     if (previouslyExpandedLift) {
-      if (liftName === previouslyExpandedLift) isCollapsedClass = '';
+      if (liftName === previouslyExpandedLift || (groupId && groupId === forceExpandGroupId)) {
+        expandThis = true;
+      }
     } else if (isFirstAccordionField && !isCompleted) {
-      isCollapsedClass = '';
+      expandThis = true;
       isFirstAccordionField = false;
+      if (groupId) forceExpandGroupId = groupId; // Snap remainder of group open
     }
+
+    let isCollapsedClass = expandThis ? '' : 'collapsed';
 
     const exCard = document.createElement('div');
     exCard.className = 'cockpit-exercise ' + isCollapsedClass + ' ' + isCompletedClass;
@@ -413,7 +424,7 @@ export function renderWorkout() {
       return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet, displayIndex);
     }).join('');
 
-    const isGrouped = !!supersetMap[liftName];
+    const isGrouped = !!groupId;
 
     try {
       exCard.innerHTML = buildExerciseCard({
@@ -430,7 +441,6 @@ export function renderWorkout() {
       exCard.innerHTML = `<div class="card-dark p-3 text-inverse">${displaySafeName} (Render Error)</div>`;
     }
 
-    const groupId = supersetMap[liftName];
     if (groupId) {
       if (groupId !== currentGroupId) {
         currentSupersetContainer = document.createElement('div');
@@ -448,7 +458,6 @@ export function renderWorkout() {
         exercisesContainer.appendChild(currentSupersetContainer);
         currentGroupId = groupId;
       }
-      // Tighten up the cards to feel like a cohesive block
       exCard.style.marginBottom = '8px'; 
       currentSupersetContainer.appendChild(exCard);
     } else {
@@ -734,27 +743,63 @@ export function toggleGymCheckLoggingState(checkboxNode) {
   evaluateAccordionAutoFlowTransitions();
 }
 
+// PHASE 3 SUPERSETS: Group-aware auto-flow transitions
 export function evaluateAccordionAutoFlowTransitions() {
-  const expandedCard = document.querySelector('.cockpit-exercise:not(.collapsed)');
-  if (!expandedCard) return;
-  
-  const rows = Array.from(expandedCard.querySelectorAll('.cockpit-set-row:not(.is-warmup)'));
-  if (rows.length === 0) return; 
-  
-  const finished = rows.every(r => r.querySelector('.gym-check')?.checked);
+  const expandedCards = document.querySelectorAll('.cockpit-exercise:not(.collapsed)');
+  if (expandedCards.length === 0) return;
 
-  if (finished) {
-    expandedCard.classList.add('completed');
-    const statusNode = expandedCard.querySelector('.cockpit-ex-status');
-    if (statusNode) statusNode.textContent = 'DONE';
-    showToast('Exercise Complete! ✓');
+  let allFinished = true;
+  let newlyFinishedCount = 0;
+  let lastCard = null;
 
-    expandedCard.classList.add('collapsed');
-    const nextCard = expandedCard.nextElementSibling;
-    if (nextCard && nextCard.classList.contains('cockpit-exercise') && !nextCard.classList.contains('completed')) {
-      nextCard.classList.remove('collapsed');
-      try { nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
-      try { moveRestTimerToActiveExercise(); } catch(e) {}
+  expandedCards.forEach(card => {
+    const rows = Array.from(card.querySelectorAll('.cockpit-set-row:not(.is-warmup)'));
+    if (rows.length === 0) {
+      allFinished = false; 
+      return;
+    }
+    const finished = rows.every(r => r.querySelector('.gym-check')?.checked);
+    if (finished) {
+      if (!card.classList.contains('completed')) {
+        card.classList.add('completed');
+        const statusNode = card.querySelector('.cockpit-ex-status');
+        if (statusNode) statusNode.textContent = 'DONE';
+        newlyFinishedCount++;
+      }
+      lastCard = card;
+    } else {
+      allFinished = false;
+    }
+  });
+
+  if (newlyFinishedCount > 0) showToast('Exercise Complete! ✓');
+
+  // Only collapse and advance if ALL currently opened exercises (i.e. the whole superset) are completely checked off
+  if (allFinished && lastCard) {
+    expandedCards.forEach(c => c.classList.add('collapsed'));
+    
+    // Jump the container if necessary to find the next valid exercise target
+    let nextTarget = lastCard.nextElementSibling;
+    if (!nextTarget && lastCard.parentElement.classList.contains('superset-container')) {
+      nextTarget = lastCard.parentElement.nextElementSibling;
+    }
+
+    while (nextTarget) {
+      if (nextTarget.classList.contains('cockpit-exercise') && !nextTarget.classList.contains('completed')) {
+        nextTarget.classList.remove('collapsed');
+        try { nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
+        try { moveRestTimerToActiveExercise(); } catch(e) {}
+        break;
+      } else if (nextTarget.classList.contains('superset-container')) {
+        const incomplete = nextTarget.querySelector('.cockpit-exercise:not(.completed)');
+        if (incomplete) {
+          nextTarget.querySelectorAll('.cockpit-exercise').forEach(c => c.classList.remove('collapsed'));
+          try { nextTarget.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
+          try { moveRestTimerToActiveExercise(); } catch(e) {}
+          break;
+        }
+      }
+      nextTarget = nextTarget.nextElementSibling;
     }
   }
 }
@@ -913,13 +958,19 @@ export function removeCustomSetRow(liftName, setIndex) {
   }
 }
 
+// PHASE 3 SUPERSETS: Group-aware accordion toggling
 export function toggleAccordionManual(elementNode) {
   if (!elementNode) return;
   const wasCollapsed = elementNode.classList.contains('collapsed');
   document.querySelectorAll('.cockpit-exercise').forEach(card => card.classList.add('collapsed'));
 
   if (wasCollapsed) {
-    elementNode.classList.remove('collapsed');
+    const parent = elementNode.parentElement;
+    if (parent && parent.classList.contains('superset-container')) {
+      parent.querySelectorAll('.cockpit-exercise').forEach(c => c.classList.remove('collapsed'));
+    } else {
+      elementNode.classList.remove('collapsed');
+    }
   }
   try { moveRestTimerToActiveExercise(); } catch(e) { console.warn(e); }
 }
@@ -939,6 +990,12 @@ export function unlinkSuperset(liftName) {
 // ==========================================
 // EVENT DELEGATION ROUTER
 // ==========================================
+
+// Intercept the drag-drop system's decoupled render request
+document.addEventListener('workout:force-rerender', () => {
+  renderWorkout();
+});
+
 document.addEventListener('click', (e) => {
   const target = e.target.closest('[data-action]');
   if (!target) return;
