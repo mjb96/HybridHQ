@@ -86,6 +86,16 @@
   --z-nav:   100;
   --z-modal: 200;
   --z-toast: 300;
+
+  /* --- Accent aliases (referenced app-wide; previously undefined) ---
+     'pink' maps to cyan to match the existing .text-accent-pink utility. */
+  --accent-blue:   var(--color-blue);
+  --accent-cyan:   var(--color-cyan);
+  --accent-green:  var(--color-green);
+  --accent-amber:  var(--color-amber);
+  --accent-red:    var(--color-red);
+  --accent-pink:   var(--color-cyan);
+  --accent-purple: #a855f7;
 }
 
 
@@ -1627,3 +1637,59 @@ td {
   font-size: 0.68rem; color: var(--color-cyan);
   font-variant-numeric: tabular-nums; flex-basis: 100%;
 }
+/* ==========================================
+   PROGRAM BUILDER v2 — PHASE 4 (progression / run editor / preview)
+   ========================================== */
+.builder-progression summary { cursor: pointer; color: var(--accent-purple); }
+.builder-prog-body { display: flex; flex-direction: column; gap: 8px; }
+.prog-ctl {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);
+}
+.prog-ctl .native-select {
+  width: auto !important; font-size: 0.78rem !important; padding: 5px 8px !important;
+  text-align: left !important; background: var(--bg-input) !important;
+}
+.prog-check { justify-content: flex-start; gap: 8px; }
+.prog-check input { width: auto !important; }
+
+.builder-run-editor { flex-direction: column; align-items: stretch; gap: 8px; }
+.run-head { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.run-type-select {
+  width: auto !important; flex: 1; text-align: left !important;
+  font-size: 0.82rem !important; font-weight: 700 !important; padding: 6px 8px !important;
+  color: var(--accent-purple) !important;
+}
+.run-body { display: flex; flex-direction: column; gap: 6px; }
+.run-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.run-reps { display: flex; flex-direction: column; gap: 5px; }
+.run-rep { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.run-rep input { text-align: center !important; font-size: 0.8rem !important; padding: 5px 4px !important; font-weight: 700 !important; }
+.run-num { width: 44px !important; }
+.run-amt { width: 64px !important; }
+.run-rec { width: 64px !important; }
+.run-unit {
+  width: auto !important; font-size: 0.74rem !important; padding: 5px 4px !important;
+  text-align: left !important; background: var(--bg-input) !important;
+}
+.run-unit-lbl { font-size: 0.74rem; color: var(--text-secondary); }
+.run-rep-foot { display: flex; align-items: center; gap: 10px; }
+.run-pace-hint { font-size: 0.72rem; font-weight: 800; color: var(--accent-cyan); font-variant-numeric: tabular-nums; }
+.run-notes { text-align: left !important; font-size: 0.78rem !important; font-weight: 600 !important; padding: 6px 8px !important; }
+.run-zones { font-size: 0.66rem; }
+.run-goal-ctx { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.run-goal-warn { color: var(--accent-amber); font-weight: 700; }
+
+.builder-preview {
+  margin-top: 8px; padding: 8px 10px;
+  background: rgba(34, 211, 238, 0.05);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: var(--radius-sm);
+}
+.builder-preview-head {
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent-cyan); margin-bottom: 4px;
+}
+.prev-line { display: flex; justify-content: space-between; gap: 10px; font-size: 0.76rem; padding: 1px 0; }
+.prev-name { color: var(--text-white); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prev-rx { color: var(--text-secondary); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
