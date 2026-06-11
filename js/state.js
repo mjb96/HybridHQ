@@ -3,7 +3,7 @@
 // ==========================================
 import { PROGRAMS } from './constants.js';
 import { prescribeSetsForLift } from './engine.js';
-import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2 } from './schema.js';
+import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2, migrateProgramToV2 } from './schema.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -73,16 +73,44 @@ export function getProgramById(id) {
 // ==========================================
 // PROGRAM LIBRARY CRUD LOGIC
 // ==========================================
-export function createCustomProgram(name, totalWeeks, focus, philosophy) {
+// Translate authored v2 block.group fields into the cockpit's supersets[day]
+// map (only groups with >= 2 members are real supersets).
+function supersetsFromBlockEntries(entries) {
+  const groupMap = {}, counts = {};
+  entries.forEach(en => { if (en.group) { groupMap[en.name] = en.group; counts[en.group] = (counts[en.group] || 0) + 1; } });
+  const ss = {};
+  for (const name in groupMap) if (counts[groupMap[name]] >= 2) ss[name] = groupMap[name];
+  return ss;
+}
+
+export function listSeededPrograms() {
+  return Object.keys(PROGRAMS).map(id => ({ id, name: PROGRAMS[id].name, weeks: PROGRAMS[id].totalWeeks }));
+}
+
+export function createCustomProgram(name, totalWeeks, focus, philosophy, templateId) {
   const id = 'prog_' + Date.now();
-  // SCHEMA v2: new custom programs are authored directly in the unified
-  // weeks[] → days{mon..sun} → block[] tree the builder + engine share.
-  const newProg = createEmptyV2Program({
-    id,
-    name: name || 'New Custom Program',
-    totalWeeks,
-    dossier: { creator: 'You', focus: focus || 'Custom Focus', philosophy: philosophy || 'A custom built training block.' },
-  });
+  // SCHEMA v2: new custom programs are authored in the unified weeks[] →
+  // days{mon..sun} → block[] tree. Optionally seeded from a library template.
+  let newProg;
+  if (templateId && PROGRAMS[templateId]) {
+    const base = migrateProgramToV2({ id, ...PROGRAMS[templateId] });
+    newProg = {
+      ...base, id,
+      name: name || `${PROGRAMS[templateId].name} (Custom)`,
+      dossier: {
+        creator: 'You',
+        focus: focus || base.dossier?.focus || 'Custom Focus',
+        philosophy: philosophy || base.dossier?.philosophy || 'A custom built training block.',
+      },
+    };
+  } else {
+    newProg = createEmptyV2Program({
+      id,
+      name: name || 'New Custom Program',
+      totalWeeks,
+      dossier: { creator: 'You', focus: focus || 'Custom Focus', philosophy: philosophy || 'A custom built training block.' },
+    });
+  }
 
   if (!appState.customPrograms) appState.customPrograms = [];
   appState.customPrograms.push(newProg);
@@ -192,6 +220,8 @@ export function verifyWeekStorageSchema(wk) {
           appState.weeks[wk].lifts[d][entry.name] =
             prescribeSetsForLift(wk, d, entry, weekContext);
         });
+        // SUPERSET CONVERGENCE: carry authored block.group -> cockpit supersets[d]
+        appState.weeks[wk].supersets[d] = supersetsFromBlockEntries(entries);
       }
     });
   }
@@ -241,6 +271,8 @@ export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {})
   
   if (entries.length) {
     const weekContext = { label: dayV2?.label || '' };
+    // SUPERSET CONVERGENCE: authored groups form the base; live source-day edits overlay.
+    Object.assign(weekData.supersets[targetDay], supersetsFromBlockEntries(entries));
     entries.forEach(entry => {
       weekData.lifts[targetDay][entry.name] =
         prescribeSetsForLift(wk, sourceDay, entry, weekContext);
