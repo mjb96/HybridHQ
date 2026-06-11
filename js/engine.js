@@ -116,14 +116,33 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   return result;
 }
 
-export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
-  const parsedTarget = parseTargetFromDescription(desc, liftName);
-  const usesInlineSpec = desc && desc.includes('x');
-  let setsCount  = usesInlineSpec ? parsedTarget.sets : (weekModifier.sets || 4);
-  let repsTarget = usesInlineSpec ? parsedTarget.reps : (weekModifier.reps || 5);
+// SCHEMA v2: native structured prescription. Reads a v2 lift entry
+//   { name, sets, reps:{min,max}|null, rpe, pct1rm, restSec, ... }
+// directly — no free-text `desc` regex on the hot path (that now lives only
+// in the schema.js migration importer). `weekContext` carries the week label
+// (taper detection) and an optional fallback reps value.
+export function prescribeSetsForLift(wk, dayKey, liftEntry, weekContext = {}) {
+  const entry = liftEntry || {};
+  const liftName = entry.name || '';
 
-  if (weekModifier.intensityLabel.toLowerCase().includes("taper") || weekModifier.reps === 1) {
-    repsTarget = weekModifier.reps;
+  let setsCount = Math.max(1, parseInt(entry.sets, 10) || 4);
+
+  // Rep target = top of the authored range (mirrors the legacy regex, which
+  // took the second number of "8–10"). Fixed scheme → that value.
+  let repsTarget;
+  if (entry.reps && (entry.reps.max != null || entry.reps.min != null)) {
+    repsTarget = entry.reps.max ?? entry.reps.min;
+  } else if (weekContext.reps != null) {
+    repsTarget = weekContext.reps;
+  } else {
+    repsTarget = 10;
+  }
+
+  // Taper weeks: if the entry carries no explicit scheme, honour the week's
+  // low rep fallback (preserves the old taper behaviour).
+  const label = (weekContext.label || '').toLowerCase();
+  if (label.includes('taper') && !entry.reps && weekContext.reps != null) {
+    repsTarget = weekContext.reps;
   }
 
   const diagnostic = computeDiagnosticForLift(wk, dayKey, liftName);
@@ -135,11 +154,52 @@ export function prescribeSetsForLift(wk, dayKey, liftName, desc, weekModifier) {
   for (let i = 0; i < setsCount; i++) {
     sets.push({
       w: diagnostic.suggestedWeight !== '' ? diagnostic.suggestedWeight.toString() : '',
-      r: repsTarget.toString(),
+      r: repsTarget != null ? repsTarget.toString() : '',
       c: false
     });
   }
   return sets;
+}
+
+// ==========================================
+// RUN PACE DERIVATION  (threshold → zone paces)
+// Single source of truth for pace constants (schema.js re-exports these to
+// keep the import graph acyclic). Offsets mirror analytics.paceZoneColour so
+// builder-derived paces and analytics colouring agree.
+// ==========================================
+export const GOAL_5K_PACE_SEC = 239; // sub-20:00 5K ≈ 3:59/km (20:00 flat = 240/km)
+export const PACE_OFFSETS = { easy: 60, tempo: 30, threshold: 0, interval: -10 };
+
+export function derivePaceTargets(thresholdSec, offsets = PACE_OFFSETS) {
+  const t = parseInt(thresholdSec, 10) || 0;
+  if (t <= 0) {
+    return { easy: null, tempo: null, threshold: null, interval: null, goal: GOAL_5K_PACE_SEC, hasThreshold: false };
+  }
+  return {
+    easy: t + offsets.easy,
+    tempo: t + offsets.tempo,
+    threshold: t + offsets.threshold,
+    interval: t + offsets.interval,
+    goal: GOAL_5K_PACE_SEC,
+    hasThreshold: true,
+  };
+}
+
+// Attach computed target paces (s/km) to a RunWorkout and its interval reps,
+// based on the run's paceBasis and the athlete's saved threshold pace.
+export function derivePaceForRun(run, thresholdSec) {
+  if (!run) return run;
+  const z = derivePaceTargets(thresholdSec);
+  const byBasis = {
+    easy: z.easy, tempo: z.tempo, threshold: z.threshold,
+    interval: z.interval, goal: z.goal, custom: null,
+  };
+  const pace = byBasis[run.paceBasis] ?? null;
+  const out = { ...run, paceTargetSec: pace };
+  if (Array.isArray(run.reps) && run.reps.length) {
+    out.reps = run.reps.map(rp => ({ ...rp, paceTarget: rp.paceTarget ?? pace }));
+  }
+  return out;
 }
 
 // ==========================================
