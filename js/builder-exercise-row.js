@@ -39,11 +39,15 @@ function canonicalBadge(name) {
   return `<span class="builder-canon-custom" title="Custom name — won't auto-match PR/history">\uff0b custom</span>`;
 }
 
-export function renderLiftRow(entry, w, dk, e) {
+export function renderLiftRow(entry, w, dk, e, groupCtx = {}) {
   const nameMissing = !(entry.name || '').trim();
   const repsStr = formatReps(entry.reps);
+  const { hasPrevLift = false, linkedToPrev = false, inGroup = false } = groupCtx;
+  const ssBtn = hasPrevLift
+    ? `<button class="btn-pad builder-mini builder-ss-btn${linkedToPrev ? ' active' : ''}" data-action="toggle-group" data-w="${w}" data-dk="${dk}" data-e="${e}" title="${linkedToPrev ? 'Unlink from superset above' : 'Superset with exercise above'}">\u26a1</button>`
+    : '';
   return `
-    <div class="builder-row" data-w="${w}" data-dk="${dk}" data-e="${e}">
+    <div class="builder-row${inGroup ? ' builder-row-grouped' : ''}" data-w="${w}" data-dk="${dk}" data-e="${e}">
       <div class="builder-reorder">
         <button class="btn-pad tactile-scale builder-mini" data-action="ex-up" data-w="${w}" data-dk="${dk}" data-e="${e}" title="Move up">\u25b2</button>
         <button class="btn-pad tactile-scale builder-mini" data-action="ex-down" data-w="${w}" data-dk="${dk}" data-e="${e}" title="Move down">\u25bc</button>
@@ -72,6 +76,7 @@ export function renderLiftRow(entry, w, dk, e) {
         </div>
       </div>
       <div class="builder-row-actions">
+        ${ssBtn}
         <button class="btn-pad builder-mini" data-action="dup-ex" data-w="${w}" data-dk="${dk}" data-e="${e}" title="Duplicate">\u29c9</button>
         <button class="btn-pad builder-mini builder-danger" data-action="remove-ex" data-w="${w}" data-dk="${dk}" data-e="${e}" title="Remove">\u2715</button>
       </div>
