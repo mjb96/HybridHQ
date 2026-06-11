@@ -3,6 +3,7 @@
 // ==========================================
 import { DAY_NAMES_FULL } from './constants.js';
 import { escapeHtml } from './util.js';
+import { DAY_KEYS, SCHEMA_VERSION, getDisplayBlueprint } from './schema.js';
 
 export function buildRunPreviewRow(runsText) {
   const firstSegment = runsText.split('•')[0];
@@ -177,9 +178,18 @@ export function buildWeekMatrixHTML(prog, currentWeek) {
 }
 
 export function buildDaysSplitHTML(prog) {
-  if (!prog || !prog.days) return '';
+  if (!prog) return '';
+  // Legacy seeded programs iterate their curated days{}; v2 programs derive a
+  // representative split from Week 1 via the shared display blueprint.
+  let entries;
+  if (prog.schemaVersion !== SCHEMA_VERSION && prog.days) {
+    entries = Object.entries(prog.days);
+  } else {
+    entries = DAY_KEYS.map(dk => [dk, getDisplayBlueprint(prog, 1, dk)]);
+  }
+  if (!entries.length) return '';
   let html = '';
-  for (const [dayKey, day] of Object.entries(prog.days)) {
+  for (const [dayKey, day] of entries) {
     const liftsHTML = (day.lifts && day.lifts.length > 0)
       ? `<div class="text-sm-label mt-2 mb-2">LIFTING DISCIPLINE TIERS</div>` +
         day.lifts.map(l => `<div class="text-sm text-inverse day-split-lift-item">🔹 ${escapeHtml(l)}</div>`).join('')
