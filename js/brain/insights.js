@@ -121,6 +121,15 @@ function template(f) {
         whyItMatters: `Sharp single-week jumps in running load are a known overuse-injury pattern.`,
         suggestedAction: `Hold or slightly reduce next week so your body can absorb the jump.`,
       };
+    case 'interference:up':
+      return {
+        category: CAT.RISK,
+        observation: `Recovery demand is elevated — driven by both strength and endurance stress.`,
+        explanation: `This week pairs heavy lifting load (${ev(f, 'strength_cost')} AU) with high running load (${ev(f, 'endurance_cost')} AU); acute:chronic load sits at ${ev(f, 'acwr')}.`,
+        whyItMatters: `Pushing strength and endurance hard at once raises systemic fatigue faster than either alone — where interference and overuse risk concentrate.`,
+        suggestedAction: `Ease one side for a few days: keep the priority quality session and make the other easy or short.`,
+        tradeoffs: `Holding both high can stall progress in both; easing endurance protects strength recovery, and vice-versa.`,
+      };
     default:
       break;
   }
@@ -170,21 +179,45 @@ export function toInsight(finding, ctx = {}) {
     relevance        * W.goalRelevance +
     recency          * W.recency;
 
+  // Phase 2: fold causal attribution into the copy + derive a tradeoff.
+  const attribution = finding.attribution || null;
+  let explanation = t.explanation;
+  let tradeoffs = t.tradeoffs ?? null;
+  if (attribution) {
+    explanation += ` ${capitalize(attribution.summary)}.`;
+    if (!tradeoffs) tradeoffs = tradeoffFor(finding, attribution);
+  }
+
   return {
     id: `insight.${finding.id}`,
     category: t.category,
     domain: finding.domain,
     surfaces: ['dashboard'],
     observation: t.observation,
-    explanation: t.explanation,
+    explanation,
     whyItMatters: t.whyItMatters,
     suggestedAction: t.suggestedAction,
-    tradeoffs: null,
+    tradeoffs,
+    attribution,
+    evidence: finding.evidence || [],
     confidence: conf.level,
     confidenceScore: conf.score,
     priority: Math.round(priority * 1000) / 1000,
     findings: [finding.id],
   };
+}
+
+const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+// Derive a tradeoff line when a strength stall/plateau is attributed to endurance.
+function tradeoffFor(finding, attribution) {
+  const runDriver = (attribution.drivers || []).some(d =>
+    d.factor === 'running_load' || d.factor === 'hard_running_min' || d.factor === 'running_distance');
+  const isStall = (finding.type === 'e1rm_trend' && finding.direction === 'down') || finding.type === 'plateau';
+  if (isStall && runDriver) {
+    return `More running volume can build endurance but may slow strength recovery on this lift — balance the two deliberately.`;
+  }
+  return null;
 }
 
 function recencyFor(window, currentWeek) {

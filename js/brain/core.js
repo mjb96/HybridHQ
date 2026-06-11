@@ -12,6 +12,7 @@
 // Safe under `node --test`.
 // ==========================================
 import { runAnalysis } from './analysis.js';
+import { attributeFindings, detectInterference } from './attribution.js';
 import { buildInsights, selectTop } from './insights.js';
 
 const DEFAULT_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -41,7 +42,16 @@ export function generateInsights(appState, opts = {}) {
   const topN = opts.topN ?? 5;
 
   const ctx = { days, program, currentWeek, maxWeek };
-  const findings = runAnalysis(appState, ctx);
+
+  // Findings → causal enrichment. Interference is an extra finding; then every
+  // finding is passed through attribution to attach evidence-backed "why".
+  const rawFindings = runAnalysis(appState, ctx);
+  const interference = detectInterference(appState, ctx);
+  const findings = attributeFindings(
+    interference ? [...rawFindings, interference] : rawFindings,
+    appState, ctx,
+  );
+
   const allInsights = buildInsights(findings, ctx);
   const insights = selectTop(allInsights, topN);
 
