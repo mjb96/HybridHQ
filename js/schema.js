@@ -288,6 +288,55 @@ export function dayRunWorkout(dayV2) {
   return r ? r.run : null;
 }
 
+// Render a structured RunWorkout to a human display string (for legacy-shaped
+// display consumers that expect a `runs` string).
+export function formatRunDisplay(run) {
+  if (!run || run.type === 'rest') return 'Rest';
+  const label = run.type.charAt(0).toUpperCase() + run.type.slice(1);
+  if (Array.isArray(run.reps) && run.reps.length) {
+    const parts = run.reps.map(r => {
+      const amt = r.distM ? `${r.distM}m` : (r.durationSec ? `${Math.round(r.durationSec / 60)}min` : '');
+      const rec = r.recoverySec ? ` (${r.recoverySec}s rec)` : '';
+      return `${r.count}\u00d7${amt}${rec}`;
+    });
+    return `${label}: ${parts.join(', ')}`;
+  }
+  if (run.durationMin) {
+    const d = run.durationMin.min === run.durationMin.max
+      ? `${run.durationMin.min} min`
+      : `${run.durationMin.min}\u2013${run.durationMin.max} min`;
+    return `${label}: ${d}`;
+  }
+  return run.notes ? `${label}: ${run.notes}` : label;
+}
+
+// Return a LEGACY-SHAPED day blueprint ({title,badge,color,desc,runs,lifts})
+// for any program + week + day, so display consumers (cockpit, dashboard,
+// library day-split) work uniformly. Seeded programs pass through their
+// curated days{} unchanged; v2 programs derive the shape from the v2 day.
+// The synthesised `desc` ("Name (SxR)") round-trips through the engine's
+// existing parseTargetFromDescription, so target-label code needs no change.
+export function getDisplayBlueprint(prog, week, dayKey) {
+  if (prog && prog.schemaVersion !== SCHEMA_VERSION && prog.days && prog.days[dayKey]) {
+    return prog.days[dayKey];
+  }
+  const v2 = getDayV2(prog, week, dayKey);
+  const day = v2?.day;
+  if (!day) return { title: 'Rest', badge: 'Rest', color: 'var(--text-muted)', desc: '', runs: 'Rest', lifts: [] };
+  const lifts = dayLiftEntries(day);
+  const run = dayRunWorkout(day);
+  const hasContent = lifts.length > 0 || (run && run.type !== 'rest');
+  const desc = lifts.map(e => `${e.name} (${e.sets}x${repsTargetValue(e.reps)})`).join(', ');
+  return {
+    title: day.title || (hasContent ? 'Training Day' : 'Rest'),
+    badge: (day.title && day.title.trim()) || (hasContent ? 'Train' : 'Rest'),
+    color: day.color || 'var(--text-muted)',
+    desc,
+    runs: formatRunDisplay(run),
+    lifts: lifts.map(e => e.name),
+  };
+}
+
 // Pull the v2 day blueprint for ALL seeded + custom programs once. Useful for
 // migration round-trip tests and for any one-shot tooling.
 export function migrateAllSeededPrograms() {
