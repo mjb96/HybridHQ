@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v35';
+const CACHE_NAME = 'hybrid-training-v36';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -16,6 +16,7 @@ const ASSETS_TO_CACHE = [
   './js/db.js',
   './js/dragdrop.js',
   './js/engine.js',
+  './js/schema.js',
   './js/debug.js',
   './js/util.js',
   './js/garmin.js',
