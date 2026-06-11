@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v36';
+const CACHE_NAME = 'hybrid-training-v37';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -28,7 +28,8 @@ const ASSETS_TO_CACHE = [
   './js/workout-map.js',
   './js/workout-exercise-picker.js',
   './js/workout-session-modals.js',
-  './js/program_builder.js'
+  './js/program_builder.js',
+  './js/builder-exercise-row.js'
 ];
 
 self.addEventListener('install', (event) => {
