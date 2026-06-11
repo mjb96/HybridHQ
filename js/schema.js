@@ -238,11 +238,15 @@ export function migrateProgramToV2(prog) {
 // ==========================================
 const _v2Cache = new WeakMap();
 
+function isV2Program(prog) {
+  return !!(prog && prog.schemaVersion === SCHEMA_VERSION
+    && Array.isArray(prog.weeks) && prog.weeks[0]?.days
+    && !Array.isArray(prog.weeks[0].days));
+}
+
 export function resolveProgramV2(prog) {
   if (!prog) return prog;
-  if (prog.schemaVersion === SCHEMA_VERSION && Array.isArray(prog.weeks) && prog.weeks[0]?.days) {
-    return prog;
-  }
+  if (isV2Program(prog)) return prog;
   if (_v2Cache.has(prog)) return _v2Cache.get(prog);
   const v2 = migrateProgramToV2(prog);
   _v2Cache.set(prog, v2);
@@ -292,4 +296,112 @@ export function migrateAllSeededPrograms() {
     out[id] = migrateProgramToV2({ id, ...PROGRAMS[id] });
   }
   return out;
+}
+
+// ==========================================
+// V2 CONSTRUCTORS (builder writer + new custom programs)
+// ==========================================
+export function makeLiftEntry(partial = {}) {
+  return {
+    kind: 'lift',
+    name: canonicalizeExercise(partial.name || ''),
+    sets: Math.max(1, parseInt(partial.sets, 10) || 3),
+    reps: partial.reps ?? makeReps(partial.repMin ?? 10, partial.repMax ?? partial.repMin ?? 10),
+    rpe: partial.rpe ?? null,
+    pct1rm: partial.pct1rm ?? null,
+    restSec: partial.restSec ?? null,
+    group: partial.group ?? null,
+    notes: partial.notes ?? '',
+  };
+}
+
+export function makeRunEntry(run) {
+  return { kind: 'run', run: run || parseRunString('') };
+}
+
+export function emptyDayV2(title = '') {
+  return { title, badge: 'Rest', color: 'var(--text-muted)', notes: '', block: [] };
+}
+
+export function emptyWeekV2(label = '') {
+  const days = {};
+  for (const dk of DAY_KEYS) days[dk] = emptyDayV2();
+  return { label, days };
+}
+
+export function createEmptyV2Program({ id, name, totalWeeks, dossier, color } = {}) {
+  const tw = parseInt(totalWeeks, 10) || 12;
+  const weeks = [];
+  for (let w = 1; w <= tw; w++) weeks.push(emptyWeekV2(`Week ${w}`));
+  return {
+    id, name: name || 'New Custom Program', totalWeeks: tw,
+    dossier: dossier || { creator: 'You', focus: 'Custom Focus', philosophy: 'A custom built training block.' },
+    color: color || null,
+    schemaVersion: SCHEMA_VERSION,
+    weeks,
+  };
+}
+
+// Flat, de-duplicated, sorted canonical exercise list — feeds the builder's
+// autocomplete datalist.
+export function allCanonicalExercises() {
+  const set = new Set();
+  for (const cat of Object.keys(EXERCISE_LIBRARY)) {
+    for (const name of EXERCISE_LIBRARY[cat]) set.add(name);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+// ==========================================
+// LEGACY POSITIONAL BUILDER  →  v2
+// The pre-v2 builder wrote weeks[] = [{ days: [{ dayName, runs,
+// exercises:[{name,targetSets,targetReps}] }] }]. Positional days map to
+// mon..sun by index (the old builder had no day-of-week concept). Content is
+// preserved; only the slot assignment is inferred.
+// ==========================================
+function migrateLegacyPositionalToV2(prog) {
+  const totalWeeks = parseInt(prog.totalWeeks, 10) || (Array.isArray(prog.weeks) ? prog.weeks.length : 12) || 12;
+  const srcWeeks = Array.isArray(prog.weeks) ? prog.weeks : [];
+  const weeks = [];
+  for (let w = 0; w < totalWeeks; w++) {
+    const src = srcWeeks[w] || srcWeeks[srcWeeks.length - 1] || { days: [] };
+    const days = {};
+    for (const dk of DAY_KEYS) days[dk] = emptyDayV2();
+    (src.days || []).forEach((d, i) => {
+      if (i >= DAY_KEYS.length) return; // beyond 7 positional days is dropped-to-cap (rare)
+      const dk = DAY_KEYS[i];
+      const block = [];
+      (d.exercises || []).forEach(ex => {
+        if (!ex || !(ex.name || '').trim()) return;
+        block.push(makeLiftEntry({ name: ex.name, sets: ex.targetSets, repMin: ex.targetReps, repMax: ex.targetReps }));
+      });
+      const run = parseRunString(d.runs);
+      if (run.type !== 'rest') block.push(makeRunEntry(run));
+      days[dk] = { title: d.dayName || '', badge: 'Rest', color: 'var(--text-muted)', notes: '', block };
+    });
+    weeks.push({ label: `Week ${w + 1}`, days });
+  }
+  return {
+    id: prog.id, name: prog.name, totalWeeks,
+    dossier: prog.dossier, color: prog.color || null,
+    schemaVersion: SCHEMA_VERSION, weeks,
+  };
+}
+
+// Smart, lossless migration of a stored CUSTOM program to v2. Picks the source
+// of truth: structured `days{}` if it carries lifts (it's what executed),
+// otherwise the orphaned positional `weeks[]` (the user's authored intent),
+// otherwise an empty skeleton. Idempotent.
+export function migrateCustomProgramToV2(prog) {
+  if (!prog) return prog;
+  if (isV2Program(prog)) return prog;
+
+  const daysHaveLifts = prog.days && Object.values(prog.days).some(d => (d?.lifts || []).length > 0);
+  if (daysHaveLifts) return migrateProgramToV2(prog);
+
+  const positionalHasContent = Array.isArray(prog.weeks) && prog.weeks.some(w =>
+    (w?.days || []).some(d => (d?.exercises || []).length > 0 || (d?.runs && d.runs !== 'Rest')));
+  if (positionalHasContent) return migrateLegacyPositionalToV2(prog);
+
+  return migrateProgramToV2(prog); // empty days{} → sized-but-empty v2 skeleton
 }
