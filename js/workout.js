@@ -413,7 +413,6 @@ export function renderWorkout() {
       return buildSetRow(sData, sIdx, safeLiftName, linkedGhostSet, displayIndex);
     }).join('');
 
-    // PHASE 2 SUPERSETS: Pass isGrouped to template
     const isGrouped = !!supersetMap[liftName];
 
     try {
@@ -516,10 +515,27 @@ export function executeOneTapQuickLog(labelNode, liftName, sIdx) {
 
   try { logActivityForStreak(); } catch (e) { console.warn(e); }
   
+  // PHASE 3 SUPERSETS: Timer Suppression Logic
   try {
     const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
     const setRpe = gymRpeEl && gymRpeEl.value ? parseFloat(gymRpeEl.value) : null;
-    triggerRestTimerEngine(liftName, setRpe);
+    
+    let shouldTrigger = true;
+    const ssMap = appState.weeks[wk].supersets?.[selectedDay];
+    if (ssMap && ssMap[liftName]) {
+      const gId = ssMap[liftName];
+      const allLifts = Object.keys(appState.weeks[wk].lifts[selectedDay] || {});
+      const gLifts = allLifts.filter(l => ssMap[l] === gId);
+      if (gLifts.length > 0 && gLifts[gLifts.length - 1] !== liftName) {
+        shouldTrigger = false;
+      }
+    }
+    
+    if (shouldTrigger) {
+      triggerRestTimerEngine(liftName, setRpe);
+    } else {
+      showToast('Superset Transition ⚡');
+    }
   } catch(e) { console.warn(e); }
 
   _saveState(true);
@@ -680,11 +696,33 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       if (!rInput.value) rInput.value = "10";
     }
 
+    // PHASE 3 SUPERSETS: Timer Suppression Logic
     try {
-      const liftName = exCard ? exCard.getAttribute('data-liftname') : null;
+      const appState = _getState();
+      const wk = appState.currentWeek;
+      const selectedDay = _getSelectedDay();
+      const liftNameAttr = exCard ? exCard.getAttribute('data-liftname') : null;
       const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
       const setRpe = gymRpeEl && gymRpeEl.value ? parseFloat(gymRpeEl.value) : null;
-      triggerRestTimerEngine(liftName, setRpe);
+      
+      let shouldTrigger = true;
+      if (liftNameAttr) {
+        const ssMap = appState.weeks[wk].supersets?.[selectedDay];
+        if (ssMap && ssMap[liftNameAttr]) {
+          const gId = ssMap[liftNameAttr];
+          const allLifts = Object.keys(appState.weeks[wk].lifts[selectedDay] || {});
+          const gLifts = allLifts.filter(l => ssMap[l] === gId);
+          if (gLifts.length > 0 && gLifts[gLifts.length - 1] !== liftNameAttr) {
+            shouldTrigger = false;
+          }
+        }
+      }
+      
+      if (shouldTrigger) {
+        triggerRestTimerEngine(liftNameAttr, setRpe);
+      } else {
+        showToast('Superset Transition ⚡');
+      }
     } catch(e) { console.warn(e); }
   } else {
     if (parentRow) parentRow.classList.remove('is-complete');
@@ -883,7 +921,6 @@ export function toggleAccordionManual(elementNode) {
   try { moveRestTimerToActiveExercise(); } catch(e) { console.warn(e); }
 }
 
-// PHASE 2 SUPERSETS: New Unlink Logic
 export function unlinkSuperset(liftName) {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
@@ -923,7 +960,6 @@ document.addEventListener('click', (e) => {
   }
   else if (action === 'close-exercise-history') closeExerciseHistoryModal();
   
-  // PHASE 2 SUPERSETS: Router Hooks
   else if (action === 'open-add-superset') {
     const modal = document.getElementById('addExerciseModal');
     if (modal) modal.setAttribute('data-source-lift', liftName);
@@ -932,7 +968,7 @@ document.addEventListener('click', (e) => {
   else if (action === 'unlink-superset') unlinkSuperset(liftName);
   else if (action === 'open-add-exercise') {
     const modal = document.getElementById('addExerciseModal');
-    if (modal) modal.removeAttribute('data-source-lift'); // Clear to prevent contamination
+    if (modal) modal.removeAttribute('data-source-lift'); 
     openAddExerciseModal();
   }
 
