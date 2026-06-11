@@ -9,7 +9,7 @@ import { openBuilder } from './program_builder.js';
 import {
   appState, activeTab, selectedDay, DEFAULT_DAYS,
   setActiveTab, setSelectedDay, setAppState,
-  getProgramById, createCustomProgram, duplicateCustomProgram, deleteCustomProgram,
+  getProgramById, createCustomProgram, duplicateCustomProgram, deleteCustomProgram, listSeededPrograms,
   determineDefaultCalendarDay,
   verifyWeekStorageSchema,
   saveStateToLocalStorage,
@@ -328,20 +328,29 @@ export function cancelWeekAdvance() {
   saveStateToLocalStorage(true);
 }
 
-export function openCreateProgramModal() { document.getElementById('createProgramModal').classList.add('active'); }
+export function openCreateProgramModal() {
+  const sel = document.getElementById('cpInputTemplate');
+  if (sel) {
+    sel.innerHTML = '<option value="">Blank program</option>' +
+      listSeededPrograms().map(p => `<option value="${p.id}">${p.name} (${p.weeks} wks)</option>`).join('');
+  }
+  document.getElementById('createProgramModal').classList.add('active');
+}
 export function closeCreateProgramModal() { document.getElementById('createProgramModal').classList.remove('active'); }
 
 export function executeCreateProgram() {
   const name = document.getElementById('cpInputName').value;
   const focus = document.getElementById('cpInputFocus').value;
   const wks = document.getElementById('cpInputWeeks').value;
-  createCustomProgram(name, wks, focus, "");
+  const templateId = document.getElementById('cpInputTemplate')?.value || '';
+  createCustomProgram(name, wks, focus, "", templateId);
   closeCreateProgramModal();
   renderProgramLibrary();
-  showToast('Custom Program Created!');
+  showToast(templateId ? 'Program created from template!' : 'Custom Program Created!');
   document.getElementById('cpInputName').value = '';
   document.getElementById('cpInputFocus').value = '';
   document.getElementById('cpInputWeeks').value = '12';
+  const tmpl = document.getElementById('cpInputTemplate'); if (tmpl) tmpl.value = '';
 }
 
 export function executeDeleteProgram(id) {
