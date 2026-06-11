@@ -2,6 +2,7 @@
 // WORKOUT VIEW
 // ==========================================
 import { getProgramById } from './state.js';
+import { getDisplayBlueprint } from './schema.js';
 import { logActivityForStreak } from './state.js';
 import { getSessionSourceDay, loadSessionIntoDay, resetSessionForDay } from './state.js';
 import { CONFIG } from './constants.js';
@@ -103,7 +104,7 @@ export function renderWorkout() {
   const activeProgram = getProgramById(appState.activeProgramId);
   const sessionSourceDay = getSessionSourceDay(wk, selectedDay);
   const isMovedSession = sessionSourceDay !== selectedDay;
-  const homeBlueprint = activeProgram.days?.[sessionSourceDay] || { lifts: [], runs: "Rest" };
+  const homeBlueprint = getDisplayBlueprint(activeProgram, wk, sessionSourceDay);
 
   const runContext = weekData.runs[selectedDay] || { dist: '', time: '', rpe: '', avgHR: '', maxHR: '', elev: '', cals: '' };
   
@@ -268,7 +269,7 @@ export function renderWorkout() {
     const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     pills.forEach((pill, idx) => {
       const dayKey = days[idx];
-      const dayData = activeProgram.days?.[dayKey];
+      const dayData = getDisplayBlueprint(activeProgram, wk, dayKey);
       const badge = dayData?.badge || dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
       const shortDay = dayKey.charAt(0).toUpperCase() + dayKey.slice(1, 3);
       pill.textContent = `${shortDay} (${badge})`;
@@ -278,7 +279,7 @@ export function renderWorkout() {
   const sessionSelect = document.getElementById('cockpitSessionSelect');
   if (sessionSelect) {
     sessionSelect.innerHTML = _getDays().map(dk => {
-      const dd = activeProgram.days?.[dk];
+      const dd = getDisplayBlueprint(activeProgram, wk, dk);
       const label = (dd?.badge || dd?.title || dk).toString();
       const short = dk.charAt(0).toUpperCase() + dk.slice(1, 3);
       const sel = dk === sessionSourceDay ? ' selected' : '';
@@ -288,7 +289,8 @@ export function renderWorkout() {
   const movedBadge = document.getElementById('cockpitSessionMoved');
   if (movedBadge) {
     if (isMovedSession) {
-      const srcLabel = activeProgram.days?.[sessionSourceDay]?.badge || activeProgram.days?.[sessionSourceDay]?.title || sessionSourceDay;
+      const _srcBp = getDisplayBlueprint(activeProgram, wk, sessionSourceDay);
+      const srcLabel = _srcBp.badge || _srcBp.title || sessionSourceDay;
       movedBadge.textContent = `↪ Running "${srcLabel}" here (moved from its usual day)`;
       movedBadge.style.display = '';
     } else {
