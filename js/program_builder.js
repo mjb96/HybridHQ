@@ -127,9 +127,13 @@ function renderDay(day, w, dk, weekLabel) {
   const hasRun = block.some(en => en.kind === 'run');
   const threshold = appState.thresholdPaceSeconds;
 
-  const rowsHTML = block.map((en, e) =>
-    en.kind === 'run' ? renderRunEditor(en, w, dk, e, threshold) : renderLiftRow(en, w, dk, e)
-  ).join('');
+  const rowsHTML = block.map((en, e) => {
+    if (en.kind === 'run') return renderRunEditor(en, w, dk, e, threshold);
+    const prev = block[e - 1];
+    const hasPrevLift = !!(prev && prev.kind === 'lift');
+    const linkedToPrev = !!(en.group && hasPrevLift && prev.group === en.group);
+    return renderLiftRow(en, w, dk, e, { hasPrevLift, linkedToPrev, inGroup: !!en.group });
+  }).join('');
 
   const copyOptions = DAY_KEYS.filter(t => t !== dk)
     .map(t => `<option value="${t}">${dayLabel(t)}</option>`).join('');
@@ -270,6 +274,28 @@ const updateRep = (w, dk, e, i, field, val) => {
   commit();
 };
 
+const normalizeGroups = (b) => {
+  const counts = {};
+  b.forEach(en => { if (en.kind === 'lift' && en.group) counts[en.group] = (counts[en.group] || 0) + 1; });
+  b.forEach(en => { if (en.kind === 'lift' && en.group && counts[en.group] < 2) en.group = null; });
+};
+
+const toggleGroupWithPrev = (w, dk, e) => {
+  const b = block(w, dk);
+  if (!b || !b[e] || b[e].kind !== 'lift') return;
+  const prev = b[e - 1];
+  if (!prev || prev.kind !== 'lift') return;
+  const a = b[e];
+  if (a.group && a.group === prev.group) {
+    a.group = null; // unlink from the superset above
+  } else {
+    const g = prev.group || ('g' + Date.now());
+    prev.group = g; a.group = g;
+  }
+  normalizeGroups(b);
+  commit();
+};
+
 const generateProgression = () => {
   const p = prog();
   if (!p.weeks?.length) return;
@@ -390,6 +416,7 @@ document.addEventListener('click', (ev) => {
     case 'ex-down': moveEntry(w, dk, e, +1); break;
     case 'rep-add': addRep(w, dk, e); break;
     case 'rep-remove': removeRep(w, dk, e, i); break;
+    case 'toggle-group': toggleGroupWithPrev(w, dk, e); break;
     case 'generate-progression': generateProgression(); break;
     default: break;
   }
