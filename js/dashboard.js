@@ -1,50 +1,19 @@
 // ==========================================
 // DASHBOARD TILE REGISTRY (dashboard.js)
+// Now augmented by the Hybrid Brain intelligence layer.
 // ==========================================
-// Architecture: add a new tile by adding one entry to TILE_REGISTRY.
-// Each entry is a DashboardTileConfig object — no other files need touching
-// for basic tiles that navigate to an existing analytics context.
-//
-// DashboardTileConfig shape:
-// {
-//   id:          string          — unique key, matches HTML element id prefix
-//   type:        DashboardTileType
-//   icon:        string          — emoji icon
-//   label:       string          — uppercase micro-label
-//   accentVar:   string          — CSS var name for the icon/accent colour
-//   navTarget:   string | null   — analytics context string, or 'custom' for special handlers
-//   order:       number          — render order (lower = first)
-//   renderData:  (appState, defaultDays) => DashboardTileData
-// }
-//
-// DashboardTileData shape:
-// {
-//   hero:        string          — large primary value
-//   sub?:        string          — optional secondary line
-//   tag?:        string          — optional small tag/badge (coloured)
-//   tagColor?:   string          — CSS colour string for the tag
-//   extraHTML?:  string          — raw HTML injected below hero (for progress bars, etc.)
-//   state:       'loaded'|'empty'|'error'
-// }
 
-import { appState } from './state.js';
 import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
-         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence, computeHybridInsights } from './engine.js';
+         computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence } from './engine.js';
 
-// ==========================================
-// TILE TYPE ENUM
-// ==========================================
 export const DashboardTileType = Object.freeze({
-  METRIC:    'metric',    // Simple hero number + subtitle
-  RING:      'ring',      // Progress ring (readiness)
-  SPLIT_3:   'split_3',  // 3-row mini-table (top lifts)
-  RATIO_BAR: 'ratio_bar', // Dual fill bar (stress balance)
-  PROGRESS:  'progress',  // Count / total (consistency)
+  METRIC:    'metric',   
+  RING:      'ring',      
+  SPLIT_3:   'split_3',  
+  RATIO_BAR: 'ratio_bar', 
+  PROGRESS:  'progress',  
 });
 
-// ==========================================
-// HELPER — parse run time string → total minutes
-// ==========================================
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const parts = timeStr.split(':').map(Number);
@@ -53,10 +22,6 @@ function parseTimeToMinutes(timeStr) {
   return parseFloat(timeStr) || 0;
 }
 
-// ==========================================
-// TILE REGISTRY
-// To add a tile: push a new config object into this array.
-// ==========================================
 export const TILE_REGISTRY = [
 
   // ---- TODAY --------------------------------------------------
@@ -68,7 +33,7 @@ export const TILE_REGISTRY = [
     accentVar: '--color-blue',
     navTarget: 'custom:today-summary',
     order:     0,
-    renderData(appState, defaultDays, activeProgram, selectedDay) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
         const wk = appState.currentWeek || '1';
         const weekData = appState.weeks?.[wk];
@@ -82,7 +47,7 @@ export const TILE_REGISTRY = [
         let completedSets = 0;
         for (const lift in todayLifts) {
           if (Array.isArray(todayLifts[lift])) {
-            completedSets += todayLifts[lift].filter(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
+            completedSets += todayLifts[lift].filter(s => s && !s.isWarmup && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
           }
         }
         const runDist = parseFloat(todayRun.dist) || 0;
@@ -120,19 +85,22 @@ export const TILE_REGISTRY = [
     accentVar: '--color-green',
     navTarget: 'recovery',
     order:     1,
-    renderData(appState, defaultDays, activeProgram) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
-        const maxWeek = activeProgram?.totalWeeks || 12;
-        const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
-        const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
-        const r = computeReadiness(totalByWeek, appState.currentWeek);
-        if (!r.hasData) {
-          return { hero: '--', sub: 'Log RPE + duration', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
+        if (brainPayload && brainPayload.readiness) {
+          let ringColor = 'var(--color-green)';
+          if (brainPayload.readiness.score <= 40) ringColor = 'var(--color-red)';
+          else if (brainPayload.readiness.score < 75) ringColor = 'var(--color-amber)';
+          
+          return { 
+            hero: `${brainPayload.readiness.score}`, 
+            sub: `${brainPayload.readiness.label} Readiness`, 
+            ringPct: brainPayload.readiness.score, 
+            ringColor, 
+            state: 'loaded' 
+          };
         }
-        let ringColor = 'var(--color-green)';
-        if (r.score < 50) ringColor = 'var(--color-red)';
-        else if (r.score < 75) ringColor = 'var(--color-amber)';
-        return { hero: `${r.score}`, sub: `ACWR ${r.acwr.toFixed(2)}`, ringPct: r.score, ringColor, state: 'loaded' };
+        return { hero: '--', sub: 'Log sessions for insights', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
       } catch {
         return { hero: '--', sub: 'Unavailable', ringPct: 0, ringColor: 'var(--color-blue)', state: 'error' };
       }
@@ -148,7 +116,7 @@ export const TILE_REGISTRY = [
     accentVar: '--color-blue',
     navTarget: 'progress',
     order:     2,
-    renderData(appState, defaultDays, activeProgram) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
         const wk = appState.currentWeek || '1';
         const weekData = appState.weeks?.[wk];
@@ -166,14 +134,24 @@ export const TILE_REGISTRY = [
           for (const lift in dayLifts) {
             if (Array.isArray(dayLifts[lift])) {
               dayLifts[lift].forEach(s => {
-                total++;
-                if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) done++;
+                if (!s.isWarmup) {
+                  total++;
+                  if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) done++;
+                }
               });
             }
           }
         });
 
-        return { done, total, sub: 'Weekly tasks ticked', state: done > 0 ? 'loaded' : 'empty' };
+        // Brain context overlay
+        let subText = 'Weekly tasks ticked';
+        let tagColor = 'var(--text-muted)';
+        if (brainPayload?.primaryFocus?.theme === 'Consistency Focus') {
+          subText = 'Current Primary Focus';
+          tagColor = 'var(--color-blue)';
+        }
+
+        return { done, total, sub: subText, tagColor, state: done > 0 ? 'loaded' : 'empty' };
       } catch {
         return { done: 0, total: 0, sub: 'Unavailable', state: 'error' };
       }
@@ -225,11 +203,9 @@ export const TILE_REGISTRY = [
     accentVar: '--color-blue',
     navTarget: 'strength_pr',
     order:     4,
-    renderData(appState) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
         const p = computeBig3Progression(appState);
-        // Show current-block best; mark ★ when it's also the all-time PR. If the
-        // lift hasn't been trained this block, fall back to the all-time PR.
         const fmt = (cat) => {
           const { current, allTime } = p[cat];
           if (current > 0) return current >= allTime ? `${Math.round(current)} kg ★` : `${Math.round(current)} kg`;
@@ -237,12 +213,26 @@ export const TILE_REGISTRY = [
           return '-- kg';
         };
         const anyData = p.squat.allTime > 0 || p.bench.allTime > 0 || p.deadlift.allTime > 0;
+        
+        // Brain augmentation
+        let contextTag = null;
+        let contextColor = 'var(--color-blue)';
+        if (brainPayload) {
+          const opp = brainPayload.opportunities.find(o => o.domain === 'STRENGTH');
+          if (opp) {
+            contextTag = opp.text;
+            contextColor = 'var(--color-green)';
+          }
+        }
+
         return {
           rows: [
             { label: 'SQ', value: fmt('squat') },
             { label: 'BP', value: fmt('bench') },
             { label: 'DL', value: fmt('deadlift') },
           ],
+          tag: contextTag,
+          tagColor: contextColor,
           state: anyData ? 'loaded' : 'empty',
         };
       } catch {
@@ -323,77 +313,68 @@ export const TILE_REGISTRY = [
     accentVar: '--color-amber',
     navTarget: 'stress-balance',
     order:     7,
-    renderData(appState, defaultDays) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
-        const wk = appState.currentWeek || '1';
-        const weekData = appState.weeks?.[wk];
-        let gymTSS = 0, runTSS = 0;
-        if (weekData) {
-          defaultDays.forEach(d => {
-            let completedSets = 0;
-            const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-            const dayLifts = weekData.lifts?.[d] || {};
-            for (const lift in dayLifts) {
-              if (Array.isArray(dayLifts[lift])) {
-                completedSets += dayLifts[lift].filter(s => s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)).length;
-              }
-            }
-            gymTSS += completedSets * (gRpe > 0 ? gRpe : 6);
-
-            const rDist = parseFloat(weekData.runs?.[d]?.dist) || 0;
-            const rRpe  = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-            runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
-          });
+        if (brainPayload && brainPayload.fatigue) {
+          // Brain-augmented stress balance relies on precise fatigue models
+          const liftF = Math.max(brainPayload.fatigue.push, brainPayload.fatigue.pull, brainPayload.fatigue.legs);
+          const runF = brainPayload.fatigue.aerobic;
+          
+          if (liftF === 0 && runF === 0) return { label: 'No data', advice: 'Log workouts to see your bias', liftPct: 50, runPct: 50, state: 'empty' };
+          
+          const total = liftF + runF;
+          const liftPct = Math.round((liftF / total) * 100);
+          const runPct = 100 - liftPct;
+          
+          let advice = '🏆 Balanced Load';
+          if (liftPct >= 70) advice = '⚠️ Heavy lifting bias.';
+          else if (runPct >= 70) advice = '⚠️ High running stress.';
+          
+          return { label: `${liftPct}% / ${runPct}%`, advice, liftPct, runPct, state: 'loaded' };
         }
-
-        if (gymTSS === 0 && runTSS === 0) {
-          return { label: 'No data logged', advice: 'Log workouts to see your bias.', liftPct: 50, runPct: 50, state: 'empty' };
-        }
-        const total = gymTSS + runTSS;
-        const liftPct = Math.round((gymTSS / total) * 100);
-        const runPct  = 100 - liftPct;
-        let advice = '🏆 Perfect balance.';
-        if (liftPct >= 70) advice = '⚠️ Heavy lifting bias.';
-        else if (runPct >= 70) advice = '⚠️ High running stress.';
-        return { label: `${liftPct}% / ${runPct}%`, advice, liftPct, runPct, state: 'loaded' };
+        
+        return { label: '0% / 0%', advice: 'No data', liftPct: 50, runPct: 50, state: 'empty' };
       } catch {
         return { label: '0% / 0%', advice: 'Unavailable', liftPct: 50, runPct: 50, state: 'error' };
       }
     },
   },
 
-  // ---- RECOVERY SCORE (NEW) ----------------------------------
+  // ---- FATIGUE SCORE (formerly Recovery Score) ----------------
   {
     id:        'recovery-score',
     type:      DashboardTileType.METRIC,
     icon:      '🛌',
-    label:     'Recovery Score',
+    label:     'Systemic Fatigue',
     accentVar: '--color-green',
     navTarget: 'recovery-score',
     order:     8,
-    renderData(appState, defaultDays) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
-        const r = computeRecoveryScore(appState, defaultDays);
-        if (!r.hasData) {
-          return { hero: '--', sub: 'Log sessions for score', tag: 'N/A', tagColor: 'var(--text-secondary)', state: 'empty' };
+        if (brainPayload && brainPayload.fatigue) {
+          const sys = brainPayload.fatigue.systemic;
+          let tagColor = 'var(--color-green)';
+          let tagText = 'Recovered';
+          
+          if (sys >= 75) { tagColor = 'var(--color-red)'; tagText = 'High Fatigue'; }
+          else if (sys >= 50) { tagColor = 'var(--color-amber)'; tagText = 'Accumulating'; }
+          
+          return {
+            hero:  `${sys}%`,
+            sub:   `Systemic load metrics`,
+            tag:   tagText,
+            tagColor,
+            state: 'loaded',
+          };
         }
-        let tagColor = 'var(--color-green)';
-        if (r.score < 40) tagColor = 'var(--color-red)';
-        else if (r.score < 70) tagColor = 'var(--color-amber)';
-        return {
-          hero:  `${r.score}%`,
-          sub:   `Fatigue ${r.fatigueScore} · Rest ${r.restScore}`,
-          tag:   `${r.score}%`,
-          tagColor,
-          state: 'loaded',
-        };
+        return { hero: '--', sub: 'Log sessions for insights', tag: 'N/A', tagColor: 'var(--text-secondary)', state: 'empty' };
       } catch {
         return { hero: '--', sub: 'Unavailable', state: 'error' };
       }
     },
   },
 
-  // ---- WEEKLY VOLUME (NEW) -----------------------------------
+  // ---- WEEKLY VOLUME -----------------------------------
   {
     id:        'weekly-volume',
     type:      DashboardTileType.METRIC,
@@ -402,7 +383,7 @@ export const TILE_REGISTRY = [
     accentVar: '--color-blue',
     navTarget: 'weekly-volume',
     order:     9,
-    renderData(appState, defaultDays) {
+    renderData(appState, defaultDays, activeProgram, selectedDay, brainPayload) {
       try {
         const wk = appState.currentWeek || '1';
         const weekData = appState.weeks?.[wk];
@@ -414,7 +395,7 @@ export const TILE_REGISTRY = [
           for (const lift in dayLifts) {
             if (Array.isArray(dayLifts[lift])) {
               dayLifts[lift].forEach(s => {
-                if (s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) {
+                if (s && !s.isWarmup && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) {
                   const w = parseFloat(s.w) || 0;
                   const r = parseInt(s.r, 10) || 0;
                   totalVol  += w * r;
@@ -429,10 +410,16 @@ export const TILE_REGISTRY = [
         const heroStr = totalVol >= 1000
           ? `${(totalVol / 1000).toFixed(1)}t`
           : `${Math.round(totalVol)} kg`;
+          
+        let subStr = `${totalSets} sets · ${totalReps} reps`;
+        if (brainPayload && brainPayload.fatigue) {
+          const maxLocal = Math.max(brainPayload.fatigue.push, brainPayload.fatigue.pull, brainPayload.fatigue.legs);
+          if (maxLocal >= 80) subStr = '⚠️ Warning: Localized volume very high';
+        }
 
         return {
           hero:  heroStr,
-          sub:   `${totalSets} sets · ${totalReps} reps`,
+          sub:   subStr,
           state: totalVol > 0 ? 'loaded' : 'empty',
         };
       } catch {
@@ -441,7 +428,7 @@ export const TILE_REGISTRY = [
     },
   },
 
-  // ---- TRAINING STREAK (NEW) ---------------------------------
+  // ---- TRAINING STREAK ---------------------------------
   {
     id:        'streak',
     type:      DashboardTileType.METRIC,
@@ -469,7 +456,7 @@ export const TILE_REGISTRY = [
     },
   },
 
-  // ---- GOAL PROGRESS (NEW) -----------------------------------
+  // ---- GOAL PROGRESS -----------------------------------
   {
     id:        'goal-progress',
     type:      DashboardTileType.METRIC,
@@ -482,8 +469,6 @@ export const TILE_REGISTRY = [
       try {
         const wk    = parseInt(appState.currentWeek, 10) || 1;
         const total = activeProgram?.totalWeeks || 12;
-        // Hero = real adherence (work actually done vs scheduled, through now),
-        // not raw calendar position. Calendar week is shown as context.
         const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk);
         return {
           hero:  `${a.pct}%`,
@@ -499,80 +484,9 @@ export const TILE_REGISTRY = [
   },
 ];
 
-// ==========================================
-// NAVIGATION RESOLVER
-// Emits an 'app:navigate' event carrying the raw navTarget.
-// app.js owns the routing (sentinel 'custom:today-summary' → modal,
-// any other target → analytics context). No reverse import on app.js.
-// ==========================================
 export function resolveTileNavigation(navTarget) {
   if (!navTarget) return null;
   return () => document.dispatchEvent(
     new CustomEvent('app:navigate', { detail: { target: navTarget } })
   );
-}
-
-// ==========================================
-// DAILY INTELLIGENCE BRIEFING CONTROLLER
-// ==========================================
-export function renderIntelligenceBriefing() {
-  const container = document.getElementById('intelligenceBriefingContainer');
-  if (!container) return;
-
-  // Read raw entries from the hybrid brain engine
-  const insights = computeHybridInsights(appState);
-  
-  // Check for dismissed items stored in session memory to prevent spam
-  const dismissedIds = JSON.parse(sessionStorage.getItem('dismissed_insights') || '[]');
-  const activeInsights = insights.filter(ins => !dismissedIds.includes(ins.id));
-
-  if (activeInsights.length === 0) {
-    container.innerHTML = '';
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  container.innerHTML = `
-    <div class="briefing-wrapper" style="margin-bottom: 20px;">
-      ${activeInsights.map(ins => {
-        let borderStroke = 'var(--accent-blue)';
-        if (ins.type === 'warning') borderStroke = 'var(--accent-amber, #f59e0b)';
-        if (ins.type === 'danger') borderStroke = 'var(--accent-red, #ef4444)';
-        if (ins.type === 'success') borderStroke = 'var(--accent-green, #10b981)';
-
-        return `
-          <div class="card-dark p-3 mb-2 intelligence-brief-card" id="card_${ins.id}" 
-               style="border-left: 4px solid ${borderStroke}; position: relative; background: linear-gradient(90deg, #0d1527 0%, var(--bg-card) 100%);">
-            <button class="dismiss-brief-btn" 
-                    data-id="${ins.id}"
-                    style="position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; font-weight: 700;">
-              ✕ Dismiss
-            </button>
-            <div class="text-sm font-heavy text-inverse mb-1" style="padding-right: 60px;">${ins.title}</div>
-            <p class="text-xs text-muted leading-relaxed m-0">${ins.text}</p>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-
-  // Attach interactive dismissal click event routing
-  container.querySelectorAll('.dismiss-brief-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = e.target.getAttribute('data-id');
-      const currentDismissed = JSON.parse(sessionStorage.getItem('dismissed_insights') || '[]');
-      currentDismissed.push(id);
-      sessionStorage.setItem('dismissed_insights', JSON.stringify(currentDismissed));
-      
-      // Clean, seamless exit animation execution
-      const card = document.getElementById(`card_${id}`);
-      if (card) {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(-10px)';
-        card.style.transition = 'all 0.3s ease';
-        setTimeout(() => { renderIntelligenceBriefing(); }, 300);
-      }
-    });
-  });
 }
