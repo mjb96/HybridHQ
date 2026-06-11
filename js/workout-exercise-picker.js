@@ -1,8 +1,5 @@
 // ==========================================
 // WORKOUT EXERCISE PICKER (workout-exercise-picker.js)
-// Owns the add-exercise dropdown + modal. Extracted verbatim from workout.js;
-// the only change is renderWorkout() -> injected _rerender() to avoid a
-// reverse import back into workout.js.
 // ==========================================
 import { EXERCISE_LIBRARY } from './constants.js';
 import { showToast, saveNewCustomExerciseToLibrary } from './state.js';
@@ -24,17 +21,13 @@ export function populateExerciseDropdown() {
   const selectedDay = _getSelectedDay ? _getSelectedDay() : 'mon';
   select.innerHTML = '';
 
-  // ---------------------------------------------------------
-  // INCREMENT 10: DYNAMIC RECENT EXERCISES
-  // ---------------------------------------------------------
   let recentExercises = [];
   if (appState && appState.weeks && appState.currentWeek) {
     const currentWk = parseInt(appState.currentWeek, 10);
     if (!isNaN(currentWk)) {
       const recentMap = {};
-      const minWk = Math.max(1, currentWk - 3); // 4-week lookback
+      const minWk = Math.max(1, currentWk - 3); 
       
-      // 1. Build Frequency & Recency Map
       for (let w = currentWk; w >= minWk; w--) {
         const wData = appState.weeks[w.toString()];
         if (!wData || !wData.lifts) continue;
@@ -52,13 +45,11 @@ export function populateExerciseDropdown() {
         }
       }
       
-      // 2. Exclude Lifts Already Active in Today's Session
       const todaysLifts = appState.weeks[currentWk.toString()]?.lifts?.[selectedDay] || {};
       for (const activeLift in todaysLifts) {
         delete recentMap[activeLift];
       }
       
-      // 3. Sort: Recency First, Frequency Second, then Slice Top 15
       recentExercises = Object.values(recentMap).sort((a, b) => {
         if (b.lastSeenWeek !== a.lastSeenWeek) {
           return b.lastSeenWeek - a.lastSeenWeek;
@@ -68,7 +59,6 @@ export function populateExerciseDropdown() {
     }
   }
 
-  // 4. Inject Recent Optgroup
   if (recentExercises.length > 0) {
     const recentGroup = document.createElement('optgroup');
     recentGroup.label = "Recent Exercises";
@@ -80,9 +70,7 @@ export function populateExerciseDropdown() {
     });
     select.appendChild(recentGroup);
   }
-  // ---------------------------------------------------------
 
-  // Standard Static Library Rendering
   for (const [category, exercises] of Object.entries(EXERCISE_LIBRARY)) {
     const optgroup = document.createElement('optgroup');
     optgroup.label = category;
@@ -96,7 +84,6 @@ export function populateExerciseDropdown() {
     select.appendChild(optgroup);
   }
 
-  // Custom User Exercises Rendering
   if (appState.customExercises && appState.customExercises.length > 0) {
     const customGroup = document.createElement('optgroup');
     customGroup.label = "Custom";
@@ -110,7 +97,6 @@ export function populateExerciseDropdown() {
     select.appendChild(customGroup);
   }
 
-  // Custom Entry Trigger
   const writeOpt = document.createElement('option');
   writeOpt.value = "__WRITE_CUSTOM__";
   writeOpt.textContent = "+ Write Custom...";
@@ -143,9 +129,13 @@ export function openAddExerciseModal() {
   if (modal) modal.classList.add('active');
 }
 
+// PHASE 2 SUPERSETS: Clear attribute to prevent accidental groupings
 export function closeAddExerciseModal() {
   const modal = document.getElementById('addExerciseModal');
-  if (modal) modal.classList.remove('active');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.removeAttribute('data-source-lift');
+  }
 }
 
 export function confirmAddExercise() {
@@ -175,9 +165,26 @@ export function confirmAddExercise() {
     appState.weeks[wk].lifts[selectedDay] = {};
   }
 
-  // Native dictionary constraint naturally prevents duplicates
   if (!appState.weeks[wk].lifts[selectedDay][liftName]) {
     appState.weeks[wk].lifts[selectedDay][liftName] = [{ w: '', r: '10', c: false }];
+  }
+
+  // PHASE 2 SUPERSETS: Handle grouping intercept logic
+  const modal = document.getElementById('addExerciseModal');
+  if (modal && modal.hasAttribute('data-source-lift')) {
+    const sourceLift = modal.getAttribute('data-source-lift');
+    if (!appState.weeks[wk].supersets) appState.weeks[wk].supersets = {};
+    if (!appState.weeks[wk].supersets[selectedDay]) appState.weeks[wk].supersets[selectedDay] = {};
+
+    const supersetsMap = appState.weeks[wk].supersets[selectedDay];
+    let groupId = supersetsMap[sourceLift];
+
+    if (!groupId) {
+      groupId = 'group_' + Date.now();
+      supersetsMap[sourceLift] = groupId;
+    }
+    supersetsMap[liftName] = groupId;
+    modal.removeAttribute('data-source-lift'); 
   }
 
   _saveState(true);
@@ -187,7 +194,6 @@ export function confirmAddExercise() {
     _rerender();
   }
 
-  // Smooth scroll to the newly appended exercise
   setTimeout(() => {
     const cards = document.querySelectorAll('.cockpit-exercise');
     if (cards.length > 0) {
