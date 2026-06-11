@@ -130,6 +130,38 @@ function template(f) {
         suggestedAction: `Ease one side for a few days: keep the priority quality session and make the other easy or short.`,
         tradeoffs: `Holding both high can stall progress in both; easing endurance protects strength recovery, and vice-versa.`,
       };
+    case 'bodyweight_trend:up':
+      return {
+        category: CAT.PROGRESS,
+        observation: `Body weight is trending up (${signed(mag)} kg).`,
+        explanation: `From ${ev(f, 'bw_first')} to ${ev(f, 'bw_last')} kg across your recent logs.`,
+        whyItMatters: `Weight direction tells you whether you're gaining, maintaining or losing — key context for strength and running changes.`,
+        suggestedAction: `Check the trend matches your current goal (gain / maintain / cut).`,
+      };
+    case 'bodyweight_trend:down':
+      return {
+        category: CAT.PROGRESS,
+        observation: `Body weight is trending down (${mag} kg).`,
+        explanation: `From ${ev(f, 'bw_first')} to ${ev(f, 'bw_last')} kg across your recent logs.`,
+        whyItMatters: `Weight direction tells you whether you're gaining, maintaining or losing — key context for strength and running changes.`,
+        suggestedAction: `Check the trend matches your current goal (gain / maintain / cut).`,
+      };
+    case 'fuel_trend:up':
+      return {
+        category: CAT.PROGRESS,
+        observation: `Active calorie burn is increasing (${signed(mag)}%).`,
+        explanation: `Weekly active calories rose from ${ev(f, 'cals_first')} to ${ev(f, 'cals_last')} kcal.`,
+        whyItMatters: `Higher energy expenditure raises your fuelling needs to sustain training and recovery.`,
+        suggestedAction: `If weight or performance is dropping, make sure intake keeps up.`,
+      };
+    case 'fuel_trend:down':
+      return {
+        category: CAT.RECOVERY,
+        observation: `Active calorie burn is decreasing (${mag}%).`,
+        explanation: `Weekly active calories fell from ${ev(f, 'cals_first')} to ${ev(f, 'cals_last')} kcal.`,
+        whyItMatters: `Lower output often just means a lighter training week — fine if intentional.`,
+        suggestedAction: `If unplanned, check whether training volume has quietly dropped.`,
+      };
     default:
       break;
   }
@@ -158,6 +190,36 @@ function template(f) {
       whyItMatters: `Direction of adherence usually precedes changes in results.`,
       suggestedAction: up ? `Keep the momentum — protect the habit.`
                           : `Identify what's getting in the way before it compounds.`,
+    };
+  }
+
+  if (f.type === 'recovery_status') {
+    const score = mag;
+    const detail = `Fatigue score ${ev(f, 'fatigue')}, rest score ${ev(f, 'rest')}, avg RPE ${ev(f, 'avg_rpe')} this week.`;
+    if (score < 40) {
+      return {
+        category: CAT.RISK,
+        observation: `Recovery is running low (${score}%).`,
+        explanation: detail,
+        whyItMatters: `Training hard from a low-recovery base raises injury risk and blunts adaptation.`,
+        suggestedAction: `Prioritise sleep and an easier day or two before the next hard session.`,
+      };
+    }
+    if (score >= 75) {
+      return {
+        category: CAT.PROGRESS,
+        observation: `Recovery looks strong (${score}%).`,
+        explanation: detail,
+        whyItMatters: `A well-recovered week is when you can absorb a harder push.`,
+        suggestedAction: `Good window to add intensity if your plan calls for it.`,
+      };
+    }
+    return {
+      category: CAT.RECOVERY,
+      observation: `Recovery is moderate (${score}%).`,
+      explanation: detail,
+      whyItMatters: `You're holding a sustainable load — neither fried nor fully fresh.`,
+      suggestedAction: `Stick to planned volume and keep an eye on sleep.`,
     };
   }
   return null;
