@@ -55,7 +55,7 @@ function renderBannerInner(list, verdict) {
   return `
     <div class="card-dark p-3 mb-3" style="border-left:3px solid ${pm.color};">
       <div class="flex-between mb-1">
-        <span class="font-bold" style="color:${pm.color};font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;">🧠 Brain read</span>
+        <span class="font-bold" style="color:${pm.color};font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;">Coach's Read</span>
         ${verdict ? `<span class="font-bold" style="font-size:0.58rem;padding:1px 8px;border-radius:999px;color:${vm.color};background:color-mix(in srgb, ${vm.color} 16%, transparent);">${verdict.label}</span>` : ''}
       </div>
       <div class="font-heavy text-inverse mb-1" style="font-size:0.86rem;line-height:1.25;">${escapeHtml(primary.observation)}</div>
