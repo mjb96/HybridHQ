@@ -316,3 +316,126 @@ export function resetHiddenTiles() {
     localStorage.removeItem(TILE_HIDDEN_KEY);
   } catch {}
 }
+
+// ==========================================
+// IN-FOCUS CAROUSEL ORDER (long-press → horizontal drag)
+// ==========================================
+const FOCUS_ORDER_KEY = 'inFocusOrder';
+
+export function loadFocusOrder() {
+  try { const raw = localStorage.getItem(FOCUS_ORDER_KEY); return raw ? JSON.parse(raw) : null; }
+  catch { return null; }
+}
+export function saveFocusOrder(ids) {
+  try { localStorage.setItem(FOCUS_ORDER_KEY, JSON.stringify(ids)); } catch {}
+}
+export function resetFocusOrder() {
+  try { localStorage.removeItem(FOCUS_ORDER_KEY); } catch {}
+}
+
+// Reorder the carousel DOM to the saved order; new/unknown cards keep their
+// authored position at the end. Idempotent — safe to call on every render.
+export function applyFocusOrder() {
+  const carousel = document.querySelector('.in-focus-carousel');
+  if (!carousel) return;
+  const order = loadFocusOrder();
+  if (!order) return;
+  Array.from(carousel.querySelectorAll('.carousel-card'))
+    .sort((a, b) => {
+      const ai = order.indexOf(a.dataset.focusId), bi = order.indexOf(b.dataset.focusId);
+      return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+    })
+    .forEach(c => carousel.appendChild(c));
+}
+
+let focusDragSource = null;
+let focusEditMode = false;
+let focusLongPressTimer = null;
+let focusTouchActive = false;
+
+export function mountFocusDragAndDrop() {
+  const carousel = document.querySelector('.in-focus-carousel');
+  if (!carousel) return;
+  carousel.querySelectorAll('.carousel-card').forEach(card => {
+    if (card.dataset.focusDragBound === '1') return;
+    card.dataset.focusDragBound = '1';
+    card.addEventListener('mousedown', onFocusMouseDown);
+    card.addEventListener('dragstart', onFocusDragStart);
+    card.addEventListener('dragover',  onFocusDragOver);
+    card.addEventListener('dragend',   onFocusDragEnd);
+    card.addEventListener('touchstart', onFocusTouchStart, { passive: true });
+    card.addEventListener('touchmove',  onFocusTouchMove,  { passive: false });
+    card.addEventListener('touchend',   onFocusTouchEnd);
+  });
+}
+
+function enterFocusEditMode() {
+  if (focusEditMode) return;
+  focusEditMode = true;
+  document.querySelectorAll('.in-focus-carousel .carousel-card').forEach(c => c.classList.add('tile-drag-mode'));
+  if (navigator.vibrate) navigator.vibrate(30);
+  showToast('Drag to reorder');
+}
+function exitFocusEditMode() {
+  focusEditMode = false;
+  document.querySelectorAll('.in-focus-carousel .carousel-card')
+    .forEach(c => c.classList.remove('tile-drag-mode', 'tile-drag-over'));
+}
+function commitFocusOrder() {
+  const carousel = document.querySelector('.in-focus-carousel');
+  if (!carousel) return;
+  const ids = Array.from(carousel.querySelectorAll('.carousel-card')).map(c => c.dataset.focusId).filter(Boolean);
+  saveFocusOrder(ids);
+  showToast('Order saved ✓');
+}
+
+function onFocusMouseDown(e) {
+  const card = e.currentTarget;
+  focusLongPressTimer = setTimeout(() => { enterFocusEditMode(); card.setAttribute('draggable', 'true'); }, 450);
+}
+function onFocusDragStart(e) {
+  clearTimeout(focusLongPressTimer);
+  if (!focusEditMode) { e.preventDefault(); return; }
+  focusDragSource = e.currentTarget;
+  e.currentTarget.classList.add('tile-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onFocusDragOver(e) {
+  if (!focusEditMode || !focusDragSource) return;
+  e.preventDefault();
+  const target = e.currentTarget;
+  if (target === focusDragSource) return;
+  const b = target.getBoundingClientRect();
+  if (e.clientX > b.left + b.width / 2) target.after(focusDragSource);
+  else target.before(focusDragSource);
+}
+function onFocusDragEnd(e) {
+  clearTimeout(focusLongPressTimer);
+  e.currentTarget.classList.remove('tile-dragging');
+  e.currentTarget.setAttribute('draggable', 'false');
+  if (focusEditMode) { commitFocusOrder(); exitFocusEditMode(); }
+}
+function onFocusTouchStart(e) {
+  const card = e.currentTarget;
+  focusLongPressTimer = setTimeout(() => {
+    enterFocusEditMode(); focusTouchActive = true; focusDragSource = card; card.classList.add('tile-dragging');
+  }, 450);
+}
+function onFocusTouchMove(e) {
+  clearTimeout(focusLongPressTimer);
+  if (!focusTouchActive || !focusDragSource) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const target = el && el.closest('.carousel-card');
+  const carousel = document.querySelector('.in-focus-carousel');
+  if (!target || target === focusDragSource || !carousel || !carousel.contains(target)) return;
+  const b = target.getBoundingClientRect();
+  if (t.clientX > b.left + b.width / 2) target.after(focusDragSource);
+  else target.before(focusDragSource);
+}
+function onFocusTouchEnd() {
+  clearTimeout(focusLongPressTimer);
+  if (focusDragSource) focusDragSource.classList.remove('tile-dragging');
+  if (focusTouchActive) { focusTouchActive = false; focusDragSource = null; commitFocusOrder(); exitFocusEditMode(); }
+}

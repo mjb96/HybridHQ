@@ -8,7 +8,7 @@ import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
-import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles } from './dragdrop.js';
+import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
 import { renderBrainInsights } from './brain/brain_dashboard.js';
 
 let _getState;
@@ -564,9 +564,13 @@ export function renderHome() {
 
   renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay);
 
-  // Hybrid Brain — read-only coaching insights below the glance grid.
+  // Coach's Read — read-only coaching tile in the In-Focus carousel.
   try { renderBrainInsights(appState, DEFAULT_DAYS, activeProgram); }
-  catch (e) { console.warn('[hybrid-brain] render skipped:', e); }
+  catch (e) { console.warn('[coach] render skipped:', e); }
+
+  // In-Focus carousel: apply the saved order and enable long-press reordering.
+  try { applyFocusOrder(); mountFocusDragAndDrop(); }
+  catch (e) { console.warn('[in-focus] reorder skipped:', e); }
 
   const progressPercentage = (() => {
     let total = 0, done = 0;
