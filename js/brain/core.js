@@ -60,6 +60,7 @@ export function generateInsights(appState, opts = {}) {
   return {
     generatedAt: now,
     insights,
+    allInsights,
     findings,
     meta: {
       dataWeeks,
@@ -68,6 +69,31 @@ export function generateInsights(appState, opts = {}) {
       currentWeek,
     },
   };
+}
+
+// Map an analytics context (router / tile target) to the insight domains
+// relevant to it, so each detail view can surface its own coaching.
+export const CONTEXT_DOMAINS = Object.freeze({
+  strength:        ['strength'],
+  strength_pr:     ['strength'],
+  'weekly-volume': ['strength'],
+  running:         ['aerobic', 'fuel'],
+  'active-fuel':   ['fuel', 'aerobic'],
+  recovery:        ['recovery'],
+  'recovery-score':['recovery'],
+  'stress-balance':['recovery'],
+  progress:        ['adherence', 'strength', 'aerobic'],
+  'goal-progress': ['adherence'],
+  streak:          ['adherence'],
+  bodyweight:      ['bodyweight'],
+});
+
+// Prioritised insights relevant to a given analytics context (full list, not
+// just the home top-N). Empty when nothing in those domains has fired.
+export function insightsForContext(report, context) {
+  const domains = CONTEXT_DOMAINS[context] || [];
+  const all = report?.allInsights || report?.insights || [];
+  return all.filter(i => domains.includes(i.domain));
 }
 
 // Convenience: counts of surfaced insights by category (for tile badges etc).
