@@ -1,38 +1,66 @@
 // ==========================================
-// PROGRAM BUILDER LOGIC (program_builder.js)
+// PROGRAM BUILDER (program_builder.js) — SCHEMA v2 controller
+// Reads + writes the unified weeks[] → days{mon..sun} → block[] tree the
+// engine reads natively. Row markup lives in builder-exercise-row.js.
 // ==========================================
 import { saveStateToLocalStorage, getProgramById } from './state.js';
 import { escapeHtml } from './util.js';
+import { DAY_NAMES_FULL } from './constants.js';
+import {
+  DAY_KEYS, allCanonicalExercises, makeLiftEntry, makeRunEntry,
+  parseRunString, canonicalizeExercise, migrateCustomProgramToV2,
+} from './schema.js';
+import { renderLiftRow, renderRunRow, parseRepsInput } from './builder-exercise-row.js';
 
 let activeBuilderId = null;
+let expandedWeek = 0;
 
 export function openBuilder(programId) {
   activeBuilderId = programId;
-  const program = getProgramById(programId);
+  let program = getProgramById(programId);
   if (!program) return;
-  
+
+  // Safety net: ensure the program is v2 before editing (covers any program
+  // that reached the builder without the at-load migration).
+  if (program.schemaVersion !== 2) {
+    const migrated = migrateCustomProgramToV2(program);
+    Object.keys(program).forEach(k => { if (!(k in migrated)) delete program[k]; });
+    Object.assign(program, migrated);
+    saveStateToLocalStorage(true);
+  }
+
+  expandedWeek = 0;
+
   const container = document.getElementById('builderViewContainer');
-  if(container) container.style.display = 'block';
-  
+  if (container) container.style.display = 'block';
   const libraryContainer = document.getElementById('progModeLibraryContainer');
-  if(libraryContainer) libraryContainer.style.display = 'none';
-  
+  if (libraryContainer) libraryContainer.style.display = 'none';
+
   renderBuilderUI(program);
 }
 
 // ==========================================
-// UI GENERATORS (Pure DOM String Builders)
+// RENDER
 // ==========================================
+function dayLabel(dk) {
+  return (DAY_NAMES_FULL[dk] || dk).slice(0, 3);
+}
 
 function renderBuilderUI(program) {
   const container = document.getElementById('builderViewContainer');
   if (!container) return;
-  
+  if (!Array.isArray(program.weeks)) program.weeks = [];
+
+  const datalist = `<datalist id="builderExerciseList">${
+    allCanonicalExercises().map(n => `<option value="${escapeHtml(n)}"></option>`).join('')
+  }</datalist>`;
+
   container.innerHTML = `
-    <button class="subview-back-btn" data-action="close-builder">← Back to Library</button>
+    ${datalist}
+    <button class="subview-back-btn" data-action="close-builder">\u2190 Back to Library</button>
     <div class="card-dark p-4 mb-4">
       <h2 class="text-xl font-heavy text-inverse">${escapeHtml(program.name)}</h2>
-      <p class="text-sm text-muted">${escapeHtml(program.dossier?.focus || 'Custom Program')}</p>
+      <p class="text-sm text-muted">${escapeHtml(program.dossier?.focus || 'Custom Program')} \u00b7 ${program.weeks.length} week${program.weeks.length === 1 ? '' : 's'}</p>
     </div>
     <div id="weeksContainer"></div>
     <button class="btn-action-block btn-blue" data-action="add-week">+ Add Week</button>
@@ -42,140 +70,174 @@ function renderBuilderUI(program) {
 
 function renderWeeks(program) {
   const container = document.getElementById('weeksContainer');
-  if (!program.weeks) program.weeks = []; 
-  
-  container.innerHTML = program.weeks.map((week, wIdx) => `
-    <div class="card-dark p-4 mb-4" style="border: 1px solid var(--overlay-sm);">
-      <div class="flex-between mb-3">
-        <h3 class="font-heavy text-lg">Week ${wIdx + 1}</h3>
-        <button class="btn-pad" style="color: var(--accent-red); border-color: rgba(239,68,68,0.2);" data-action="remove-week" data-w="${wIdx}">✕ Remove Week</button>
-      </div>
-      <div id="daysContainer_${wIdx}">
-        ${(week.days || []).map((day, dIdx) => renderDay(day, wIdx, dIdx)).join('')}
-      </div>
-      <button class="btn-pad mt-2 w-full" data-action="add-day" data-w="${wIdx}">+ Add Day to Week ${wIdx + 1}</button>
-    </div>
-  `).join('');
-}
+  if (!container) return;
 
-function renderDay(day, wIdx, dIdx) {
-  if (!day.exercises) day.exercises = []; 
-  
-  return `
-    <div class="p-3 mb-3" style="border: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2); border-radius: 8px;">
-      <div class="flex-between mb-3">
-        <input type="text" class="text-sm font-bold" value="${escapeHtml(day.dayName || 'Day')}" data-action="update-day-name" data-w="${wIdx}" data-d="${dIdx}" style="background: transparent; border: none; color: var(--accent-blue); outline: none; border-bottom: 1px dashed var(--accent-blue); border-radius: 0; padding: 2px;">
-        <button class="btn-pad" style="padding: 4px 8px; font-size: 0.7rem;" data-action="remove-day" data-w="${wIdx}" data-d="${dIdx}">✕</button>
-      </div>
-
-      <div class="mb-3">
-        <input type="text" value="${escapeHtml(day.runs || 'Rest')}" data-action="update-day-field" data-field="runs" data-w="${wIdx}" data-d="${dIdx}" placeholder="Run Target (e.g. 5km Easy)" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--overlay-sm); color: var(--accent-cyan); padding: 6px; border-radius: 4px; font-size: 0.8rem;">
-      </div>
-      
-      <div class="flex-col gap-2 mb-3">
-        ${day.exercises.map((ex, eIdx) => `
-          <div class="flex gap-2 align-center">
-            <div class="flex-col" style="justify-content: center; gap: 4px;">
-              <button class="btn-pad tactile-scale" style="padding: 2px 6px; font-size: 0.6rem; min-width: 0;" data-action="move-ex-up" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" ${eIdx === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
-              <button class="btn-pad tactile-scale" style="padding: 2px 6px; font-size: 0.6rem; min-width: 0;" data-action="move-ex-down" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" ${eIdx === day.exercises.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
-            </div>
-            <input type="text" value="${escapeHtml(ex.name || '')}" data-action="update-ex" data-field="name" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" placeholder="Exercise Name" style="flex: 2;">
-            <input type="number" value="${ex.targetSets || 3}" data-action="update-ex" data-field="targetSets" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" title="Sets" style="flex: 1; text-align: center;">
-            <span class="text-muted text-xs">x</span>
-            <input type="number" value="${ex.targetReps || 10}" data-action="update-ex" data-field="targetReps" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}" title="Reps" style="flex: 1; text-align: center;">
-            <button class="btn-pad" style="padding: 4px; color: var(--accent-red);" data-action="remove-ex" data-w="${wIdx}" data-d="${dIdx}" data-e="${eIdx}">✕</button>
+  container.innerHTML = program.weeks.map((week, w) => {
+    const isOpen = w === expandedWeek;
+    const trainingDays = DAY_KEYS.filter(dk => (week.days?.[dk]?.block || []).length > 0).length;
+    return `
+      <div class="card-dark p-3 mb-3 builder-week ${isOpen ? 'open' : ''}" style="border:1px solid var(--overlay-sm);">
+        <div class="flex-between builder-week-head" data-action="toggle-week" data-w="${w}">
+          <div class="flex gap-2 align-center" style="flex:1; min-width:0;">
+            <span class="font-heavy text-lg">${isOpen ? '\u25be' : '\u25b8'} Week ${w + 1}</span>
+            <input type="text" value="${escapeHtml(week.label || '')}" class="builder-week-label"
+              data-action="update-week-label" data-w="${w}" placeholder="Phase label"
+              onclick="event.stopPropagation()">
           </div>
-        `).join('')}
+          <div class="flex gap-1 align-center">
+            <span class="text-xs-muted">${trainingDays}/7</span>
+            <button class="btn-pad builder-mini" data-action="dup-week" data-w="${w}" title="Duplicate week" onclick="event.stopPropagation()">\u29c9</button>
+            <button class="btn-pad builder-mini builder-danger" data-action="remove-week" data-w="${w}" title="Remove week" onclick="event.stopPropagation()">\u2715</button>
+          </div>
+        </div>
+        ${isOpen ? `<div class="builder-week-body mt-3">${DAY_KEYS.map(dk => renderDay(week.days?.[dk], w, dk)).join('')}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderDay(day, w, dk) {
+  const d = day || { title: '', block: [] };
+  const block = Array.isArray(d.block) ? d.block : [];
+  const hasRun = block.some(en => en.kind === 'run');
+
+  const rowsHTML = block.map((en, e) =>
+    en.kind === 'run' ? renderRunRow(en, w, dk, e) : renderLiftRow(en, w, dk, e)
+  ).join('');
+
+  const copyOptions = DAY_KEYS.filter(t => t !== dk)
+    .map(t => `<option value="${t}">${dayLabel(t)}</option>`).join('');
+
+  return `
+    <div class="builder-day" data-w="${w}" data-dk="${dk}">
+      <div class="flex-between builder-day-head">
+        <div class="flex gap-2 align-center" style="flex:1; min-width:0;">
+          <span class="builder-day-tag">${dayLabel(dk)}</span>
+          <input type="text" value="${escapeHtml(d.title || '')}" class="builder-day-title"
+            data-action="update-day-title" data-w="${w}" data-dk="${dk}" placeholder="Session title (optional)">
+        </div>
+        <select class="builder-copy-select" data-action="copy-day-to" data-w="${w}" data-dk="${dk}" title="Copy this day to...">
+          <option value="">Copy \u2192</option>${copyOptions}
+        </select>
       </div>
-      
-      <button class="btn-pad" style="font-size: 0.75rem;" data-action="add-ex" data-w="${wIdx}" data-d="${dIdx}">+ Add Exercise</button>
-    </div>
-  `;
+      <div class="builder-day-block">${rowsHTML || '<p class="text-xs-muted builder-empty">Rest day \u2014 add an exercise or run.</p>'}</div>
+      <div class="flex gap-2 mt-2">
+        <button class="btn-pad builder-add" data-action="add-ex" data-w="${w}" data-dk="${dk}">+ Exercise</button>
+        ${hasRun ? '' : `<button class="btn-pad builder-add" data-action="add-run" data-w="${w}" data-dk="${dk}">+ Run</button>`}
+      </div>
+    </div>`;
 }
 
 // ==========================================
-// PRIVATE ACTION CONTROLLERS
+// MUTATION HELPERS
 // ==========================================
-
-const moveExerciseUp = (w, d, e) => {
-  if (e === 0) return;
-  const prog = getProgramById(activeBuilderId);
-  const arr = prog.weeks[w].days[d].exercises;
-  [arr[e-1], arr[e]] = [arr[e], arr[e-1]]; 
+function prog() { return getProgramById(activeBuilderId); }
+function block(w, dk) {
+  const p = prog();
+  const day = p?.weeks?.[w]?.days?.[dk];
+  if (day && !Array.isArray(day.block)) day.block = [];
+  return day ? day.block : null;
+}
+function commit(rerender = true) {
   saveStateToLocalStorage(true);
-  renderBuilderUI(prog); 
+  if (rerender) renderBuilderUI(prog());
+}
+
+// ==========================================
+// ACTION CONTROLLERS
+// ==========================================
+const addExercise = (w, dk) => { const b = block(w, dk); if (b) { b.push(makeLiftEntry({})); commit(); } };
+const addRun = (w, dk) => { const b = block(w, dk); if (b && !b.some(e => e.kind === 'run')) { b.push(makeRunEntry()); commit(); } };
+const removeEntry = (w, dk, e) => { const b = block(w, dk); if (b) { b.splice(e, 1); commit(); } };
+const dupExercise = (w, dk, e) => {
+  const b = block(w, dk);
+  if (b && b[e]) { b.splice(e + 1, 0, JSON.parse(JSON.stringify(b[e]))); commit(); }
+};
+const moveEntry = (w, dk, e, dir) => {
+  const b = block(w, dk);
+  if (!b) return;
+  const t = e + dir;
+  if (t < 0 || t >= b.length) return;
+  [b[e], b[t]] = [b[t], b[e]];
+  commit();
 };
 
-const moveExerciseDown = (w, d, e) => {
-  const prog = getProgramById(activeBuilderId);
-  const arr = prog.weeks[w].days[d].exercises;
-  if (e === arr.length - 1) return;
-  [arr[e], arr[e+1]] = [arr[e+1], arr[e]]; 
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog); 
+const updateEntry = (w, dk, e, field, val) => {
+  const b = block(w, dk);
+  if (!b || !b[e]) return;
+  const en = b[e];
+  if (field === 'name') en.name = canonicalizeExercise(val);
+  else if (field === 'sets') en.sets = Math.max(1, parseInt(val, 10) || 1);
+  else if (field === 'reps') en.reps = parseRepsInput(val);
+  else if (field === 'rpe') { const n = parseFloat(val); en.rpe = Number.isNaN(n) ? null : n; }
+  commit();
 };
 
-const updateEx = (w, d, e, field, val) => {
-  const prog = getProgramById(activeBuilderId);
-  if (field === 'targetSets' || field === 'targetReps') val = parseInt(val, 10) || 0;
-  prog.weeks[w].days[d].exercises[e][field] = val;
-  saveStateToLocalStorage(true);
+const updateRun = (w, dk, e, val) => {
+  const b = block(w, dk);
+  if (!b || !b[e] || b[e].kind !== 'run') return;
+  b[e].run = parseRunString(val);
+  commit();
 };
 
-const updateDayName = (w, d, val) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[w].days[d].dayName = val;
-  saveStateToLocalStorage(true);
+const updateDayTitle = (w, dk, val) => {
+  const day = prog()?.weeks?.[w]?.days?.[dk];
+  if (day) { day.title = val; commit(false); }
 };
 
-const updateDayField = (w, d, field, val) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[w].days[d][field] = val;
-  saveStateToLocalStorage(true);
+const updateWeekLabel = (w, val) => {
+  const week = prog()?.weeks?.[w];
+  if (week) { week.label = val; commit(false); }
 };
 
-const addWeekToProgram = () => {
-  const prog = getProgramById(activeBuilderId);
-  if (!prog.weeks) prog.weeks = [];
-  prog.weeks.push({ days: [{ dayName: "Day 1", runs: "Rest", exercises: [] }] });
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
+const copyDayTo = (w, dk, targetDk) => {
+  if (!targetDk) return;
+  const p = prog();
+  const src = p?.weeks?.[w]?.days?.[dk];
+  const tgt = p?.weeks?.[w]?.days?.[targetDk];
+  if (!src || !tgt) return;
+  if ((tgt.block || []).length > 0 && !confirm(`Overwrite ${dayLabel(targetDk)} with ${dayLabel(dk)}?`)) {
+    renderBuilderUI(p);
+    return;
+  }
+  tgt.block = JSON.parse(JSON.stringify(src.block || []));
+  tgt.title = src.title || tgt.title;
+  commit();
 };
 
-const removeWeek = (wIdx) => {
-  if (!confirm("Remove this entire week?")) return;
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks.splice(wIdx, 1);
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
+const addWeek = () => {
+  const p = prog();
+  if (!Array.isArray(p.weeks)) p.weeks = [];
+  const days = {};
+  DAY_KEYS.forEach(dk => { days[dk] = { title: '', badge: 'Rest', color: 'var(--text-muted)', notes: '', block: [] }; });
+  p.weeks.push({ label: `Week ${p.weeks.length + 1}`, days });
+  p.totalWeeks = p.weeks.length;
+  expandedWeek = p.weeks.length - 1;
+  commit();
 };
 
-const addDayToWeek = (wIdx) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[wIdx].days.push({ dayName: `Day ${prog.weeks[wIdx].days.length + 1}`, runs: "Rest", exercises: [] });
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
+const dupWeek = (w) => {
+  const p = prog();
+  const clone = JSON.parse(JSON.stringify(p.weeks[w]));
+  clone.label = (clone.label || `Week ${w + 1}`) + ' (copy)';
+  p.weeks.splice(w + 1, 0, clone);
+  p.totalWeeks = p.weeks.length;
+  expandedWeek = w + 1;
+  commit();
 };
 
-const removeDay = (wIdx, dIdx) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[wIdx].days.splice(dIdx, 1);
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
+const removeWeek = (w) => {
+  const p = prog();
+  if (p.weeks.length <= 1) { alert('A program needs at least one week.'); return; }
+  if (!confirm('Remove this entire week?')) return;
+  p.weeks.splice(w, 1);
+  p.totalWeeks = p.weeks.length;
+  if (expandedWeek >= p.weeks.length) expandedWeek = p.weeks.length - 1;
+  commit();
 };
 
-const addExercise = (wIdx, dIdx) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[wIdx].days[dIdx].exercises.push({ name: "", targetSets: 3, targetReps: 10 });
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
-};
-
-const removeExercise = (wIdx, dIdx, eIdx) => {
-  const prog = getProgramById(activeBuilderId);
-  prog.weeks[wIdx].days[dIdx].exercises.splice(eIdx, 1);
-  saveStateToLocalStorage(true);
-  renderBuilderUI(prog);
+const toggleWeek = (w) => {
+  expandedWeek = (expandedWeek === w) ? -1 : w;
+  renderWeeks(prog());
 };
 
 const closeBuilder = () => {
@@ -185,41 +247,53 @@ const closeBuilder = () => {
 };
 
 // ==========================================
-// EVENT DELEGATION ROUTER
+// EVENT DELEGATION
 // ==========================================
+function attrs(t) {
+  return {
+    w: parseInt(t.getAttribute('data-w'), 10),
+    dk: t.getAttribute('data-dk'),
+    e: parseInt(t.getAttribute('data-e'), 10),
+    field: t.getAttribute('data-field'),
+  };
+}
 
-document.addEventListener('click', (e) => {
-  const target = e.target.closest('#builderViewContainer [data-action]');
-  if (!target) return;
+document.addEventListener('click', (ev) => {
+  const t = ev.target.closest('#builderViewContainer [data-action]');
+  if (!t) return;
+  const action = t.getAttribute('data-action');
+  const { w, dk, e } = attrs(t);
 
-  const action = target.getAttribute('data-action');
-  const w = parseInt(target.getAttribute('data-w'), 10);
-  const d = parseInt(target.getAttribute('data-d'), 10);
-  const ex = parseInt(target.getAttribute('data-e'), 10);
-
-  if (action === 'close-builder') closeBuilder();
-  else if (action === 'add-week') addWeekToProgram();
-  else if (action === 'remove-week') removeWeek(w);
-  else if (action === 'add-day') addDayToWeek(w);
-  else if (action === 'remove-day') removeDay(w, d);
-  else if (action === 'add-ex') addExercise(w, d);
-  else if (action === 'remove-ex') removeExercise(w, d, ex);
-  else if (action === 'move-ex-up') moveExerciseUp(w, d, ex);
-  else if (action === 'move-ex-down') moveExerciseDown(w, d, ex);
+  switch (action) {
+    case 'close-builder': closeBuilder(); break;
+    case 'add-week': addWeek(); break;
+    case 'dup-week': dupWeek(w); break;
+    case 'remove-week': removeWeek(w); break;
+    case 'toggle-week': toggleWeek(w); break;
+    case 'add-ex': addExercise(w, dk); break;
+    case 'add-run': addRun(w, dk); break;
+    case 'remove-ex':
+    case 'remove-run': removeEntry(w, dk, e); break;
+    case 'dup-ex': dupExercise(w, dk, e); break;
+    case 'ex-up': moveEntry(w, dk, e, -1); break;
+    case 'ex-down': moveEntry(w, dk, e, +1); break;
+    default: break;
+  }
 });
 
-document.addEventListener('change', (e) => {
-  const target = e.target.closest('#builderViewContainer [data-action]');
-  if (!target) return;
+document.addEventListener('change', (ev) => {
+  const t = ev.target.closest('#builderViewContainer [data-action]');
+  if (!t) return;
+  const action = t.getAttribute('data-action');
+  const { w, dk, e, field } = attrs(t);
+  const val = t.value;
 
-  const action = target.getAttribute('data-action');
-  const w = parseInt(target.getAttribute('data-w'), 10);
-  const d = parseInt(target.getAttribute('data-d'), 10);
-  const ex = parseInt(target.getAttribute('data-e'), 10);
-  const field = target.getAttribute('data-field');
-  const val = target.value;
-
-  if (action === 'update-day-name') updateDayName(w, d, val);
-  else if (action === 'update-day-field') updateDayField(w, d, field, val);
-  else if (action === 'update-ex') updateEx(w, d, ex, field, val);
+  switch (action) {
+    case 'update-entry': updateEntry(w, dk, e, field, val); break;
+    case 'update-run': updateRun(w, dk, e, val); break;
+    case 'update-day-title': updateDayTitle(w, dk, val); break;
+    case 'update-week-label': updateWeekLabel(w, val); break;
+    case 'copy-day-to': copyDayTo(w, dk, val); break;
+    default: break;
+  }
 });
