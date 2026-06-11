@@ -1,16 +1,14 @@
 // ==========================================
-// HYBRID BRAIN — DASHBOARD RENDERER (brain_dashboard.js)
+// COACH'S READ — HOME TILE + DETAIL RENDERER (brain_dashboard.js)
 // ------------------------------------------
-// The only DOM-bound Brain module. Surfaces the prioritised InsightReport in a
-// single, uncluttered home area:
-//   • a concise summary header (category tally),
-//   • one full "Today's Focus" card (the highest-priority insight),
-//   • optional goal-alignment line,
-//   • compact risk/opportunity indicators for the rest.
-// Read-only and advisory — no controls mutate state. All athlete-derived text
-// is escaped before insertion.
+// Renders two read-only surfaces from the InsightReport:
+//   • a compact "Coach's Read" tile in the home In-Focus carousel (overall
+//     verdict + top read + category tally), clickable through to…
+//   • the full detail view (every insight as a coach card) shown in the
+//     analytics 'coach' context.
+// Advisory only — no controls mutate state. All athlete text is escaped.
 // ==========================================
-import { generateInsights, summarizeReport } from './core.js';
+import { generateInsights, summarizeReport, contextVerdict } from './core.js';
 import { escapeHtml } from '../util.js';
 
 export const CATEGORY_META = {
@@ -21,100 +19,88 @@ export const CATEGORY_META = {
   goal:        { icon: '🎯', label: 'Goal',        color: 'var(--accent-blue, #3b82f6)' },
 };
 const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;
-
 const CONF_LABEL = { high: 'High confidence', med: 'Moderate confidence', low: 'Low confidence' };
-
-// Order categories show in the header tally (most actionable first).
 const CHIP_ORDER = ['risk', 'opportunity', 'progress', 'recovery', 'goal'];
 
-// Render the Brain area for the current athlete snapshot.
+function buildReport(appState, days, program) {
+  return generateInsights(appState, {
+    days, program,
+    currentWeek: appState?.currentWeek,
+    maxWeek: program?.totalWeeks,
+    topN: 20, // tile/detail want the full prioritised set
+  });
+}
+
+// ---- In-Focus carousel tile -------------------------------------------
 export function renderBrainInsights(appState, days, program) {
-  const section = document.getElementById('homeInsights');
-  const body = document.getElementById('homeInsightsBody');
-  if (!section || !body) return;
+  const tile = document.getElementById('coachReadTile');
+  const body = document.getElementById('coachReadTileBody');
+  if (!tile || !body) return;
 
   let report;
-  try {
-    report = generateInsights(appState, {
-      days, program,
-      currentWeek: appState?.currentWeek,
-      maxWeek: program?.totalWeeks,
-      topN: 4,
-    });
-  } catch (err) {
-    console.warn('[hybrid-brain] insight generation failed:', err);
-    section.style.display = 'none';
+  try { report = buildReport(appState, days, program); }
+  catch (e) { console.warn('[coach] insight generation failed:', e); tile.style.display = 'none'; return; }
+
+  const insights = report.allInsights || report.insights;
+  if (!insights.length) {
+    if (report.meta.dataWeeks < 1) { tile.style.display = 'none'; return; }
+    tile.style.display = '';
+    body.innerHTML = `<div class="text-muted" style="font-size:0.72rem;line-height:1.3;">Keep logging — your read appears after a few sessions.</div>`;
     return;
   }
 
-  if (!report.insights.length) {
-    if (report.meta.dataWeeks < 1) { section.style.display = 'none'; return; }
-    section.style.display = 'block';
-    body.innerHTML =
-      `<div class="brain-insight-empty text-muted" style="font-size:0.8rem;padding:8px 2px;">` +
-      `Keep logging — the Brain needs a few sessions before it can spot trends.</div>`;
+  tile.style.display = '';
+  const { focus, counts } = summarizeReport(report);
+  body.innerHTML = renderTileBody(focus, contextVerdict(insights), counts, insights.length);
+}
+
+function renderTileBody(focus, verdict, counts, total) {
+  const vm = verdict ? meta(verdict.tone) : meta('progress');
+  const chips = CHIP_ORDER.filter(c => counts[c] > 0).map(c => {
+    const m = meta(c);
+    return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:0.58rem;font-weight:700;color:${m.color};">${m.icon}${counts[c]}</span>`;
+  }).join(' ');
+  return `
+    ${verdict ? `<div class="font-heavy mb-1" style="font-size:1.15rem;line-height:1.1;color:${vm.color};">${verdict.label}</div>` : ''}
+    <div class="text-inverse mb-2" style="font-size:0.8rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(focus ? focus.observation : '')}</div>
+    <div class="flex-between align-center">
+      <div class="flex gap-2" style="flex-wrap:wrap;">${chips}</div>
+      <span class="text-muted" style="font-size:0.6rem;white-space:nowrap;">${total} insight${total !== 1 ? 's' : ''} →</span>
+    </div>`;
+}
+
+// ---- Full detail view (analytics 'coach' context) ---------------------
+export function renderCoachDetail(report) {
+  const el = document.getElementById('coachDetailBody');
+  if (!el) return;
+  const insights = report?.allInsights || report?.insights || [];
+  if (!insights.length) {
+    el.innerHTML = `<p class="text-muted" style="font-size:0.85rem;">Log a few sessions and your coach's read will appear here.</p>`;
     return;
   }
-
-  const { focus, goal, rest, counts } = summarizeReport(report);
-  section.style.display = 'block';
-  body.innerHTML = [
-    renderSummaryHeader(counts),
-    goal ? renderGoalLine(goal) : '',
-    focus ? renderFocusCard(focus) : '',
-    rest.length ? renderMore(rest) : '',
-  ].join('');
+  const verdict = contextVerdict(insights);
+  const vm = verdict ? meta(verdict.tone) : meta('progress');
+  const header = verdict
+    ? `<div class="card-dark p-3 mb-3" style="border-left:3px solid ${vm.color};">
+         <span class="text-muted" style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.06em;">Overall read</span>
+         <div class="font-heavy" style="font-size:1.15rem;color:${vm.color};">${verdict.label}</div>
+       </div>`
+    : '';
+  el.innerHTML = header + insights.map(renderInsightCard).join('');
 }
 
-// ---- summary header: tiny category tally -------------------------------
-function renderSummaryHeader(counts) {
-  const chips = CHIP_ORDER
-    .filter(cat => counts[cat] > 0)
-    .map(cat => {
-      const m = meta(cat);
-      return `<span class="brain-chip" style="display:inline-flex;align-items:center;gap:3px;font-size:0.62rem;font-weight:700;padding:2px 7px;border-radius:999px;color:${m.color};background:color-mix(in srgb, ${m.color} 14%, transparent);">${m.icon} ${counts[cat]} ${m.label}</span>`;
-    }).join('');
-  return `<div class="brain-summary flex gap-2 mb-2" style="flex-wrap:wrap;align-items:center;">${chips}</div>`;
-}
-
-// ---- goal-alignment line (slot for richer goal summaries later) --------
-function renderGoalLine(g) {
-  const m = meta('goal');
-  return `<div class="brain-goal-line flex gap-2 align-center p-2 mb-2 card-dark" style="border-left:3px solid ${m.color};font-size:0.74rem;">
-    <span>${m.icon}</span>
-    <span class="text-inverse font-bold">${escapeHtml(g.observation)}</span>
-  </div>`;
-}
-
-// ---- Today's Focus: the single highest-priority insight, in full -------
-function renderFocusCard(i) {
+function renderInsightCard(i) {
   const m = meta(i.category);
   return `
-    <div class="brain-focus-label text-muted mb-1" style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">Today's Focus</div>
-    <article class="brain-insight-card card-dark p-3 mb-2" style="border-left:3px solid ${m.color};">
+    <article class="card-dark p-3 mb-2" style="border-left:3px solid ${m.color};">
       <div class="flex-between mb-1">
         <span class="font-bold" style="color:${m.color};font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;">${m.icon} ${m.label}</span>
         <span class="text-muted" style="font-size:0.6rem;">${CONF_LABEL[i.confidence] || ''}</span>
       </div>
-      <div class="font-heavy text-inverse mb-1" style="font-size:0.95rem;line-height:1.25;">${escapeHtml(i.observation)}</div>
+      <div class="font-heavy text-inverse mb-1" style="font-size:0.92rem;line-height:1.25;">${escapeHtml(i.observation)}</div>
       <div class="text-muted mb-2" style="font-size:0.72rem;line-height:1.4;">${escapeHtml(i.explanation)}</div>
       <div class="mb-2" style="font-size:0.72rem;line-height:1.4;"><span class="text-muted">Why it matters:</span> ${escapeHtml(i.whyItMatters)}</div>
       <div style="font-size:0.74rem;line-height:1.35;"><span style="color:${m.color};font-weight:700;">Consider:</span> ${escapeHtml(i.suggestedAction)}</div>
       ${i.tradeoffs ? `<div class="mt-1 text-muted" style="font-size:0.7rem;line-height:1.35;"><span style="font-weight:700;">Tradeoff:</span> ${escapeHtml(i.tradeoffs)}</div>` : ''}
     </article>`;
-}
-
-// ---- compact indicators: the remaining insights as one-liners ----------
-function renderMore(rest) {
-  const rows = rest.slice(0, 3).map(i => {
-    const m = meta(i.category);
-    return `<div class="brain-more-row flex gap-2 align-center" style="font-size:0.72rem;padding:5px 2px;border-top:1px solid var(--overlay-sm, rgba(255,255,255,0.06));">
-      <span style="color:${m.color};">${m.icon}</span>
-      <span class="text-inverse" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(i.observation)}</span>
-    </div>`;
-  }).join('');
-  return `<div class="brain-more mt-1">
-    <div class="text-muted mb-1" style="font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">Also worth a look</div>
-    ${rows}
-  </div>`;
 }

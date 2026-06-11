@@ -29,7 +29,8 @@ const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;
 
 // Inject (or refresh / remove) the Brain banner for an analytics context.
 export function renderContextBanner(context, report) {
-  const c = (context === 'overview' || !CONTEXT_SECTION[context]) ? 'strength' : context;
+  const c = context === 'overview' ? 'strength' : context;
+  if (!CONTEXT_SECTION[c]) return; // e.g. the 'coach' view renders its own full detail
   const section = document.getElementById(CONTEXT_SECTION[c]);
   if (!section) return;
 

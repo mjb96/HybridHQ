@@ -211,16 +211,18 @@
           <div class="bar-chart-container" id="runBarChart"></div>
         </article>
 
+        <article class="card-dark carousel-card" id="coachReadTile" data-action="open-analytics" data-context="coach" style="cursor: pointer; display:none;" aria-label="Coach's Read — tap for the full read">
+          <div class="flex-between mb-2">
+             <div class="card-icon-title text-accent-blue"><span>🧭</span> Coach's Read</div>
+          </div>
+          <div id="coachReadTileBody"></div>
+        </article>
+
       </div>
 
       <h2 class="focus-header-text mt-2">At a Glance</h2>
 
       <div class="glance-grid mb-4" id="glanceGrid" aria-label="At a Glance metrics"></div>
-
-      <section id="homeInsights" class="brain-insights mb-4" style="display:none;" aria-label="Coach's Read">
-        <h2 class="focus-header-text mt-2">Coach's Read</h2>
-        <div id="homeInsightsBody"></div>
-      </section>
 
     </section>
 
@@ -343,7 +345,12 @@
       <button class="subview-back-btn" data-action="switch-tab" data-target="home">
         ← Back to Dashboard
       </button>
-      
+
+      <div id="analytics-coach" class="analytics-section">
+        <h2 class="section-header">Coach's Read</h2>
+        <div id="coachDetailBody"></div>
+      </div>
+
       <div id="analytics-strength" class="analytics-section">
         <h2 class="section-header">Strength Analytics</h2>
         

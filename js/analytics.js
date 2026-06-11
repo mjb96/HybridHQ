@@ -14,6 +14,7 @@ import {
 import { getStreamFromDB } from './db.js';
 import { generateInsights } from './brain/core.js';
 import { renderContextBanner } from './brain/analytics_brain.js';
+import { renderCoachDetail } from './brain/brain_dashboard.js';
 
 let _getState;
 let _getDays;
@@ -1169,6 +1170,10 @@ export function renderAnalytics() {
       document.getElementById('analytics-progress').classList.add('active');
       renderProgressAnalytics(data);
       renderGoalProgressDetail(data);
+      break;
+    case 'coach':
+      document.getElementById('analytics-coach').classList.add('active');
+      if (_brainReport) renderCoachDetail(_brainReport);
       break;
     default:
       document.getElementById('analytics-strength').classList.add('active');
