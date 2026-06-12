@@ -5,7 +5,7 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
@@ -517,6 +517,18 @@ export function renderHome() {
   if (strengthHero) strengthHero.textContent = formatMinutesToHoursMins(currentWeekGymTimeSum);
   if (runHero) runHero.textContent = currentWeekRunDistSum.toFixed(1) + ' km';
 
+  // TIER 3 — block / phase / week + progress bar.
+  const totalWeeks = activeProgram?.totalWeeks || 12;
+  const wkNum = parseInt(wk, 10) || 1;
+  const phase = WEEK_PHASE_NAMES[wk] || activeProgram?.dossier?.focus || 'Training block';
+  const progPct = Math.min(100, Math.round((wkNum / totalWeeks) * 100));
+  const setTxt = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  const setW = (id, p) => { const el = document.getElementById(id); if (el) el.style.width = p + '%'; };
+  setTxt('focusStrengthSub', `${phase} · Week ${wkNum}/${totalWeeks}`);
+  setW('focusStrengthBar', progPct);
+  setTxt('focusRunSub', `${currentWeekRunDistSum.toFixed(1)} km this week · Week ${wkNum}/${totalWeeks}`);
+  setW('focusRunBar', progPct);
+
   if (strengthChartContainer && runChartContainer) {
     const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     
@@ -747,19 +759,56 @@ function renderIntel(appState, days, program, selectedDay) {
     focusObservation: all[0]?.observation,
   };
 
-  renderTelemetryStrip(buildTelemetry(ctx));
+  renderTelemetryStrip(buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readiness));
   renderBriefing(composeBriefing(ctx), contextVerdict(all));
+}
+
+// Always-substantive Tier-1 complications from data we always have, plus
+// energy/readiness when available. `action` is a raw data-action attr string.
+function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readiness) {
+  const wk = appState.currentWeek || '1';
+  const weekData = appState.weeks?.[wk] || {};
+
+  let vol = 0, runKm = 0, todaySets = 0;
+  days.forEach(d => {
+    const dl = weekData.lifts?.[d] || {};
+    for (const l in dl) {
+      if (!Array.isArray(dl[l])) continue;
+      dl[l].forEach(s => {
+        if (isCompletedSet(s) && !s.isWarmup) { vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0); if (d === selectedDay) todaySets++; }
+      });
+    }
+    runKm += parseFloat(weekData.runs?.[d]?.dist) || 0;
+  });
+  const todayDone = todaySets > 0 || (parseFloat(weekData.runs?.[selectedDay]?.dist) || 0) > 0;
+  const streak = computeStreakView(appState.streakData);
+
+  const A = (s) => s; // readability for the raw data-action strings
+  const items = [
+    { label: 'Today',  value: todayDone ? '✓ Done' : 'Open', action: A('data-action="open-today-summary"') },
+    { label: 'Streak', value: `${streak.current || 0}d`,      action: A('data-action="open-analytics" data-context="streak"') },
+    { label: 'Volume', value: Math.round(vol).toLocaleString(), unit: 'kg', action: A('data-action="open-analytics" data-context="weekly-volume"') },
+    { label: 'Run',    value: `${Math.round(runKm * 10) / 10}`, unit: 'km', action: A('data-action="open-analytics" data-context="running"') },
+  ];
+  if (readiness?.hasData) items.push({ label: 'Readiness', value: `${readiness.score}`, action: A('data-action="open-analytics" data-context="recovery"') });
+  if (recovery?.hasData)  items.push({ label: 'Recovery',  value: `${recovery.score}%`, action: A('data-action="open-analytics" data-context="recovery-score"') });
+
+  if (energy.hasProfile) {
+    items.push({ label: 'Base',   value: energy.bmr.toLocaleString(),   unit: 'kcal' });
+    items.push({ label: 'Active', value: energy.active.toLocaleString(), unit: 'kcal', action: A('data-action="open-analytics" data-context="active-fuel"') });
+    items.push({ label: 'Burned', value: energy.total.toLocaleString(),  unit: 'kcal', action: A('data-action="open-analytics" data-context="active-fuel"') });
+  } else {
+    items.push({ label: 'Energy', value: 'Set up', action: A('data-action="open-profile"') });
+  }
+  return items;
 }
 
 function renderTelemetryStrip(items) {
   const el = document.getElementById('telemetryStrip');
   if (!el) return;
   el.innerHTML = (items || []).map(it => {
-    const action = it.nav === 'profile'
-      ? 'data-action="open-profile"'
-      : it.nav ? `data-action="open-analytics" data-context="${it.nav}"` : '';
-    const cursor = it.nav ? 'cursor:pointer;' : '';
-    return `<div class="card-dark" ${action} style="flex:0 0 auto;min-width:84px;padding:8px 12px;border-radius:10px;${cursor}">
+    const cursor = it.action ? 'cursor:pointer;' : '';
+    return `<div class="card-dark" ${it.action || ''} style="flex:0 0 auto;min-width:78px;padding:8px 12px;border-radius:10px;${cursor}">
       <div class="text-muted" style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(it.label)}</div>
       <div class="font-heavy text-inverse" style="font-size:0.95rem;line-height:1.1;white-space:nowrap;">${escapeHtml(it.value)}${it.unit ? ` <span class="text-muted" style="font-size:0.6rem;">${escapeHtml(it.unit)}</span>` : ''}</div>
     </div>`;
