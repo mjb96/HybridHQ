@@ -28,6 +28,76 @@ import { buildHealthSnapshot } from './healthCalculations.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Append or update today's health data in appState.healthLog.
+ * Each entry is keyed by date (YYYY-MM-DD). If an entry for today already
+ * exists it is overwritten with the latest sync data.
+ *
+ * Sleep stages (deep/REM/light/awake hours) are extracted from raw bridge
+ * payload when available — these live only in the log, not in the snapshot.
+ *
+ * @param {Object} appState
+ * @param {import('./healthTypes.js').HealthSnapshot} snapshot
+ * @param {import('./healthTypes.js').RawHealthPayload|null} raw
+ */
+function appendToHealthLog(appState, snapshot, raw) {
+  if (!appState) return;
+  if (!Array.isArray(appState.healthLog)) appState.healthLog = [];
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Extract sleep stages from raw bridge payload when available.
+  // Health Connect SleepStage constants: AWAKE=0, SLEEPING=1, OUT_OF_BED=2,
+  // LIGHT=3, DEEP=4, REM=5.
+  let sleepDeepHours = null, sleepRemHours = null, sleepLightHours = null, sleepAwakeHours = null;
+  if (raw?.sleepSessions?.length > 0) {
+    let deep = 0, rem = 0, light = 0, awake = 0;
+    raw.sleepSessions.forEach(session => {
+      (session.stages || []).forEach(stage => {
+        const hrs = (stage.durationMs || 0) / (1000 * 60 * 60);
+        if (stage.stage === 4 || stage.stage === 'DEEP')  deep  += hrs;
+        else if (stage.stage === 5 || stage.stage === 'REM')   rem   += hrs;
+        else if (stage.stage === 3 || stage.stage === 'LIGHT') light += hrs;
+        else if (stage.stage === 0 || stage.stage === 'AWAKE') awake += hrs;
+      });
+    });
+    if (deep + rem + light + awake > 0) {
+      sleepDeepHours  = Math.round(deep  * 10) / 10;
+      sleepRemHours   = Math.round(rem   * 10) / 10;
+      sleepLightHours = Math.round(light * 10) / 10;
+      sleepAwakeHours = Math.round(awake * 10) / 10;
+    }
+  }
+
+  const entry = {
+    date:             today,
+    steps:            snapshot.steps,
+    activeCalories:   snapshot.activeCalories,
+    sleepHours:       snapshot.sleepHours,
+    sleepScore:       snapshot.sleepScore,
+    sleepDeepHours,
+    sleepRemHours,
+    sleepLightHours,
+    sleepAwakeHours,
+    restingHeartRate: snapshot.restingHeartRate,
+    averageHeartRate: snapshot.averageHeartRate,
+    weightKg:         snapshot.weightKg,
+  };
+
+  const idx = appState.healthLog.findIndex(e => e.date === today);
+  if (idx >= 0) {
+    appState.healthLog[idx] = entry;
+  } else {
+    appState.healthLog.push(entry);
+  }
+
+  // Cap log at 365 entries to prevent unbounded state growth.
+  if (appState.healthLog.length > 365) {
+    appState.healthLog.sort((a, b) => a.date.localeCompare(b.date));
+    appState.healthLog = appState.healthLog.slice(-365);
+  }
+}
+
 function emptySnapshot(extraFields = {}) {
   return {
     steps: 0, activeCalories: 0, sleepHours: 0, sleepScore: null,
@@ -93,6 +163,7 @@ export const HealthService = Object.freeze({
     // 4. Persist to appState
     if (appState) {
       appState.health = snapshot;
+      appendToHealthLog(appState, snapshot, raw);
       if (typeof saveState === 'function') saveState();
     }
 

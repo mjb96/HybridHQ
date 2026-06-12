@@ -5,6 +5,8 @@
 // (loaded asynchronously from IndexedDB).
 // ==========================================
 import { computeWeeklyCaloriesSeries, formatPace } from '../../engine.js';
+import { getLastNDays } from '../../health/healthBaselines.js';
+import { escapeHtml } from '../../util.js';
 import {
   weeklyDistanceSeries, weeklyElevationSeries, weeklyPaceSeries,
   weeklyHrSeries, weeklyHrZonesSeries, weeklyCadenceSeries, weeklyTrainingEffectSeries,
@@ -15,6 +17,8 @@ import { setText, paceZoneColour } from '../utils.js';
 import { renderHrZonesChart, renderCadenceChart, renderWeeklyLinesChart, renderStreamCharts } from '../charts.js';
 
 export function renderRunningView(appState, days) {
+  _renderRunningHealthContext(appState);
+
   const activeProgram  = getProgramById(appState.activeProgramId);
   const maxWeek        = activeProgram?.totalWeeks || 12;
   const weekLabels     = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
@@ -127,4 +131,53 @@ function _loadAndRenderLatestRunStream(appState, days) {
     }
   }
   renderStreamCharts(null);
+}
+
+// ---- Health Connect activity context (non-run steps + avg HR from HC) ------
+function _renderRunningHealthContext(appState) {
+  const section = document.getElementById('analytics-running');
+  if (!section) return;
+
+  let panel = section.querySelector('.running-health-context');
+
+  const health    = appState.health;
+  const healthLog = appState.healthLog || [];
+  const steps     = health?.steps || 0;
+  const last7     = getLastNDays(healthLog, 7).filter(e => e.steps > 0);
+  const avg7steps = last7.length ? Math.round(last7.reduce((s, e) => s + e.steps, 0) / last7.length) : 0;
+
+  if (!steps && !avg7steps) { if (panel) panel.remove(); return; }
+
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'running-health-context mb-3';
+    section.insertBefore(panel, section.firstChild);
+  }
+
+  const stepColor = steps >= 10000 ? '#10b981' : steps >= 6000 ? '#f59e0b' : '#ef4444';
+  const avgColor  = avg7steps >= 8000 ? '#10b981' : avg7steps >= 5000 ? '#f59e0b' : '#ef4444';
+
+  let note = '';
+  if (avg7steps > 0 && steps > 0) {
+    const ratio = steps / avg7steps;
+    if (ratio < 0.5) note = 'Today\'s step count is well below your weekly average — low-activity days can complement hard running sessions.';
+    else if (steps >= 12000) note = 'High step count alongside running adds meaningful aerobic volume. Factor this into total daily load.';
+  }
+
+  panel.innerHTML = `
+    <div class="grid-2-col gap-2 mb-2">
+      ${steps > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${stepColor} 25%,transparent);">
+        <div class="text-xs text-muted mb-1">Steps Today</div>
+        <div class="font-heavy" style="color:${stepColor};">${steps.toLocaleString()}</div>
+        <div class="text-xs text-muted mt-1">via Health Connect</div>
+      </article>` : ''}
+      ${avg7steps > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${avgColor} 25%,transparent);">
+        <div class="text-xs text-muted mb-1">7-Day Step Avg</div>
+        <div class="font-heavy" style="color:${avgColor};">${avg7steps.toLocaleString()}</div>
+        <div class="text-xs text-muted mt-1">steps/day</div>
+      </article>` : ''}
+    </div>
+    ${note ? `<article class="card-dark p-2 mb-2" style="border-left:3px solid var(--color-blue);">
+      <div class="text-xs text-muted" style="line-height:1.4;">${escapeHtml(note)}</div>
+    </article>` : ''}`;
 }

@@ -14,6 +14,9 @@ import { renderRunningView } from './analytics/views/view-running.js';
 import { renderRecoveryView, renderRecoveryScoreView, renderStressBalanceView } from './analytics/views/view-recovery.js';
 import { renderBodyweightView } from './analytics/views/view-bodyweight.js';
 import { renderProgressView, renderStreakView, renderGoalProgressView, renderActiveFuelView } from './analytics/views/view-progress.js';
+import { renderHealthStepsView } from './analytics/views/view-health-steps.js';
+import { renderHealthSleepView } from './analytics/views/view-health-sleep.js';
+import { renderHealthRhrView } from './analytics/views/view-health-rhr.js';
 
 let _getState;
 let _getDays;
@@ -132,6 +135,18 @@ export function renderAnalytics() {
       document.getElementById('analytics-progress').classList.add('active');
       renderProgressView(appState, days);
       renderGoalProgressView(appState, days);
+      break;
+    case 'health-steps':
+      document.getElementById('analytics-health-steps').classList.add('active');
+      renderHealthStepsView(appState);
+      break;
+    case 'health-sleep':
+      document.getElementById('analytics-health-sleep').classList.add('active');
+      renderHealthSleepView(appState);
+      break;
+    case 'health-rhr':
+      document.getElementById('analytics-health-rhr').classList.add('active');
+      renderHealthRhrView(appState, days);
       break;
     case 'coach':
       document.getElementById('analytics-coach').classList.add('active');

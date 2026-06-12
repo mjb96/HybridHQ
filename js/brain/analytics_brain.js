@@ -22,7 +22,10 @@ const CONTEXT_SECTION = {
   streak:          'analytics-streak',
   'active-fuel':   'analytics-active-fuel',
   'stress-balance':'analytics-stress-balance',
-  'goal-progress': 'analytics-progress',
+  'goal-progress':  'analytics-progress',
+  'health-steps':   'analytics-health-steps',
+  'health-sleep':   'analytics-health-sleep',
+  'health-rhr':     'analytics-health-rhr',
 };
 
 const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;

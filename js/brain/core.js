@@ -112,6 +112,9 @@ export const CONTEXT_DOMAINS = Object.freeze({
   'goal-progress': ['adherence'],
   streak:          ['adherence'],
   bodyweight:      ['bodyweight'],
+  'health-steps':  ['adherence', 'fuel'],
+  'health-sleep':  ['recovery'],
+  'health-rhr':    ['recovery'],
 });
 
 // Prioritised insights relevant to a given analytics context (full list, not

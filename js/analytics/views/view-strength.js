@@ -7,9 +7,60 @@ import { allLiftsStats, weeklyTonnageSeries } from '../../metrics/metrics-streng
 import { weeklyDistanceSeries } from '../../metrics/metrics-running.js';
 import { setText } from '../utils.js';
 import { renderVolumeChart, renderBig3ProgressionChart } from '../charts.js';
+import { computeBaseline } from '../../health/healthBaselines.js';
+import { escapeHtml } from '../../util.js';
+
+function _renderStrengthHealthContext(section, health, healthLog) {
+  let panel = section.querySelector('.strength-health-context');
+
+  const rhr = health?.restingHeartRate || 0;
+  const sleep = health?.sleepHours || 0;
+  if (!sleep && !rhr) { if (panel) panel.remove(); return; }
+
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'strength-health-context mb-3';
+    section.insertBefore(panel, section.firstChild);
+  }
+
+  const rhrBaseline = computeBaseline(healthLog || [], 'restingHeartRate');
+  const rhrPct = rhrBaseline.pctDiff;
+  const rhrColor = rhr > 0 && rhrPct !== null && rhrPct > 10 ? '#ef4444'
+    : rhr > 0 && rhrPct !== null && rhrPct > 5 ? '#f59e0b' : '#10b981';
+  const sleepColor = sleep < 6 ? '#ef4444' : sleep < 7 ? '#f59e0b' : '#10b981';
+
+  let note = '';
+  if (sleep > 0 && sleep < 6) {
+    note = 'Short sleep may blunt strength output and increase injury risk. Focus on technique over max loads today.';
+  } else if (rhr > 0 && rhrPct !== null && rhrPct > 10) {
+    note = `RHR is ${rhrPct}% above baseline — nervous system may still be recovering. Avoid pushing to true 1RM today.`;
+  } else if (sleep >= 8 && (!rhr || (rhrPct !== null && rhrPct <= 5))) {
+    note = 'Good recovery signals. Conditions are favourable for a performance session.';
+  }
+
+  panel.innerHTML = `
+    <div class="grid-2-col gap-2 mb-2">
+      ${sleep > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${sleepColor} 25%,transparent);">
+        <div class="text-xs text-muted mb-1">Sleep</div>
+        <div class="font-heavy" style="color:${sleepColor};">${sleep}h</div>
+        <div class="text-xs mt-1" style="color:${sleepColor};">${sleep >= 8 ? 'Excellent' : sleep >= 7 ? 'Good' : sleep >= 6 ? 'Fair' : 'Poor'}</div>
+      </article>` : ''}
+      ${rhr > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${rhrColor} 25%,transparent);">
+        <div class="text-xs text-muted mb-1">Resting HR</div>
+        <div class="font-heavy" style="color:${rhrColor};">${rhr} bpm</div>
+        <div class="text-xs mt-1" style="color:${rhrColor};">${rhrPct !== null ? (rhrPct > 0 ? '+' + rhrPct + '% vs avg' : rhrPct + '% vs avg') : 'Building baseline'}</div>
+      </article>` : ''}
+    </div>
+    ${note ? `<article class="card-dark p-2 mb-2" style="border-left:3px solid var(--color-amber);">
+      <div class="text-xs text-muted" style="line-height:1.4;">${escapeHtml(note)}</div>
+    </article>` : ''}`;
+}
 
 // ---- Strength overview (totals + volume chart + 1RM list) -----------------
 export function renderStrengthView(appState, days) {
+  const section = document.getElementById('analytics-strength');
+  if (section) _renderStrengthHealthContext(section, appState.health, appState.healthLog);
+
   const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek  = activeProgram?.totalWeeks || 12;
   const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));

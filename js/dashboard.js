@@ -470,7 +470,7 @@ export const TILE_REGISTRY = [
     icon:      '👟',
     label:     'Steps',
     accentVar: '--color-green',
-    navTarget: null,
+    navTarget: 'health-steps',
     order:     12,
     renderData(appState) {
       try {
@@ -500,7 +500,7 @@ export const TILE_REGISTRY = [
     icon:      '🌙',
     label:     'Sleep',
     accentVar: '--color-blue',
-    navTarget: null,
+    navTarget: 'health-sleep',
     order:     13,
     renderData(appState) {
       try {
@@ -527,7 +527,7 @@ export const TILE_REGISTRY = [
     icon:      '💗',
     label:     'Resting HR',
     accentVar: '--color-pink',
-    navTarget: 'recovery',
+    navTarget: 'health-rhr',
     order:     14,
     renderData(appState) {
       try {

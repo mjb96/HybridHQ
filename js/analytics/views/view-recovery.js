@@ -8,6 +8,61 @@ import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
 import { getProgramById } from '../../state.js';
 import { setText } from '../utils.js';
 import { renderRpeChart, renderStackedLoadChart } from '../charts.js';
+import { computeBaseline } from '../../health/healthBaselines.js';
+import { escapeHtml } from '../../util.js';
+
+// Inject (or refresh) the Health Connect signal panel above the RPE summary.
+function renderHealthSignalsPanel(section, health, healthLog) {
+  let panel = section.querySelector('.recovery-health-signals');
+
+  if (!health || (health.sleepHours <= 0 && !health.restingHeartRate)) {
+    if (panel) panel.remove();
+    return;
+  }
+
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'recovery-health-signals mb-3';
+    section.insertBefore(panel, section.firstChild);
+  }
+
+  const rhrBaseline = computeBaseline(healthLog || [], 'restingHeartRate');
+  const rhr   = health.restingHeartRate;
+  const rhrPct = rhrBaseline.pctDiff;
+  const rhrColor = rhr > 0 && rhrPct !== null && rhrPct > 10 ? '#ef4444'
+    : rhr > 0 && rhrPct !== null && rhrPct > 5 ? '#f59e0b' : '#10b981';
+
+  const sleepH = health.sleepHours;
+  const sleepColor = sleepH < 6 ? '#ef4444' : sleepH < 7 ? '#f59e0b' : '#10b981';
+
+  let contextNote = '';
+  if (sleepH > 0 && sleepH < 6 && rhr > 0 && rhrPct !== null && rhrPct > 8) {
+    contextNote = `Short sleep and elevated RHR both detected — recovery is compromised. Avoid high-intensity work today.`;
+  } else if (sleepH > 0 && sleepH < 7) {
+    contextNote = `${sleepH}h sleep may carry residual fatigue into today's session.`;
+  } else if (rhr > 0 && rhrPct !== null && rhrPct > 10) {
+    contextNote = `RHR is ${rhrPct}% above your baseline — a systemic stress signal. Adjust session intensity.`;
+  }
+
+  panel.innerHTML = `
+    <div class="grid-2-col gap-2 mb-2">
+      ${sleepH > 0 ? `
+      <article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb, ${sleepColor} 30%, transparent);">
+        <div class="text-xs text-muted mb-1">Sleep Last Night</div>
+        <div class="font-heavy" style="color:${sleepColor};">${sleepH}h</div>
+        <div class="text-xs mt-1" style="color:${sleepColor};">${sleepH >= 8 ? 'Excellent' : sleepH >= 7 ? 'Good' : sleepH >= 6 ? 'Fair' : 'Poor'}</div>
+      </article>` : ''}
+      ${rhr > 0 ? `
+      <article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb, ${rhrColor} 30%, transparent);" data-action="open-analytics" data-context="health-rhr" style="cursor:pointer;">
+        <div class="text-xs text-muted mb-1">Resting HR</div>
+        <div class="font-heavy" style="color:${rhrColor};">${rhr} bpm</div>
+        <div class="text-xs mt-1" style="color:${rhrColor};">${rhrPct !== null ? (rhrPct > 0 ? '+' + rhrPct + '% vs avg' : rhrPct + '% vs avg') : 'Building baseline'}</div>
+      </article>` : ''}
+    </div>
+    ${contextNote ? `<article class="card-dark p-3 mb-2" style="border-left:3px solid var(--color-amber);">
+      <div class="text-sm text-muted" style="line-height:1.4;">${escapeHtml(contextNote)}</div>
+    </article>` : ''}`;
+}
 
 // ---- Recovery overview (RPE summary cards + RPE trend + ACWR) --------------
 export function renderRecoveryView(appState, days) {
@@ -49,6 +104,8 @@ export function renderRecoveryView(appState, days) {
 
   const section = document.getElementById('analytics-recovery');
   if (!section) return;
+
+  renderHealthSignalsPanel(section, appState.health, appState.healthLog);
 
   let summaryEl = section.querySelector('.recovery-summary-cards');
   if (!summaryEl) {

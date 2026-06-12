@@ -588,6 +588,118 @@ export function renderCompletionVsTargetChart(container, series, curWeek) {
 }
 
 // ==========================================
+// SLEEP STAGES CHART
+// Stacked bar showing deep / REM / light / awake hours per night.
+// Accepts an array of stage objects: [{ label, deep, rem, light, awake }]
+// ==========================================
+export function renderSleepStagesChart(container, stagesData) {
+  if (!container) return;
+  const valid = (stagesData || []).filter(s => (s.deep + s.rem + s.light + s.awake) > 0);
+  if (valid.length === 0) {
+    container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">Sleep stage data unavailable — requires a sleep-tracking device.</p>';
+    return;
+  }
+
+  const H = 170;
+  const chartW = W - PAD_L - PAD_R, chartH = H - PAD_B - PAD_T;
+  const n = valid.length;
+  const barW = Math.max(12, Math.floor(chartW / n) - 6);
+  const maxTotal = Math.max(...valid.map(s => s.deep + s.rem + s.light + s.awake), 8);
+
+  const COLORS = { deep: '#3b82f6', rem: '#a855f7', light: '#22d3ee', awake: '#6b7280' };
+  const KEYS   = ['awake', 'light', 'rem', 'deep'];
+
+  let bars = '', xAxis = '';
+  valid.forEach((s, i) => {
+    const x  = PAD_L + (i / n) * chartW + (chartW / n - barW) / 2;
+    let curY = PAD_T + chartH;
+    KEYS.forEach(k => {
+      const val = s[k] || 0;
+      if (val <= 0) return;
+      const h = (val / maxTotal) * chartH;
+      curY -= h;
+      bars += `<rect x="${x.toFixed(1)}" y="${curY.toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="${COLORS[k]}" opacity="0.9" rx="1"/>`;
+    });
+    if (i % 2 === 0 || n <= 8) {
+      xAxis += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">${s.label}</text>`;
+    }
+  });
+
+  let yAxis = '';
+  [0, Math.round(maxTotal / 2), maxTotal].forEach(v => {
+    const vy = PAD_T + chartH - (v / maxTotal) * chartH;
+    yAxis += `<text x="${PAD_L - 6}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="rgba(255,255,255,0.6)">${v}h</text>
+              <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${bars}${xAxis}</svg>`;
+}
+
+// ==========================================
+// TREND LINE WITH BASELINE BAND
+// Single line chart with a dashed reference line for the athlete's baseline.
+// ==========================================
+export function renderTrendLineWithBaseline(container, labels, values, baselineValue, opts = {}) {
+  if (!container) return;
+  const n = labels.length;
+  const hasData = values.some(v => v > 0);
+  if (!hasData || n === 0) {
+    container.innerHTML = `<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;padding:12px 0;">${opts.emptyMsg || 'No data yet.'}</p>`;
+    return;
+  }
+
+  const H = 170;
+  const chartW = W - PAD_L - PAD_R, chartH = H - PAD_B - PAD_T;
+  const allVals = values.filter(v => v > 0);
+  const base = baselineValue || 0;
+  let minV = Math.min(...allVals, base > 0 ? base : Infinity);
+  let maxV = Math.max(...allVals, base || 0);
+  const pad = (maxV - minV) * 0.15 || 1;
+  minV = Math.max(0, minV - pad);
+  maxV += pad;
+  const rangeV = (maxV - minV) || 1;
+
+  const color = opts.color || '#22d3ee';
+  const toX   = i => PAD_L + (i / n) * chartW + chartW / n / 2;
+  const toY   = v => PAD_T + chartH - ((v - minV) / rangeV) * chartH;
+  const fmtY  = opts.yFmt || (v => Math.round(v).toLocaleString());
+
+  let yAxis = '';
+  [minV, (minV + maxV) / 2, maxV].forEach(v => {
+    const vy = toY(v);
+    yAxis += `<text x="${PAD_L - 6}" y="${(vy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="rgba(255,255,255,0.6)">${fmtY(v)}</text>
+              <line x1="${PAD_L}" y1="${vy.toFixed(1)}" x2="${W - PAD_R}" y2="${vy.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+  });
+
+  let pts = [], dots = '';
+  values.forEach((v, i) => {
+    if (v > 0) {
+      const x = toX(i), y = toY(v);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${color}" stroke="#111827" stroke-width="1.5"/>`;
+    }
+  });
+
+  const line = pts.length >= 2
+    ? `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" points="${pts.join(' ')}"/>`
+    : '';
+
+  let baseline = '';
+  if (base > 0) {
+    const by = toY(base);
+    baseline = `<line x1="${PAD_L}" y1="${by.toFixed(1)}" x2="${W - PAD_R}" y2="${by.toFixed(1)}" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-dasharray="5 4"/>
+                <text x="${(W - PAD_R - 2).toFixed(1)}" y="${(by - 4).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.4)">avg</text>`;
+  }
+
+  let xAxis = '';
+  labels.forEach((lbl, i) => {
+    if (i % 3 === 0 || n <= 8) xAxis += `<text x="${toX(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.7)">${lbl}</text>`;
+  });
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${yAxis}${baseline}${line}${dots}${xAxis}</svg>`;
+}
+
+// ==========================================
 // STREAM CHARTS
 // Per-run pace / HR / elevation from IndexedDB FIT stream data.
 // ==========================================
