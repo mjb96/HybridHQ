@@ -12,6 +12,8 @@ import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, 
 import { CATEGORY_META } from './brain/brain_dashboard.js';
 import { generateInsights, contextVerdict } from './brain/core.js';
 import { composeBriefing, trainingStatus } from './brain/briefing.js';
+import { generateWeekBrief, PHASES, PHASE_TONES } from './brain/weekly_brief.js';
+import { generateDailyBrief } from './brain/daily_readiness.js';
 import { energyProfile, activeCaloriesForDay } from './profile.js';
 import { escapeHtml } from './util.js';
 
@@ -604,6 +606,14 @@ export function renderHome() {
   try { renderIntel(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
   catch (e) { console.warn('[intel] render skipped:', e); }
 
+  // TIER 2.5a — Today's Focus (daily readiness).
+  try { renderDailyReadiness(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
+  catch (e) { console.warn('[daily-readiness] render skipped:', e); }
+
+  // TIER 2.5b — Your Week Ahead.
+  try { renderWeekAhead(appState, DEFAULT_DAYS, activeProgram); }
+  catch (e) { console.warn('[week-ahead] render skipped:', e); }
+
   // TIER 3 — Hybrid Focus carousel: apply saved order + enable reordering.
   try { applyFocusOrder(); mountFocusDragAndDrop(); }
   catch (e) { console.warn('[hybrid-focus] reorder skipped:', e); }
@@ -745,6 +755,214 @@ export function renderHome() {
       deloadCard.style.display = 'none';
     }
   }
+}
+
+// ==========================================
+// TIER 2.5a — TODAY'S FOCUS (daily readiness)
+// ==========================================
+
+const DR_TONE = { fresh: '#10b981', moderate: '#f59e0b', reduced: '#ef4444' };
+
+export function renderDailyReadiness(appState, days, program, selectedDay) {
+  const card = document.getElementById('dailyReadinessCard');
+  if (!card) return;
+
+  let brief;
+  try {
+    brief = generateDailyBrief(appState, {
+      days,
+      program,
+      selectedDay,
+      currentWeek: appState.currentWeek,
+    });
+  } catch (e) {
+    console.warn('[daily-readiness] brief failed:', e);
+    card.style.display = 'none';
+    return;
+  }
+
+  // Hide when session is already logged (already done for today)
+  if (brief.sessionLogged) { card.style.display = 'none'; return; }
+  // Hide when there's no data from yesterday (nothing to say)
+  if (!brief.hasData) { card.style.display = 'none'; return; }
+
+  card.style.display = '';
+  const accent = DR_TONE[brief.status] || DR_TONE.fresh;
+  card.style.setProperty('--dr-accent', accent);
+  card.style.borderLeftColor = accent;
+
+  const chip     = document.getElementById('drStatusChip');
+  const headline = document.getElementById('drHeadline');
+  const directive = document.getElementById('drDirective');
+  const list     = document.getElementById('drAdjustments');
+
+  if (chip) {
+    chip.textContent = brief.status === 'fresh' ? 'Fresh' : brief.status === 'moderate' ? 'Moderate' : 'Reduced';
+    chip.style.background = `color-mix(in srgb, ${accent} 16%, transparent)`;
+    chip.style.color = accent;
+  }
+  if (headline)  headline.textContent  = brief.headline  || '';
+  if (directive) directive.textContent = brief.directive || '';
+  if (list) {
+    if (brief.adjustments && brief.adjustments.length > 0) {
+      list.innerHTML = brief.adjustments.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+      list.style.display = '';
+    } else {
+      list.innerHTML = '';
+      list.style.display = 'none';
+    }
+  }
+}
+
+// ==========================================
+// TIER 2.5b — YOUR WEEK AHEAD CARD
+// ==========================================
+
+const TONE_COLORS = {
+  risk:        '#ef4444',
+  opportunity: '#f59e0b',
+  goal:        '#3b82f6',
+  recovery:    '#3b82f6',
+  progress:    '#10b981',
+};
+
+export function renderWeekAhead(appState, days, program) {
+  const card = document.getElementById('weekAheadCard');
+  if (!card) return;
+
+  let brief;
+  try {
+    brief = generateWeekBrief(appState, {
+      days,
+      program,
+      currentWeek: appState.currentWeek,
+      maxWeek: program?.totalWeeks || 12,
+      goalConfig: appState?.goalData?.goalConfig,
+    });
+  } catch (e) {
+    console.warn('[week-ahead] brief generation failed:', e);
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+
+  const accent = TONE_COLORS[brief.tone] || TONE_COLORS.progress;
+  card.style.setProperty('--wa-accent', accent);
+  card.style.borderLeftColor = accent;
+
+  const phaseChip     = document.getElementById('weekAheadPhaseChip');
+  const countdown     = document.getElementById('weekAheadCountdown');
+  const goalBtn       = document.getElementById('weekAheadGoalBtn');
+  const headline      = document.getElementById('weekAheadHeadline');
+  const directive     = document.getElementById('weekAheadDirective');
+  const adjustmentsList = document.getElementById('weekAheadAdjustments');
+  const rationale     = document.getElementById('weekAheadRationale');
+
+  if (phaseChip) {
+    phaseChip.textContent = brief.phase || 'Training';
+    phaseChip.style.background = `color-mix(in srgb, ${accent} 16%, transparent)`;
+    phaseChip.style.color       = accent;
+  }
+
+  if (countdown) {
+    if (brief.weeksToGoal !== null && brief.weeksToGoal > 0) {
+      countdown.textContent = `${brief.weeksToGoal} wk${brief.weeksToGoal !== 1 ? 's' : ''} to go`;
+      countdown.style.display = '';
+    } else {
+      countdown.textContent = '';
+      countdown.style.display = 'none';
+    }
+  }
+
+  if (goalBtn) {
+    goalBtn.textContent    = brief.hasGoal ? 'Edit goal' : 'Set goal';
+    goalBtn.dataset.action = 'open-goal-setup';
+  }
+
+  if (headline)  headline.textContent  = brief.headline  || '';
+  if (directive) directive.textContent = brief.directive || '';
+
+  if (adjustmentsList) {
+    if (brief.adjustments && brief.adjustments.length > 0) {
+      adjustmentsList.innerHTML = brief.adjustments
+        .map(a => `<li>${escapeHtml(a)}</li>`)
+        .join('');
+      adjustmentsList.style.display = '';
+    } else {
+      adjustmentsList.innerHTML = '';
+      adjustmentsList.style.display = 'none';
+    }
+  }
+
+  if (rationale) {
+    if (brief.rationale) {
+      rationale.textContent  = brief.rationale;
+      rationale.style.display = '';
+    } else {
+      rationale.textContent  = '';
+      rationale.style.display = 'none';
+    }
+  }
+}
+
+// ==========================================
+// GOAL SETUP MODAL
+// ==========================================
+
+let _selectedGoalType = null;
+
+function openGoalSetupModal() {
+  const appState    = _getState();
+  const goalConfig  = appState?.goalData?.goalConfig || {};
+
+  _selectedGoalType = goalConfig.primaryGoal || null;
+
+  // Pre-fill form fields
+  const nameEl = document.getElementById('goalEventName');
+  const dateEl = document.getElementById('goalEventDate');
+  if (nameEl) nameEl.value = goalConfig.goalEventName || '';
+  if (dateEl) dateEl.value = goalConfig.goalEventDate || '';
+
+  // Highlight active goal type
+  document.querySelectorAll('.goal-type-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.goal === _selectedGoalType);
+  });
+
+  document.getElementById('goalSetupModal')?.classList.add('active');
+}
+
+function closeGoalSetupModal() {
+  document.getElementById('goalSetupModal')?.classList.remove('active');
+  _selectedGoalType = null;
+}
+
+function saveGoalSetup() {
+  const appState = _getState();
+  const nameEl   = document.getElementById('goalEventName');
+  const dateEl   = document.getElementById('goalEventDate');
+
+  if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0, goalConfig: {} };
+  if (!appState.goalData.goalConfig) appState.goalData.goalConfig = {};
+
+  appState.goalData.goalConfig = {
+    primaryGoal:    _selectedGoalType || null,
+    goalEventName:  nameEl ? (nameEl.value.trim() || null) : null,
+    goalEventDate:  dateEl ? (dateEl.value || null) : null,
+  };
+
+  saveStateToLocalStorage(true);
+  closeGoalSetupModal();
+  try { renderHome(); } catch {}
+}
+
+function clearGoalSetup() {
+  const appState = _getState();
+  if (!appState.goalData) return;
+  appState.goalData.goalConfig = { primaryGoal: null, goalEventDate: null, goalEventName: null };
+  saveStateToLocalStorage(true);
+  closeGoalSetupModal();
+  try { renderHome(); } catch {}
 }
 
 // ==========================================
@@ -914,5 +1132,23 @@ document.addEventListener('click', (e) => {
     closeProfileModal();
   } else if (action === 'save-profile') {
     saveAthleteProfile();
+  } else if (action === 'open-goal-setup') {
+    openGoalSetupModal();
+  } else if (action === 'close-goal-setup') {
+    closeGoalSetupModal();
+  } else if (action === 'save-goal-setup') {
+    saveGoalSetup();
+  } else if (action === 'clear-goal-setup') {
+    clearGoalSetup();
   }
+});
+
+// Goal type button selection (delegated to body so it works after DOM load)
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.goal-type-btn');
+  if (!btn) return;
+  _selectedGoalType = btn.dataset.goal || null;
+  document.querySelectorAll('.goal-type-btn').forEach(b => {
+    b.classList.toggle('selected', b === btn);
+  });
 });

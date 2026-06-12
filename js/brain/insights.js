@@ -12,6 +12,7 @@ import {
   INSIGHT_CATEGORIES as CAT,
   CONFIDENCE, CONFIDENCE_POINTS, PRIORITY_WEIGHTS,
 } from './constants_brain.js';
+import { resolveTradeoff } from './tradeoffs.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const ev = (f, metric) => (f.evidence.find(e => e.metric === metric) || {}).value;
@@ -285,6 +286,7 @@ export function toInsight(finding, ctx = {}) {
     recency          * W.recency;
 
   // Phase 2: fold causal attribution into the copy + derive a tradeoff.
+  // Goal-aware resolution always overrides the generic template default.
   const attribution = finding.attribution || null;
   let explanation = t.explanation;
   let tradeoffs = t.tradeoffs ?? null;
@@ -292,6 +294,8 @@ export function toInsight(finding, ctx = {}) {
     explanation += ` ${capitalize(attribution.summary)}.`;
     if (!tradeoffs) tradeoffs = tradeoffFor(finding, attribution);
   }
+  const goalAware = resolveTradeoff(finding, attribution, ctx);
+  if (goalAware) tradeoffs = goalAware;
 
   return {
     id: `insight.${finding.id}`,

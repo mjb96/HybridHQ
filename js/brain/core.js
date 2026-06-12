@@ -14,6 +14,8 @@
 import { runAnalysis } from './analysis.js';
 import { attributeFindings, detectInterference } from './attribution.js';
 import { buildInsights, selectTop } from './insights.js';
+import { strengthLoadSeries, enduranceLoadSeries, recoveryCostBalance } from './load_models.js';
+import { detectPhase } from './weekly_brief.js';
 
 const DEFAULT_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -41,7 +43,31 @@ export function generateInsights(appState, opts = {}) {
   const maxWeek = opts.maxWeek || program?.totalWeeks || 12;
   const topN = opts.topN ?? 5;
 
-  const ctx = { days, program, currentWeek, maxWeek };
+  // Goal context — used by tradeoff resolution to produce goal-specific directives.
+  const goalConfig = appState?.goalData?.goalConfig || {};
+  const strengthSeries  = strengthLoadSeries(appState, days, maxWeek);
+  const enduranceSeries = enduranceLoadSeries(appState, days, maxWeek);
+  const cwIdx   = (parseInt(currentWeek, 10) || 1) - 1;
+  const balance = recoveryCostBalance(appState, days, currentWeek, maxWeek);
+
+  let weeksToGoal = null;
+  if (goalConfig.goalEventDate) {
+    const weekData  = appState?.weeks?.[String(currentWeek)];
+    const weekStart = weekData?.startedAt || appState?.weekStartedAt;
+    if (weekStart) {
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      weeksToGoal = Math.ceil((new Date(goalConfig.goalEventDate) - new Date(weekStart)) / msPerWeek);
+    }
+  }
+
+  const ctx = {
+    days, program, currentWeek, maxWeek,
+    goalConfig,
+    phase:          detectPhase(weeksToGoal),
+    strengthLoad:   strengthSeries[cwIdx]  || 0,
+    enduranceLoad:  enduranceSeries[cwIdx] || 0,
+    acwr:           balance.hasData ? balance.acwr : null,
+  };
 
   // Findings → causal enrichment. Interference is an extra finding; then every
   // finding is passed through attribution to attach evidence-backed "why".
