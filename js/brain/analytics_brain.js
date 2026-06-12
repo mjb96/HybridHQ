@@ -26,6 +26,8 @@ const CONTEXT_SECTION = {
   'health-steps':   'analytics-health-steps',
   'health-sleep':   'analytics-health-sleep',
   'health-rhr':     'analytics-health-rhr',
+  'hybrid-score':   'analytics-hybrid-score',
+  adaptation:       'analytics-adaptation',
 };
 
 const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;

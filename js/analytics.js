@@ -17,6 +17,8 @@ import { renderProgressView, renderStreakView, renderGoalProgressView, renderAct
 import { renderHealthStepsView } from './analytics/views/view-health-steps.js';
 import { renderHealthSleepView } from './analytics/views/view-health-sleep.js';
 import { renderHealthRhrView } from './analytics/views/view-health-rhr.js';
+import { renderHybridScoreView } from './analytics/views/view-hybrid-score.js';
+import { renderAdaptationView } from './analytics/views/view-adaptation.js';
 
 let _getState;
 let _getDays;
@@ -147,6 +149,14 @@ export function renderAnalytics() {
     case 'health-rhr':
       document.getElementById('analytics-health-rhr').classList.add('active');
       renderHealthRhrView(appState, days);
+      break;
+    case 'hybrid-score':
+      document.getElementById('analytics-hybrid-score').classList.add('active');
+      renderHybridScoreView(appState, days);
+      break;
+    case 'adaptation':
+      document.getElementById('analytics-adaptation').classList.add('active');
+      renderAdaptationView(appState, days);
       break;
     case 'coach':
       document.getElementById('analytics-coach').classList.add('active');

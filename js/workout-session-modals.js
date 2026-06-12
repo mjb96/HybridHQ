@@ -71,11 +71,9 @@ export function openFinishSessionModal() {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
   const wk = appState.currentWeek;
-  
-  let vol = 0;
-  let setsDone = 0;
 
-  const dayLifts = appState.weeks[wk].lifts[selectedDay] || {};
+  let vol = 0, setsDone = 0;
+  const dayLifts = appState.weeks[wk]?.lifts?.[selectedDay] || {};
   for (const lift in dayLifts) {
     const arr = dayLifts[lift];
     if (Array.isArray(arr)) {
@@ -88,16 +86,31 @@ export function openFinishSessionModal() {
     }
   }
 
-  const sumModalEl = document.getElementById('finishSessionModal');
-  const sumVolEl = document.getElementById('summaryVolume');
-  const sumSetsEl = document.getElementById('summarySets');
+  const runDist  = parseFloat(appState.weeks[wk]?.runs?.[selectedDay]?.dist) || 0;
+  const runTime  = appState.weeks[wk]?.runs?.[selectedDay]?.time || '';
+  const hasLift  = setsDone > 0;
+  const hasRun   = runDist > 0;
+
+  const sumModalEl  = document.getElementById('finishSessionModal');
+  const sumVolEl    = document.getElementById('summaryVolume');
+  const sumSetsEl   = document.getElementById('summarySets');
+  const sumRunEl    = document.getElementById('summaryRunDist');
   const sumGymRpeEl = document.getElementById('summaryGymRPE');
   const sumRunRpeEl = document.getElementById('summaryRunRPE');
+  const emptyWarnEl = document.getElementById('summaryEmptyWarning');
+  const liftBlockEl = document.getElementById('summaryLiftBlock');
+  const runBlockEl  = document.getElementById('summaryRunBlock');
 
-  if (sumVolEl) sumVolEl.textContent = vol + ' kg';
+  if (sumVolEl) sumVolEl.textContent = Math.round(vol).toLocaleString() + ' kg';
   if (sumSetsEl) sumSetsEl.textContent = setsDone;
-  if (sumGymRpeEl) sumGymRpeEl.value = appState.weeks[wk].gymRpe?.[selectedDay] || '';
-  if (sumRunRpeEl) sumRunRpeEl.value = appState.weeks[wk].runs?.[selectedDay]?.rpe || '';
+  if (sumRunEl)  sumRunEl.textContent  = runDist > 0 ? runDist.toFixed(2) + ' km' + (runTime ? '  ·  ' + runTime : '') : '--';
+  if (sumGymRpeEl) sumGymRpeEl.value = appState.weeks[wk]?.gymRpe?.[selectedDay] || '';
+  if (sumRunRpeEl) sumRunRpeEl.value  = appState.weeks[wk]?.runs?.[selectedDay]?.rpe || '';
+
+  if (liftBlockEl) liftBlockEl.style.display = hasLift ? '' : 'none';
+  if (runBlockEl)  runBlockEl.style.display  = hasRun  ? '' : 'none';
+  if (emptyWarnEl) emptyWarnEl.style.display = (!hasLift && !hasRun) ? '' : 'none';
+
   if (sumModalEl) sumModalEl.classList.add('active');
 }
 
@@ -111,17 +124,17 @@ export function closeFinishSessionModal() {
   const sumRunRpeEl = document.getElementById('summaryRunRPE');
 
   if (sumGymRpeEl) appState.weeks[wk].gymRpe[selectedDay] = sumGymRpeEl.value;
-  if (sumRunRpeEl && appState.weeks[wk].runs[selectedDay]) {
+  if (sumRunRpeEl && appState.weeks[wk].runs?.[selectedDay]) {
     appState.weeks[wk].runs[selectedDay].rpe = sumRunRpeEl.value;
   }
 
   const gymRpeEl = document.getElementById('sessionGymRpeCockpit');
   const runRpeEl = document.getElementById('runInputRpeCockpit');
-  if (gymRpeEl) gymRpeEl.value = appState.weeks[wk].gymRpe[selectedDay] || '';
-  if (runRpeEl) runRpeEl.value = appState.weeks[wk].runs[selectedDay].rpe || '';
+  if (gymRpeEl) gymRpeEl.value = appState.weeks[wk].gymRpe?.[selectedDay] || '';
+  if (runRpeEl) runRpeEl.value = appState.weeks[wk].runs?.[selectedDay]?.rpe || '';
 
   _saveState(true);
-  
+
   const sumModalEl = document.getElementById('finishSessionModal');
   if (sumModalEl) sumModalEl.classList.remove('active');
 

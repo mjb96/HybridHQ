@@ -115,6 +115,8 @@ export const CONTEXT_DOMAINS = Object.freeze({
   'health-steps':  ['adherence', 'fuel'],
   'health-sleep':  ['recovery'],
   'health-rhr':    ['recovery'],
+  'hybrid-score':  ['recovery', 'adherence', 'strength', 'aerobic'],
+  adaptation:      ['recovery', 'strength', 'aerobic'],
 });
 
 // Prioritised insights relevant to a given analytics context (full list, not

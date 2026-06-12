@@ -151,7 +151,7 @@ export function renderRecoveryView(appState, days) {
   renderStackedLoadChart(document.getElementById('loadTrendContainer'), load.lift, load.run);
 }
 
-// ---- Recovery score detail (score breakdown + RPE trend) -------------------
+// ---- Recovery score detail (score breakdown + RPE trend + drivers) ----------
 export function renderRecoveryScoreView(appState, days) {
   const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek    = activeProgram?.totalWeeks || 12;
@@ -176,6 +176,109 @@ export function renderRecoveryScoreView(appState, days) {
 
   const trendEl = document.getElementById('rpeTrendContainerDetail');
   if (trendEl) renderRpeChart(trendEl, weekLabels, rpeData);
+
+  _renderRecoveryDrivers(appState, days, r);
+}
+
+function _driverRow(label, impact, note, positive) {
+  const color = positive ? '#10b981' : '#ef4444';
+  const arrow = positive ? '▲' : '▼';
+  return `<div class="flex-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+    <div>
+      <div class="text-sm font-bold text-inverse">${escapeHtml(label)}</div>
+      <div class="text-xs text-muted">${escapeHtml(note)}</div>
+    </div>
+    <div class="font-heavy" style="color:${color};font-size:0.9rem;white-space:nowrap;margin-left:12px;">${arrow} ${escapeHtml(impact)}</div>
+  </div>`;
+}
+
+function _neutralRow(label, note) {
+  return `<div class="flex-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+    <div>
+      <div class="text-sm font-bold text-inverse">${escapeHtml(label)}</div>
+      <div class="text-xs text-muted">${escapeHtml(note)}</div>
+    </div>
+    <div class="font-heavy text-muted" style="font-size:0.9rem;margin-left:12px;">— neutral</div>
+  </div>`;
+}
+
+function _renderRecoveryDrivers(appState, days, r) {
+  const section = document.getElementById('analytics-recovery-score');
+  if (!section) return;
+
+  let panel = section.querySelector('.recovery-drivers-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'recovery-drivers-panel';
+    section.appendChild(panel);
+  }
+
+  const health    = appState.health;
+  const healthLog = appState.healthLog || [];
+  const rhrBaseline = computeBaseline(healthLog, 'restingHeartRate');
+  const rows = [];
+
+  // Training stress driver
+  if (r.hasData) {
+    const rpeGood = r.avgRpe < 7;
+    rows.push(rpeGood
+      ? _driverRow('Training Stress', '+' + r.fatigueScore + ' pts', `Avg RPE ${r.avgRpe.toFixed(1)} — manageable workload`, true)
+      : _driverRow('Training Stress', '-' + (100 - r.fatigueScore) + ' pts', `Avg RPE ${r.avgRpe.toFixed(1)} — high accumulated fatigue`, false));
+  }
+
+  // Rest days driver
+  if (r.hasData) {
+    const restGood = r.restDays >= 2;
+    rows.push(restGood
+      ? _driverRow('Rest Days', '+' + r.restScore + ' pts', `${r.restDays} rest days this week`, true)
+      : _driverRow('Rest Days', '-' + (100 - r.restScore) + ' pts', `${r.restDays} rest days — less than 2 recommended`, false));
+  }
+
+  // Sleep driver (from Health Connect)
+  if (health?.sleepHours > 0) {
+    const sh = health.sleepHours;
+    const good = sh >= 7;
+    rows.push(good
+      ? _driverRow('Sleep Quality', sh >= 8 ? 'Strong +' : 'Positive', `${sh}h last night — within recovery window`, true)
+      : _driverRow('Sleep Quality', sh < 6 ? 'High risk' : 'Negative', `${sh}h last night — below recovery threshold`, false));
+  } else {
+    rows.push(_neutralRow('Sleep Quality', 'Sync Health Connect to include sleep in drivers'));
+  }
+
+  // RHR driver (from Health Connect)
+  if (health?.restingHeartRate > 0 && rhrBaseline.baseline !== null && rhrBaseline.pctDiff !== null) {
+    const pct = rhrBaseline.pctDiff;
+    rows.push(pct > 8
+      ? _driverRow('Resting HR', `−${Math.min(20, Math.round(pct / 2))} pts`, `${health.restingHeartRate} bpm — ${pct}% above baseline`, false)
+      : _driverRow('Resting HR', 'Neutral +', `${health.restingHeartRate} bpm — near baseline`, true));
+  } else if (health?.restingHeartRate > 0) {
+    rows.push(_neutralRow('Resting HR', 'Building baseline — need 3+ days of data'));
+  } else {
+    rows.push(_neutralRow('Resting HR', 'Sync Health Connect to include RHR in drivers'));
+  }
+
+  // Activity driver
+  if (health?.steps > 0) {
+    const steps = health.steps;
+    const active = steps >= 5000 && steps <= 12000;
+    rows.push(active
+      ? _driverRow('Daily Activity', 'Positive', `${steps.toLocaleString()} steps — active recovery range`, true)
+      : steps > 12000
+      ? _driverRow('Daily Activity', 'Slight −', `${steps.toLocaleString()} steps — high non-training load`, false)
+      : _neutralRow('Daily Activity', `${steps.toLocaleString()} steps — light day`));
+  }
+
+  if (!rows.length) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.innerHTML = `
+    <h2 class="section-header mt-2">Recovery Score Drivers</h2>
+    <article class="card-dark p-3 mb-4">
+      <div class="text-xs text-muted mb-3">Each driver shows its contribution to your recovery score. Address negatives first.</div>
+      ${rows.join('')}
+    </article>`;
 }
 
 // ---- Stress balance detail (lift vs run load share + stacked chart) --------
