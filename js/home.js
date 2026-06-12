@@ -5,7 +5,7 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, computeBig3Maxes, paceSecondsPerKm, formatPace } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
@@ -517,17 +517,39 @@ export function renderHome() {
   if (strengthHero) strengthHero.textContent = formatMinutesToHoursMins(currentWeekGymTimeSum);
   if (runHero) runHero.textContent = currentWeekRunDistSum.toFixed(1) + ' km';
 
-  // TIER 3 — block / phase / week + progress bar.
+  // TIER 3 — Hybrid Focus: block / goal, week-of, progress, milestone.
   const totalWeeks = activeProgram?.totalWeeks || 12;
   const wkNum = parseInt(wk, 10) || 1;
   const phase = WEEK_PHASE_NAMES[wk] || activeProgram?.dossier?.focus || 'Training block';
-  const progPct = Math.min(100, Math.round((wkNum / totalWeeks) * 100));
   const setTxt = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   const setW = (id, p) => { const el = document.getElementById(id); if (el) el.style.width = p + '%'; };
-  setTxt('focusStrengthSub', `${phase} · Week ${wkNum}/${totalWeeks}`);
-  setW('focusStrengthBar', progPct);
-  setTxt('focusRunSub', `${currentWeekRunDistSum.toFixed(1)} km this week · Week ${wkNum}/${totalWeeks}`);
-  setW('focusRunBar', progPct);
+  const setHTML = (id, h) => { const el = document.getElementById(id); if (el) el.innerHTML = h; };
+
+  // Strength track — program block + position + top lift.
+  setTxt('focusStrengthBlock', phase);
+  setTxt('focusStrengthSub', `Week ${wkNum} of ${totalWeeks} · ${formatMinutesToHoursMins(currentWeekGymTimeSum)} trained`);
+  setW('focusStrengthBar', Math.min(100, Math.round((wkNum / totalWeeks) * 100)));
+  const b3 = computeBig3Maxes(appState);
+  const top = [['Squat', b3.squat], ['Bench', b3.bench], ['Deadlift', b3.deadlift]].sort((a, b) => b[1] - a[1])[0];
+  setHTML('focusStrengthMilestone', top && top[1] > 0
+    ? `<span>Top lift</span><b>${top[0]} ${Math.round(top[1])} kg</b>`
+    : `<span>Top lift</span><b>Log to set</b>`);
+
+  // Running track — weekly mileage vs an auto target + avg pace.
+  let maxWeekKm = 0;
+  Object.keys(appState.weeks || {}).forEach(k => {
+    let km = 0; DEFAULT_DAYS.forEach(d => { km += parseFloat(appState.weeks[k]?.runs?.[d]?.dist) || 0; });
+    if (km > maxWeekKm) maxWeekKm = km;
+  });
+  const target = Math.max(20, Math.ceil(Math.max(currentWeekRunDistSum, maxWeekKm) / 5) * 5);
+  const runPct = Math.min(100, Math.round((currentWeekRunDistSum / target) * 100));
+  let tTime = 0, tDist = 0;
+  DEFAULT_DAYS.forEach(d => { const r = weekData.runs?.[d]; if (!r) return; const dd = parseFloat(r.dist) || 0; const p = paceSecondsPerKm(dd, r.time || ''); if (dd > 0 && p > 0) { tTime += p * dd; tDist += dd; } });
+  const avgPace = tDist > 0 ? formatPace(tTime / tDist) : '—';
+  setTxt('focusRunBlock', 'Weekly mileage');
+  setTxt('focusRunSub', `${currentWeekRunDistSum.toFixed(1)} / ${target} km · ${runPct}%`);
+  setW('focusRunBar', runPct);
+  setHTML('focusRunMilestone', `<span>Avg pace</span><b>${avgPace}</b>`);
 
   if (strengthChartContainer && runChartContainer) {
     const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
