@@ -30,13 +30,16 @@
   .section-title{font-size:var(--text-lg);font-weight:800;letter-spacing:0.02em;margin:6px 0 10px;}
 
   /* TIER 1 telemetry */
-  .telemetry-strip{display:flex;gap:var(--space-2);overflow-x:auto;padding:2px 0 var(--space-2);margin-bottom:var(--space-4);scrollbar-width:none;}
+  .telemetry-strip{display:flex;align-items:stretch;background:var(--bg-card);border:1px solid var(--glass-border);
+    border-radius:var(--radius-lg);padding:10px 0;margin-bottom:var(--space-4);overflow-x:auto;scrollbar-width:none;
+    box-shadow:0 6px 18px rgba(0,0,0,0.30);}
   .telemetry-strip::-webkit-scrollbar{display:none;}
-  .telemetry-chip{flex:0 0 auto;min-width:74px;padding:var(--space-2) var(--space-3);background:var(--bg-input);
-                  border:1px solid var(--glass-border);border-radius:var(--radius-md);display:flex;flex-direction:column;gap:3px;}
-  .telemetry-chip-label{font-size:var(--text-xxs);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);white-space:nowrap;}
-  .telemetry-chip-value{font-size:var(--text-xl);font-weight:800;line-height:1;white-space:nowrap;}
-  .telemetry-chip-value small{font-size:var(--text-xxs);color:var(--text-secondary);font-weight:600;}
+  .telemetry-item{flex:1 0 auto;min-width:58px;padding:0 13px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;text-align:center;border-right:1px solid var(--glass-border);}
+  .telemetry-item:last-child{border-right:none;}
+  .telemetry-value{font-size:var(--text-base);font-weight:800;line-height:1;white-space:nowrap;}
+  .telemetry-value small{font-size:0.5rem;color:var(--text-secondary);font-weight:600;}
+  .telemetry-label{font-size:0.5rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-secondary);white-space:nowrap;}
 
   /* TIER 2 briefing */
   .brain-briefing{padding:var(--space-4);margin-bottom:var(--space-5);
@@ -73,12 +76,12 @@
 
   <!-- TIER 1 · Telemetry strip -->
   <div class="telemetry-strip">
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Recovery</span><span class="telemetry-chip-value">92%</span></div>
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Readiness</span><span class="telemetry-chip-value">88</span></div>
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Streak</span><span class="telemetry-chip-value">12d</span></div>
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Base</span><span class="telemetry-chip-value">1,820 <small>kcal</small></span></div>
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Active</span><span class="telemetry-chip-value">850 <small>kcal</small></span></div>
-    <div class="telemetry-chip"><span class="telemetry-chip-label">Burned</span><span class="telemetry-chip-value">2,670 <small>kcal</small></span></div>
+    <div class="telemetry-item"><span class="telemetry-value">92%</span><span class="telemetry-label">Recovery</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">88</span><span class="telemetry-label">Readiness</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">12d</span><span class="telemetry-label">Streak</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">1,820 <small>kcal</small></span><span class="telemetry-label">Base</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">850 <small>kcal</small></span><span class="telemetry-label">Active</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">2,670 <small>kcal</small></span><span class="telemetry-label">Burned</span></div>
   </div>
 
   <!-- TIER 2 · Coach's Briefing hero -->

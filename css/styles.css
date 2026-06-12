@@ -1705,45 +1705,51 @@ td {
    ========================================================================== */
 
 /* Tier 1 · Telemetry strip — Apple-Watch-style complications */
+/* One cohesive strip with divider segments (watch-complication style) */
 .telemetry-strip {
   display: flex;
-  gap: var(--space-2);
-  overflow-x: auto;
-  padding: 2px 0 var(--space-2);
+  align-items: stretch;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 10px 0;
   margin-bottom: var(--space-4);
+  overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.30);
 }
 .telemetry-strip::-webkit-scrollbar { display: none; }
-.telemetry-chip {
-  flex: 0 0 auto;
-  min-width: 74px;
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-input);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+.telemetry-item {
+  flex: 1 0 auto;
+  min-width: 58px;
+  padding: 0 13px;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 3px;
-  transition: border-color var(--duration-base) ease, transform var(--duration-base) ease;
+  text-align: center;
+  border-right: 1px solid var(--glass-border);
 }
-.telemetry-chip[data-action] { cursor: pointer; }
-.telemetry-chip[data-action]:active { transform: scale(0.96); border-color: rgba(99,102,241,0.35); }
-.telemetry-chip-label {
-  font-size: var(--text-xxs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.telemetry-chip-value {
-  font-size: var(--text-xl);
+.telemetry-item:last-child { border-right: none; }
+.telemetry-item[data-action] { cursor: pointer; }
+.telemetry-item[data-action]:active { opacity: 0.6; }
+.telemetry-value {
+  font-size: var(--text-base);
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1;
   white-space: nowrap;
 }
-.telemetry-chip-value small { font-size: var(--text-xxs); color: var(--text-secondary); font-weight: 600; }
+.telemetry-value small { font-size: 0.5rem; color: var(--text-secondary); font-weight: 600; }
+.telemetry-label {
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
 
 /* Tier 2 · Coach's Briefing hero */
 .brain-briefing {

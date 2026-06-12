@@ -805,21 +805,20 @@ function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readi
   const todayDone = todaySets > 0 || (parseFloat(weekData.runs?.[selectedDay]?.dist) || 0) > 0;
   const streak = computeStreakView(appState.streakData);
 
+  void todayDone; // session status lives in the briefing/Today summary, not the strip
   const A = (s) => s; // readability for the raw data-action strings
-  const items = [
-    { label: 'Today',  value: todayDone ? '✓ Done' : 'Open', action: A('data-action="open-today-summary"') },
-    { label: 'Streak', value: `${streak.current || 0}d`,      action: A('data-action="open-analytics" data-context="streak"') },
-    { label: 'Volume', value: Math.round(vol).toLocaleString(), unit: 'kg', action: A('data-action="open-analytics" data-context="weekly-volume"') },
-    { label: 'Run',    value: `${Math.round(runKm * 10) / 10}`, unit: 'km', action: A('data-action="open-analytics" data-context="running"') },
-  ];
-  if (readiness?.hasData) items.push({ label: 'Readiness', value: `${readiness.score}`, action: A('data-action="open-analytics" data-context="recovery"') });
+  const items = [];
   if (recovery?.hasData)  items.push({ label: 'Recovery',  value: `${recovery.score}%`, action: A('data-action="open-analytics" data-context="recovery-score"') });
+  if (readiness?.hasData) items.push({ label: 'Readiness', value: `${readiness.score}`,  action: A('data-action="open-analytics" data-context="recovery"') });
+  items.push({ label: 'Streak', value: `${streak.current || 0}d`, action: A('data-action="open-analytics" data-context="streak"') });
 
   if (energy.hasProfile) {
     items.push({ label: 'Base',   value: energy.bmr.toLocaleString(),   unit: 'kcal' });
     items.push({ label: 'Active', value: energy.active.toLocaleString(), unit: 'kcal', action: A('data-action="open-analytics" data-context="active-fuel"') });
     items.push({ label: 'Burned', value: energy.total.toLocaleString(),  unit: 'kcal', action: A('data-action="open-analytics" data-context="active-fuel"') });
   } else {
+    items.push({ label: 'Volume', value: Math.round(vol).toLocaleString(), unit: 'kg', action: A('data-action="open-analytics" data-context="weekly-volume"') });
+    items.push({ label: 'Run',    value: `${Math.round(runKm * 10) / 10}`, unit: 'km', action: A('data-action="open-analytics" data-context="running"') });
     items.push({ label: 'Energy', value: 'Set up', action: A('data-action="open-profile"') });
   }
   return items;
@@ -829,9 +828,9 @@ function renderTelemetryStrip(items) {
   const el = document.getElementById('telemetryStrip');
   if (!el) return;
   el.innerHTML = (items || []).map(it => `
-    <div class="telemetry-chip" ${it.action || ''}>
-      <span class="telemetry-chip-label">${escapeHtml(it.label)}</span>
-      <span class="telemetry-chip-value">${escapeHtml(it.value)}${it.unit ? ` <small>${escapeHtml(it.unit)}</small>` : ''}</span>
+    <div class="telemetry-item" ${it.action || ''}>
+      <span class="telemetry-value">${escapeHtml(it.value)}${it.unit ? ` <small>${escapeHtml(it.unit)}</small>` : ''}</span>
+      <span class="telemetry-label">${escapeHtml(it.label)}</span>
     </div>`).join('');
 }
 
