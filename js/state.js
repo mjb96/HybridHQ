@@ -2,6 +2,7 @@
 // CLOUD-CONNECTED STATE MANAGER (state.js)
 // ==========================================
 import { PROGRAMS } from './constants.js';
+import { getLocalDateKey } from './util.js';
 import { prescribeSetsForLift, isCompletedSet } from './engine.js';
 import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2, migrateProgramToV2 } from './schema.js';
 import { estimateWeekStart } from './dates.js';
@@ -557,7 +558,7 @@ export function saveNewCustomExerciseToLibrary(exerciseName) {
 }
 
 export function logActivityForStreak() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
   if (!appState.streakData) appState.streakData = { current: 0, longest: 0, lastActivityDate: null };
   const lastDate = appState.streakData.lastActivityDate;
   

@@ -8,6 +8,8 @@
 // All functions are pure (no DOM, no state mutations). Safe under `node --test`.
 // ==========================================
 
+import { getLocalDateKey } from '../util.js';
+
 // ── Log utilities ─────────────────────────────────────────────────────────────
 
 /**
@@ -19,7 +21,7 @@
  */
 export function getLastNDays(healthLog, n = 30) {
   if (!Array.isArray(healthLog)) return [];
-  const cutoff = new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff = getLocalDateKey(new Date(Date.now() - n * 24 * 60 * 60 * 1000));
   return [...healthLog]
     .filter(e => e?.date >= cutoff)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -47,13 +49,13 @@ export function buildDateMap(healthLog) {
  * @returns {{ baseline: number|null, current: number, pctDiff: number|null, trend: string }}
  */
 export function computeBaseline(healthLog, field, referenceDays = 30) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
   const sorted = [...(healthLog || [])].sort((a, b) => a.date.localeCompare(b.date));
 
   const todayEntry = sorted.find(e => e.date === today) || sorted[sorted.length - 1];
   const current = parseFloat(todayEntry?.[field]) || 0;
 
-  const cutoff = new Date(Date.now() - referenceDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff = getLocalDateKey(new Date(Date.now() - referenceDays * 24 * 60 * 60 * 1000));
   const historical = sorted.filter(e => e.date >= cutoff && e.date < today && parseFloat(e[field]) > 0);
 
   if (historical.length < 3) return { baseline: null, current, pctDiff: null, trend: 'insufficient' };
@@ -247,8 +249,8 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  * @returns {{ today: number, yesterday: number, delta: number, pctDelta: number|null, direction: 'up'|'down'|'flat', hasToday: boolean, hasYesterday: boolean }}
  */
 export function dayOverDay(healthLog, field) {
-  const today     = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today     = getLocalDateKey();
+  const yesterday = getLocalDateKey(new Date(Date.now() - 86400000));
   const map = buildDateMap(healthLog);
   const t = parseFloat(map.get(today)?.[field]) || 0;
   const y = parseFloat(map.get(yesterday)?.[field]) || 0;
@@ -269,13 +271,13 @@ export function dayOverDay(healthLog, field) {
  */
 export function lastNDaysSeries(healthLog, field, n = 7) {
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = getLocalDateKey(today);
   const map = buildDateMap(healthLog);
   const labels = [], values = [], dates = [];
   let todayIndex = -1;
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(today.getTime() - i * 86400000);
-    const ds = d.toISOString().slice(0, 10);
+    const ds = getLocalDateKey(d);
     labels.push(DOW[d.getDay()]);
     values.push(parseFloat(map.get(ds)?.[field]) || 0);
     dates.push(ds);
@@ -302,7 +304,7 @@ export function lastNWeeksSeries(healthLog, field, weeks = 4, agg = 'avg') {
     let sum = 0, count = 0;
     for (let d = 0; d < 7; d++) {
       const offset = w * 7 + d;
-      const ds = new Date(now - offset * 86400000).toISOString().slice(0, 10);
+      const ds = getLocalDateKey(new Date(now - offset * 86400000));
       const v = parseFloat(map.get(ds)?.[field]) || 0;
       if (v > 0) { sum += v; count++; }
     }

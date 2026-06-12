@@ -10,7 +10,7 @@ import {
   buildTrendBrief, generateHealthCoachNote,
 } from '../../health/healthBaselines.js';
 import { renderHistoryBars, renderTrendLineWithBaseline, renderSleepStagesChart } from '../charts.js';
-import { escapeHtml } from '../../util.js';
+import { escapeHtml, getLocalDateKey } from '../../util.js';
 import { emptyState, dayOverDayChip, extremesRow, supportingAverages } from './_healthTrend.js';
 
 function sleepQualityColor(hours) {
@@ -68,7 +68,7 @@ export function renderHealthSleepView(appState) {
   const avg30  = last30.length ? (last30.reduce((s, e) => s + e.sleepHours, 0) / last30.length).toFixed(1) : '--';
 
   // Stages: today's entry
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
   const todayLog = (healthLog || []).find(e => e.date === today);
   const deepH  = todayLog?.sleepDeepHours  ?? null;
   const remH   = todayLog?.sleepRemHours   ?? null;

@@ -10,7 +10,7 @@ import {
   buildTrendBrief, generateHealthCoachNote,
 } from '../../health/healthBaselines.js';
 import { renderHistoryBars, renderTrendLineWithBaseline } from '../charts.js';
-import { escapeHtml } from '../../util.js';
+import { escapeHtml, getLocalDateKey } from '../../util.js';
 import {
   emptyState, dayOverDayChip, extremesRow, supportingAverages,
 } from './_healthTrend.js';
@@ -39,7 +39,7 @@ export function renderHealthStepsView(appState) {
   });
 
   // Today can come from the live snapshot even before it lands in the log.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
   const todaySteps = health?.steps || brief.dod.today || 0;
   if (todaySteps > 0 && brief.daily.todayIndex >= 0) {
     brief.daily.values[brief.daily.todayIndex] = todaySteps;

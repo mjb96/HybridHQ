@@ -6,6 +6,7 @@
 // in js/analytics/views/. All data aggregation lives in js/metrics/.
 // ==========================================
 import { getProgramById, saveStateToLocalStorage } from './state.js';
+import { getLocalDateKey } from './util.js';
 import { generateInsights } from './brain/core.js';
 import { renderContextBanner } from './brain/analytics_brain.js';
 import { renderCoachDetail } from './brain/brain_dashboard.js';
@@ -53,7 +54,7 @@ export function logBodyWeight() {
 
   if (!appState.bodyWeightLog) appState.bodyWeightLog = [];
 
-  const today       = new Date().toISOString().slice(0, 10);
+  const today       = getLocalDateKey();
   const existingIdx = appState.bodyWeightLog.findIndex(l => l.date === today);
   if (existingIdx >= 0) {
     appState.bodyWeightLog[existingIdx].weight = weight;
