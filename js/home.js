@@ -327,47 +327,6 @@ function renderSupportCards(appState, defaultDays, activeProgram) {
     }
   } catch {}
 
-  // Stress Balance (lift/run TSS ratio)
-  try {
-    const wk = appState.currentWeek || '1';
-    const weekData = appState.weeks?.[wk];
-    let gymTSS = 0, runTSS = 0;
-    if (weekData) {
-      defaultDays.forEach(d => {
-        let sets = 0;
-        const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-        for (const lift in (weekData.lifts?.[d] || {})) {
-          if (Array.isArray(weekData.lifts[d][lift])) sets += weekData.lifts[d][lift].filter(s => isCompletedSet(s)).length;
-        }
-        gymTSS += sets * (gRpe > 0 ? gRpe : 6);
-        const rDist = parseFloat(weekData.runs?.[d]?.dist) || 0;
-        const rRpe  = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-        runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
-      });
-    }
-    if (gymTSS > 0 || runTSS > 0) {
-      const total   = gymTSS + runTSS;
-      const liftPct = Math.round((gymTSS / total) * 100);
-      const runPct  = 100 - liftPct;
-      const advice  = liftPct >= 70 ? 'Heavy lifting bias this week'
-                    : runPct  >= 70 ? 'High running load this week'
-                    : 'Balanced hybrid week';
-      cards.push(`
-        <article class="card-dark p-3 mb-2" style="cursor:pointer;" data-action="open-analytics" data-context="stress-balance">
-          <div class="flex-between mb-2">
-            <div class="text-xs text-muted font-bold uppercase tracking-wider">Stress Balance</div>
-            <div class="text-xs font-bold text-inverse">${liftPct}% lift · ${runPct}% run</div>
-          </div>
-          <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.08);display:flex;overflow:hidden;">
-            <div style="width:${liftPct}%;background:#3b82f6;transition:width 0.4s;"></div>
-            <div style="width:${runPct}%;background:#ec4899;transition:width 0.4s;"></div>
-          </div>
-          <div class="text-xs text-muted mt-2">${advice}</div>
-        </article>
-      `);
-    }
-  } catch {}
-
   // Block Progress
   try {
     const wk        = parseInt(appState.currentWeek, 10) || 1;

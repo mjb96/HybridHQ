@@ -1,7 +1,7 @@
 // ==========================================
 // ANALYTICS VIEW — RECOVERY (view-recovery.js)
 // ------------------------------------------
-// Renders the 'recovery', 'recovery-score', and 'stress-balance' contexts.
+// Renders the 'recovery' and 'recovery-score' contexts.
 // ==========================================
 import { computeRecoveryScore, computeWeeklyLoadSeries, computeReadiness } from '../../engine.js';
 import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
@@ -281,20 +281,3 @@ function _renderRecoveryDrivers(appState, days, r) {
     </article>`;
 }
 
-// ---- Stress balance detail (lift vs run load share + stacked chart) --------
-export function renderStressBalanceView(appState, days) {
-  const activeProgram = getProgramById(appState.activeProgramId);
-  const maxWeek = activeProgram?.totalWeeks || 12;
-  const { lift, run } = computeWeeklyLoadSeries(appState, days, maxWeek);
-
-  const liftTotal = lift.reduce((a, b) => a + b, 0);
-  const runTotal  = run.reduce((a, b) => a + b, 0);
-  const grand     = liftTotal + runTotal;
-  const liftPct   = grand > 0 ? Math.round((liftTotal / grand) * 100) : 0;
-
-  setText('stressLiftShare', `${liftPct}%`);
-  setText('stressRunShare',  `${grand > 0 ? 100 - liftPct : 0}%`);
-
-  const chartEl = document.getElementById('stressChartContainer');
-  if (chartEl) renderStackedLoadChart(chartEl, lift, run);
-}

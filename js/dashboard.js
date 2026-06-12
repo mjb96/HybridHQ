@@ -308,54 +308,6 @@ export const TILE_REGISTRY = [
     },
   },
 
-  // ---- STRESS BALANCE ----------------------------------------
-  {
-    id:        'stress-balance',
-    type:      DashboardTileType.RATIO_BAR,
-    icon:      '⚖️',
-    label:     'Stress Balance',
-    accentVar: '--color-amber',
-    navTarget: 'stress-balance',
-    order:     7,
-    renderData(appState, defaultDays) {
-      try {
-        const wk = appState.currentWeek || '1';
-        const weekData = appState.weeks?.[wk];
-        let gymTSS = 0, runTSS = 0;
-        if (weekData) {
-          defaultDays.forEach(d => {
-            let completedSets = 0;
-            const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-            const dayLifts = weekData.lifts?.[d] || {};
-            for (const lift in dayLifts) {
-              if (Array.isArray(dayLifts[lift])) {
-                completedSets += dayLifts[lift].filter(s => isCompletedSet(s)).length;
-              }
-            }
-            gymTSS += completedSets * (gRpe > 0 ? gRpe : 6);
-
-            const rDist = parseFloat(weekData.runs?.[d]?.dist) || 0;
-            const rRpe  = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-            runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
-          });
-        }
-
-        if (gymTSS === 0 && runTSS === 0) {
-          return { label: 'No data logged', advice: 'Log workouts to see your bias.', liftPct: 50, runPct: 50, state: 'empty' };
-        }
-        const total = gymTSS + runTSS;
-        const liftPct = Math.round((gymTSS / total) * 100);
-        const runPct  = 100 - liftPct;
-        let advice = '🏆 Perfect balance.';
-        if (liftPct >= 70) advice = '⚠️ Heavy lifting bias.';
-        else if (runPct >= 70) advice = '⚠️ High running stress.';
-        return { label: `${liftPct}% / ${runPct}%`, advice, liftPct, runPct, state: 'loaded' };
-      } catch {
-        return { label: '0% / 0%', advice: 'Unavailable', liftPct: 50, runPct: 50, state: 'error' };
-      }
-    },
-  },
-
   // ---- RECOVERY SCORE (NEW) ----------------------------------
   {
     id:        'recovery-score',
@@ -541,67 +493,6 @@ export const TILE_REGISTRY = [
         else if (bpm > 68) { tag = 'Moderate'; tagColor = 'var(--color-amber)'; }
         const sub = h.restingHeartRate ? 'resting bpm' : 'avg bpm';
         return { hero: `${bpm}`, sub, tag, tagColor, state: 'loaded' };
-      } catch {
-        return { hero: '--', sub: 'Unavailable', state: 'error' };
-      }
-    },
-  },
-
-  // ---- HYBRID SCORE ----------------------------------------
-  {
-    id:        'hybrid-score',
-    type:      DashboardTileType.METRIC,
-    icon:      '🔷',
-    label:     'Hybrid Score',
-    accentVar: '--color-purple',
-    navTarget: 'hybrid-score',
-    order:     15,
-    renderData(appState, defaultDays) {
-      try {
-        const { computeHybridScore } = (typeof window !== 'undefined' && window.__hybridScore)
-          ? window.__hybridScore : { computeHybridScore: null };
-        // Import is handled separately; use appState.health as a proxy
-        const h = appState.health;
-        if (!h) return { hero: '--', sub: 'Sync health + log sessions', tag: 'No data', tagColor: 'var(--text-muted)', state: 'empty' };
-        // Lightweight tile-level approximation (sleep + RHR only)
-        const sleep = h.sleepHours || 0;
-        const rhr   = h.restingHeartRate || 0;
-        const sleepScore = sleep >= 8 ? 100 : sleep >= 7 ? 80 : sleep >= 6 ? 55 : Math.max(0, sleep * 8);
-        const rhrScore   = rhr ? (rhr < 55 ? 100 : rhr < 65 ? 80 : rhr < 75 ? 55 : 30) : null;
-        const approx = rhrScore !== null
-          ? Math.round((sleepScore + rhrScore) / 2)
-          : Math.round(sleepScore);
-        const color = approx >= 75 ? 'var(--color-green)' : approx >= 50 ? 'var(--color-amber)' : 'var(--color-red)';
-        const label = approx >= 75 ? 'Optimal' : approx >= 50 ? 'Building' : 'Fatigued';
-        return { hero: String(approx), sub: 'health component', tag: label, tagColor: color, state: 'loaded' };
-      } catch {
-        return { hero: '--', sub: 'Unavailable', state: 'error' };
-      }
-    },
-  },
-
-  // ---- ADAPTATION ------------------------------------------
-  {
-    id:        'adaptation',
-    type:      DashboardTileType.METRIC,
-    icon:      '🔀',
-    label:     'Adaptation',
-    accentVar: '--color-blue',
-    navTarget: 'adaptation',
-    order:     16,
-    renderData(appState) {
-      try {
-        const healthLog = appState.healthLog || [];
-        const last7sleep = healthLog.filter(e => {
-          const d = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-          return e.date >= d && e.sleepHours > 0;
-        });
-        const avgSleep = last7sleep.length
-          ? (last7sleep.reduce((s, e) => s + e.sleepHours, 0) / last7sleep.length).toFixed(1)
-          : null;
-        if (!avgSleep) return { hero: '--', sub: 'Sync health data', tag: 'No data', tagColor: 'var(--text-muted)', state: 'empty' };
-        const color = avgSleep >= 7.5 ? 'var(--color-green)' : avgSleep >= 6.5 ? 'var(--color-amber)' : 'var(--color-red)';
-        return { hero: avgSleep + 'h', sub: '7-day sleep avg', tag: 'Tap for analysis', tagColor: color, state: 'loaded' };
       } catch {
         return { hero: '--', sub: 'Unavailable', state: 'error' };
       }
