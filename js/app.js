@@ -709,9 +709,11 @@ async function bootstrapApp() {
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
-      console.warn('Service worker registration failed:', err);
-    });
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => reg.update())  // always check for a fresh SW on every load
+      .catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
   }
 }
 
