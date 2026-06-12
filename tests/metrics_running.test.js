@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   weeklyDistanceSeries,
+  weeklyElevationSeries,
   weeklyPaceSeries,
   weeklyHrSeries,
   weeklyHrZonesSeries,
@@ -53,6 +54,23 @@ test('weeklyDistanceSeries returns 0 for empty weeks', () => {
 
 test('weeklyDistanceSeries handles empty state', () => {
   assert.deepEqual(weeklyDistanceSeries({ weeks: {} }, DAYS, 2), [0, 0]);
+});
+
+// ---- weeklyElevationSeries ---------------------------------------------
+test('weeklyElevationSeries sums ascent per week', () => {
+  const state = {
+    weeks: {
+      '1': { runs: { wed: { dist: '5', elev: '120' }, sat: { dist: '10', elev: '250' } } },
+      '2': { runs: { wed: { dist: '6', elev: '90'  } } },
+    },
+  };
+  const result = weeklyElevationSeries(state, DAYS, 2);
+  assert.equal(result[0], 370); // 120 + 250
+  assert.equal(result[1], 90);
+});
+
+test('weeklyElevationSeries returns 0 for weeks with no elevation data', () => {
+  assert.deepEqual(weeklyElevationSeries({ weeks: {} }, DAYS, 2), [0, 0]);
 });
 
 // ---- weeklyPaceSeries --------------------------------------------------

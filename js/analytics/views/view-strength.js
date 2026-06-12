@@ -1,45 +1,63 @@
 // ==========================================
 // ANALYTICS VIEW — STRENGTH (view-strength.js)
-// ------------------------------------------
-// Renders the 'strength', 'strength_pr', and 'weekly-volume' analytics
-// contexts. Pure DOM writers: all state is resolved by the caller and passed
-// as arguments, so these functions have no module-level closures.
 // ==========================================
 import { computeBig3Progression, isCompletedSet } from '../../engine.js';
+import { getProgramById } from '../../state.js';
+import { allLiftsStats, weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
+import { weeklyDistanceSeries } from '../../metrics/metrics-running.js';
 import { setText } from '../utils.js';
 import { renderVolumeChart, renderBig3ProgressionChart } from '../charts.js';
 
 // ---- Strength overview (totals + volume chart + 1RM list) -----------------
-export function renderStrengthView(data, appState, days) {
-  setText('allTimeTotalVol', Math.round(data.globalTotalVol).toLocaleString() + ' kg');
-  setText('allTimeTotalSets', data.globalTotalSets.toLocaleString());
-  setText('analyticsPeakVol', data.absoluteMesoPeakVol.toLocaleString() + ' kg peak');
+export function renderStrengthView(appState, days) {
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const maxWeek  = activeProgram?.totalWeeks || 12;
+  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const volData  = weeklyTonnageSeries(appState, days, maxWeek);
+  const runData  = weeklyDistanceSeries(appState, days, maxWeek);
 
-  const gymHrEl  = document.getElementById('allTimeGymHr');
+  const totalVol   = volData.reduce((a, b) => a + b, 0);
+  const peakVol    = Math.max(...volData, 0);
+  const gymStats   = _computeGymAllTimeStats(appState, days);
+
+  setText('allTimeTotalVol',  Math.round(totalVol).toLocaleString() + ' kg');
+  setText('allTimeTotalSets', gymStats.totalSets.toLocaleString());
+  setText('analyticsPeakVol', peakVol.toLocaleString() + ' kg peak');
+
+  const gymHrEl   = document.getElementById('allTimeGymHr');
   const gymCalsEl = document.getElementById('allTimeGymCals');
-  if (gymHrEl)  gymHrEl.textContent  = data.globalAvgGymHr > 0 ? Math.round(data.globalAvgGymHr) + ' bpm' : '-- bpm';
-  if (gymCalsEl) gymCalsEl.textContent = Math.round(data.globalTotalGymCals).toLocaleString();
+  if (gymHrEl)   gymHrEl.textContent   = gymStats.avgGymHr > 0 ? Math.round(gymStats.avgGymHr) + ' bpm' : '-- bpm';
+  if (gymCalsEl) gymCalsEl.textContent = Math.round(gymStats.totalGymCals).toLocaleString();
 
-  renderVolumeChart(document.getElementById('volumeChartContainer'), data.weekLabels, data.volData, data.runData);
+  renderVolumeChart(document.getElementById('volumeChartContainer'), weekLabels, volData, runData);
 
   const rmContainer = document.getElementById('allLiftsRmContainer');
-  if (rmContainer) _render1RMList(rmContainer, data.dynamicStats);
+  if (rmContainer) _render1RMList(rmContainer, allLiftsStats(appState, days));
 }
 
 // ---- Strength PR detail (1RM list + big-3 progression chart) ---------------
-export function renderStrengthPrView(data, appState) {
+export function renderStrengthPrView(appState, days) {
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const maxWeek    = activeProgram?.totalWeeks || 12;
+  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+
   const prContainer = document.getElementById('allLiftsRmContainer_PR');
-  if (prContainer) _render1RMList(prContainer, data.dynamicStats);
+  if (prContainer) _render1RMList(prContainer, allLiftsStats(appState, days));
 
   const big3El = document.getElementById('big3ProgressionContainer');
-  if (big3El) renderBig3ProgressionChart(big3El, computeBig3Progression(appState), data.weekLabels);
+  if (big3El) renderBig3ProgressionChart(big3El, computeBig3Progression(appState), weekLabels);
 }
 
 // ---- Weekly volume detail (current-week breakdown + volume chart) ----------
-export function renderWeeklyVolumeView(data, appState, days) {
-  const wk      = appState.currentWeek || '1';
-  const weekData = appState.weeks?.[wk];
+export function renderWeeklyVolumeView(appState, days) {
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const maxWeek    = activeProgram?.totalWeeks || 12;
+  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const volData    = weeklyTonnageSeries(appState, days, maxWeek);
+  const runData    = weeklyDistanceSeries(appState, days, maxWeek);
 
+  const wk       = appState.currentWeek || '1';
+  const weekData  = appState.weeks?.[wk];
   let totalSets = 0, totalReps = 0, totalVol = 0;
   if (weekData) {
     days.forEach(d => {
@@ -70,12 +88,32 @@ export function renderWeeklyVolumeView(data, appState, days) {
     : `${Math.round(totalVol).toLocaleString()} kg`;
 
   const chartEl = document.getElementById('weekVolChartContainer');
-  if (chartEl) renderVolumeChart(chartEl, data.weekLabels || [], data.volData || [], data.runData || []);
+  if (chartEl) renderVolumeChart(chartEl, weekLabels, volData, runData);
+}
+
+// ---- Private: gym all-time totals (sets, avg HR, cals) --------------------
+function _computeGymAllTimeStats(appState, days) {
+  let totalSets = 0, gymHrSum = 0, gymHrCount = 0, gymCals = 0;
+  Object.values(appState.weeks || {}).forEach(wkData => {
+    if (!wkData) return;
+    days.forEach(d => {
+      const gym = wkData.gymStats?.[d] || {};
+      if (gym.avgHR) { gymHrSum += parseFloat(gym.avgHR); gymHrCount++; }
+      if (gym.cals)  gymCals += parseFloat(gym.cals);
+      const dayLifts = wkData.lifts?.[d] || {};
+      for (const lift in dayLifts) {
+        if (Array.isArray(dayLifts[lift])) {
+          dayLifts[lift].forEach(s => { if (isCompletedSet(s)) totalSets++; });
+        }
+      }
+    });
+  });
+  return { totalSets, avgGymHr: gymHrCount ? gymHrSum / gymHrCount : 0, totalGymCals: gymCals };
 }
 
 // ---- Private: 1RM list with PR badges and week-over-week deltas ------------
-function _render1RMList(container, dynamicStats) {
-  const entries = Object.entries(dynamicStats)
+function _render1RMList(container, liftStats) {
+  const entries = Object.entries(liftStats)
     .filter(([, v]) => v.allTimeMax > 0)
     .sort(([, a], [, b]) => b.allTimeMax - a.allTimeMax);
 
@@ -85,16 +123,16 @@ function _render1RMList(container, dynamicStats) {
   }
 
   const prCount = entries.filter(([, v]) => {
-    const cur = v.currentEstimatedMax || 0;
+    const cur = v.currentWeekMax || 0;
     return cur > 0 && Math.abs(cur - v.allTimeMax) < 0.5;
   }).length;
 
   const maxAllTime = entries[0][1].allTimeMax;
-  const rows = entries.map(([name, statData]) => {
-    const pct  = Math.min(100, Math.max(5, Math.round((statData.allTimeMax / maxAllTime) * 100)));
-    const cur  = statData.currentEstimatedMax || 0;
-    const prev = statData.previousWeekMax || 0;
-    const isCurrentWeekPR = cur > 0 && Math.abs(cur - statData.allTimeMax) < 0.5;
+  const rows = entries.map(([name, s]) => {
+    const pct  = Math.min(100, Math.max(5, Math.round((s.allTimeMax / maxAllTime) * 100)));
+    const cur  = s.currentWeekMax || 0;
+    const prev = s.prevWeekMax || 0;
+    const isCurrentWeekPR = cur > 0 && Math.abs(cur - s.allTimeMax) < 0.5;
 
     const badge = isCurrentWeekPR
       ? `<span style="font-size:0.7rem;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:2px 6px;margin-left:6px;">PR</span>`
@@ -113,7 +151,7 @@ function _render1RMList(container, dynamicStats) {
     return `<div class="mb-4">
       <div class="flex-between font-bold mb-1">
         <span class="text-inverse text-sm">${name}${badge}</span>
-        <span style="color:#3b82f6;" class="text-base">${Math.round(statData.allTimeMax)} kg</span>
+        <span style="color:#3b82f6;" class="text-base">${Math.round(s.allTimeMax)} kg</span>
       </div>
       ${deltaHtml ? `<div class="mb-2">${deltaHtml}</div>` : ''}
       <div class="trend-track-bg" style="height:10px;border-radius:5px;">

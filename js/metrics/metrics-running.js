@@ -27,6 +27,22 @@ export function weeklyDistanceSeries(state, days, maxWeek) {
 }
 
 // ==========================================
+// WEEKLY ELEVATION SERIES
+// Total ascent (m) per week from run entries.
+// ==========================================
+export function weeklyElevationSeries(state, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let elev = 0;
+    if (wkData) dayList.forEach(d => { elev += parseFloat(wkData.runs?.[d]?.elev) || 0; });
+    out.push(Math.round(elev));
+  }
+  return out;
+}
+
+// ==========================================
 // WEEKLY PACE SERIES
 // Distance-weighted average pace (s/km) per week. 0 means no runs logged.
 // Canonical single source — replaces the duplicate in brain/analysis.js.

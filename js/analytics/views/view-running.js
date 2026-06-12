@@ -4,29 +4,49 @@
 // Renders the 'running' analytics context including per-run stream charts
 // (loaded asynchronously from IndexedDB).
 // ==========================================
-import { computeWeeklyHrSeries, computeWeeklyTrainingEffectSeries, formatPace } from '../../engine.js';
+import { computeWeeklyCaloriesSeries, formatPace } from '../../engine.js';
+import {
+  weeklyDistanceSeries, weeklyElevationSeries, weeklyPaceSeries,
+  weeklyHrSeries, weeklyHrZonesSeries, weeklyCadenceSeries, weeklyTrainingEffectSeries,
+} from '../../metrics/metrics-running.js';
+import { getProgramById } from '../../state.js';
 import { getStreamFromDB } from '../../db.js';
 import { setText, paceZoneColour } from '../utils.js';
 import { renderHrZonesChart, renderCadenceChart, renderWeeklyLinesChart, renderStreamCharts } from '../charts.js';
 
-export function renderRunningView(data, appState, days) {
-  setText('allTimeRunDist', data.globalTotalDist.toFixed(1) + ' km');
-  setText('allTimeRunElev', Math.round(data.globalTotalElev) + ' m');
-  setText('allTimeRunCals', Math.round(data.globalTotalCals).toLocaleString());
+export function renderRunningView(appState, days) {
+  const activeProgram  = getProgramById(appState.activeProgramId);
+  const maxWeek        = activeProgram?.totalWeeks || 12;
+  const weekLabels     = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const distData       = weeklyDistanceSeries(appState, days, maxWeek);
+  const elevData       = weeklyElevationSeries(appState, days, maxWeek);
+  const calsSeries     = computeWeeklyCaloriesSeries(appState, days, maxWeek);
+  const paceData       = weeklyPaceSeries(appState, days, maxWeek);
+  const hrZonesData    = weeklyHrZonesSeries(appState, days, maxWeek);
+  const cadenceData    = weeklyCadenceSeries(appState, days, maxWeek);
+  const thresholdSecs  = appState.thresholdPaceSeconds || null;
+
+  const globalTotalDist = distData.reduce((a, b) => a + b, 0);
+  const globalTotalElev = elevData.reduce((a, b) => a + b, 0);
+  const globalTotalCals = calsSeries.reduce((a, b) => a + b, 0);
+
+  setText('allTimeRunDist', globalTotalDist.toFixed(1) + ' km');
+  setText('allTimeRunElev', Math.round(globalTotalElev) + ' m');
+  setText('allTimeRunCals', Math.round(globalTotalCals).toLocaleString());
 
   const thresholdInput = document.getElementById('analyticsThresholdPaceInput');
-  if (thresholdInput && data.thresholdSecs && !thresholdInput.value) {
-    thresholdInput.value = data.thresholdSecs;
+  if (thresholdInput && thresholdSecs && !thresholdInput.value) {
+    thresholdInput.value = thresholdSecs;
   }
 
   const paceContainer = document.getElementById('paceTrendContainer');
   if (paceContainer) {
-    const paceRows = data.weekLabels.map((lbl, i) => {
-      if (data.paceData[i] <= 0) return '';
-      const colour = paceZoneColour(data.paceData[i], data.thresholdSecs);
+    const paceRows = weekLabels.map((lbl, i) => {
+      if (paceData[i] <= 0) return '';
+      const colour = paceZoneColour(paceData[i], thresholdSecs);
       return `<div class="flex-between py-2 border-b-glass text-base">
           <span class="text-inverse font-bold">${lbl}</span>
-          <span class="font-heavy" style="color:${colour};font-variant-numeric:tabular-nums;">${formatPace(data.paceData[i])}</span>
+          <span class="font-heavy" style="color:${colour};font-variant-numeric:tabular-nums;">${formatPace(paceData[i])}</span>
          </div>`;
     }).filter(Boolean);
 
@@ -35,18 +55,17 @@ export function renderRunningView(data, appState, days) {
       : '<p style="color:rgba(255,255,255,0.6);font-size:0.9rem;">Log runs with time to see pace trends.</p>';
   }
 
-  renderHrZonesChart(document.getElementById('hrZonesChartContainer'), data.weekLabels, data.hrZonesData);
-  renderCadenceChart(document.getElementById('cadenceChartContainer'), data.weekLabels, data.cadenceData);
+  renderHrZonesChart(document.getElementById('hrZonesChartContainer'), weekLabels, hrZonesData);
+  renderCadenceChart(document.getElementById('cadenceChartContainer'), weekLabels, cadenceData);
 
-  const maxWeek = data.weekLabels.length;
-  const hr = computeWeeklyHrSeries(appState, days, maxWeek);
-  renderWeeklyLinesChart(document.getElementById('runHrTrendContainer'), data.weekLabels, [
+  const hr = weeklyHrSeries(appState, days, maxWeek);
+  renderWeeklyLinesChart(document.getElementById('runHrTrendContainer'), weekLabels, [
     { values: hr.avgHr, color: '#22d3ee', label: 'Avg HR' },
     { values: hr.maxHr, color: '#ef4444', label: 'Max HR' },
   ], { yFmt: v => `${Math.round(v)}`, emptyMsg: 'Log runs with HR (or import .FIT) to see HR trends.' });
 
-  const te = computeWeeklyTrainingEffectSeries(appState, days, maxWeek);
-  renderWeeklyLinesChart(document.getElementById('runTeTrendContainer'), data.weekLabels, [
+  const te = weeklyTrainingEffectSeries(appState, days, maxWeek);
+  renderWeeklyLinesChart(document.getElementById('runTeTrendContainer'), weekLabels, [
     { values: te, color: '#a78bfa', label: 'Training Effect' },
   ], { yFmt: v => v.toFixed(1), emptyMsg: 'Import .FIT runs to see training-effect trends.' });
 

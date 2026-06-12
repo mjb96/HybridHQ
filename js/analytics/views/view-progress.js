@@ -8,30 +8,42 @@ import {
   computeStreakView, computeGoalAdherence, computeDynamicMilestones,
   computeWeeklyCaloriesSeries, computeWeeklyCompletionSeries, formatPace,
 } from '../../engine.js';
+import { weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
+import { weeklyDistanceSeries, weeklyPaceSeries } from '../../metrics/metrics-running.js';
+import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
 import { getProgramById } from '../../state.js';
 import { setText, rpeColour, paceZoneColour } from '../utils.js';
 import { renderWeeklyBarChart, renderCompletionVsTargetChart } from '../charts.js';
 
 // ---- Progress timeline table (per-week vol / dist / pace / RPE) ------------
-export function renderProgressView(data, appState) {
+export function renderProgressView(appState, days) {
+  const activeProgram  = getProgramById(appState.activeProgramId);
+  const maxWeek        = activeProgram?.totalWeeks || 12;
+  const weekLabels     = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const volData        = weeklyTonnageSeries(appState, days, maxWeek);
+  const runData        = weeklyDistanceSeries(appState, days, maxWeek);
+  const paceData       = weeklyPaceSeries(appState, days, maxWeek);
+  const rpeData        = weeklyRpeSeries(appState, days, maxWeek);
+  const thresholdSecs  = appState.thresholdPaceSeconds || null;
+
   const tbody = document.getElementById('analyticsTimelineTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
   const currentWeekStr = appState.currentWeek;
-  data.weekLabels.forEach((lbl, i) => {
+  weekLabels.forEach((lbl, i) => {
     const wKey      = (i + 1).toString();
     const isActive  = wKey === currentWeekStr;
-    const avgPace   = data.paceData[i] > 0 ? formatPace(data.paceData[i]) : '--';
-    const avgRpe    = data.rpeData[i]  > 0 ? data.rpeData[i].toFixed(1) : '--';
-    const rpeStyle  = data.rpeData[i] > 0 ? `color:${rpeColour(data.rpeData[i])};font-weight:700;` : '';
-    const paceColor = data.paceData[i] > 0 ? paceZoneColour(data.paceData[i], data.thresholdSecs) : '#ffffff';
+    const avgPace   = paceData[i] > 0 ? formatPace(paceData[i]) : '--';
+    const avgRpe    = rpeData[i]  > 0 ? rpeData[i].toFixed(1) : '--';
+    const rpeStyle  = rpeData[i] > 0 ? `color:${rpeColour(rpeData[i])};font-weight:700;` : '';
+    const paceColor = paceData[i] > 0 ? paceZoneColour(paceData[i], thresholdSecs) : '#ffffff';
 
     const tr = document.createElement('tr');
     if (isActive) tr.style.background = 'rgba(59,130,246,0.1)';
     tr.innerHTML =
       `<td class="py-2"><strong style="${isActive ? 'color:#3b82f6;' : 'color:#fff;'}">${lbl}</strong></td>` +
-      `<td class="py-2" style="color:#fff;">${data.volData[i] > 0 ? data.volData[i].toLocaleString() + ' kg' : '--'}</td>` +
-      `<td class="py-2" style="color:#fff;">${data.runData[i] > 0 ? data.runData[i].toFixed(1) + ' km' : '--'}</td>` +
+      `<td class="py-2" style="color:#fff;">${volData[i] > 0 ? volData[i].toLocaleString() + ' kg' : '--'}</td>` +
+      `<td class="py-2" style="color:#fff;">${runData[i] > 0 ? runData[i].toFixed(1) + ' km' : '--'}</td>` +
       `<td class="py-2" style="color:${paceColor};font-variant-numeric:tabular-nums;">${avgPace}</td>` +
       `<td class="py-2" style="${rpeStyle}">${avgRpe}</td>`;
     tbody.appendChild(tr);
@@ -39,7 +51,7 @@ export function renderProgressView(data, appState) {
 }
 
 // ---- Streak detail (current + longest + motivational copy) -----------------
-export function renderStreakView(data, appState) {
+export function renderStreakView(appState) {
   const sv = computeStreakView(appState.streakData);
 
   const currentEl = document.getElementById('streakCurrent');
@@ -87,7 +99,7 @@ export function renderStreakView(data, appState) {
 }
 
 // ---- Goal progress detail (adherence bar + completion vs target chart) -----
-export function renderGoalProgressView(data, appState, days) {
+export function renderGoalProgressView(appState, days) {
   const activeProgram = getProgramById(appState.activeProgramId);
   const wk    = parseInt(appState.currentWeek, 10) || 1;
   const total = activeProgram.totalWeeks || 12;
@@ -143,7 +155,7 @@ export function renderGoalProgressView(data, appState, days) {
 }
 
 // ---- Active fuel detail (weekly calories bar chart) -----------------------
-export function renderActiveFuelView(data, appState, days) {
+export function renderActiveFuelView(appState, days) {
   const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek = activeProgram?.totalWeeks || 12;
   const series  = computeWeeklyCaloriesSeries(appState, days, maxWeek);

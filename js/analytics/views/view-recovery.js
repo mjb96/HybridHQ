@@ -4,12 +4,18 @@
 // Renders the 'recovery', 'recovery-score', and 'stress-balance' contexts.
 // ==========================================
 import { computeRecoveryScore, computeWeeklyLoadSeries, computeReadiness } from '../../engine.js';
+import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
 import { getProgramById } from '../../state.js';
 import { setText } from '../utils.js';
 import { renderRpeChart, renderStackedLoadChart } from '../charts.js';
 
 // ---- Recovery overview (RPE summary cards + RPE trend + ACWR) --------------
-export function renderRecoveryView(data, appState, days) {
+export function renderRecoveryView(appState, days) {
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const maxWeek    = activeProgram?.totalWeeks || 12;
+  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const rpeData    = weeklyRpeSeries(appState, days, maxWeek);
+
   const wk      = appState.currentWeek || '1';
   const weekData = appState.weeks?.[wk];
 
@@ -75,9 +81,8 @@ export function renderRecoveryView(data, appState, days) {
   }
   interpEl.innerHTML = `<div class="text-sm text-muted" style="line-height:1.5;">${interpretation}</div>`;
 
-  renderRpeChart(document.getElementById('rpeTrendContainer'), data.weekLabels, data.rpeData);
+  renderRpeChart(document.getElementById('rpeTrendContainer'), weekLabels, rpeData);
 
-  const maxWeek = data.weekLabels.length;
   const load = computeWeeklyLoadSeries(appState, days, maxWeek);
   const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
   const readiness = computeReadiness(totalByWeek, appState.currentWeek);
@@ -90,7 +95,12 @@ export function renderRecoveryView(data, appState, days) {
 }
 
 // ---- Recovery score detail (score breakdown + RPE trend) -------------------
-export function renderRecoveryScoreView(data, appState, days) {
+export function renderRecoveryScoreView(appState, days) {
+  const activeProgram = getProgramById(appState.activeProgramId);
+  const maxWeek    = activeProgram?.totalWeeks || 12;
+  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+  const rpeData    = weeklyRpeSeries(appState, days, maxWeek);
+
   const r = computeRecoveryScore(appState, days);
 
   const heroEl  = document.getElementById('recoveryScoreHero');
@@ -108,11 +118,11 @@ export function renderRecoveryScoreView(data, appState, days) {
   if (recEl)   recEl.textContent   = r.recommendation;
 
   const trendEl = document.getElementById('rpeTrendContainerDetail');
-  if (trendEl) renderRpeChart(trendEl, data.weekLabels, data.rpeData);
+  if (trendEl) renderRpeChart(trendEl, weekLabels, rpeData);
 }
 
 // ---- Stress balance detail (lift vs run load share + stacked chart) --------
-export function renderStressBalanceView(data, appState, days) {
+export function renderStressBalanceView(appState, days) {
   const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek = activeProgram?.totalWeeks || 12;
   const { lift, run } = computeWeeklyLoadSeries(appState, days, maxWeek);

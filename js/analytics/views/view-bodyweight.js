@@ -5,6 +5,6 @@
 // ==========================================
 import { renderBodyWeightChart } from '../charts.js';
 
-export function renderBodyweightView(data) {
-  renderBodyWeightChart(document.getElementById('bwChartContainer'), data.bodyWeightLog);
+export function renderBodyweightView(appState) {
+  renderBodyWeightChart(document.getElementById('bwChartContainer'), appState.bodyWeightLog || []);
 }
