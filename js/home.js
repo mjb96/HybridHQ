@@ -11,7 +11,7 @@ import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashb
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
 import { CATEGORY_META } from './brain/brain_dashboard.js';
 import { generateInsights, contextVerdict } from './brain/core.js';
-import { composeBriefing, buildTelemetry } from './brain/briefing.js';
+import { composeBriefing } from './brain/briefing.js';
 import { energyProfile, activeCaloriesForDay } from './profile.js';
 import { escapeHtml } from './util.js';
 
@@ -806,13 +806,11 @@ function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readi
 function renderTelemetryStrip(items) {
   const el = document.getElementById('telemetryStrip');
   if (!el) return;
-  el.innerHTML = (items || []).map(it => {
-    const cursor = it.action ? 'cursor:pointer;' : '';
-    return `<div class="card-dark" ${it.action || ''} style="flex:0 0 auto;min-width:78px;padding:8px 12px;border-radius:10px;${cursor}">
-      <div class="text-muted" style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(it.label)}</div>
-      <div class="font-heavy text-inverse" style="font-size:0.95rem;line-height:1.1;white-space:nowrap;">${escapeHtml(it.value)}${it.unit ? ` <span class="text-muted" style="font-size:0.6rem;">${escapeHtml(it.unit)}</span>` : ''}</div>
-    </div>`;
-  }).join('');
+  el.innerHTML = (items || []).map(it => `
+    <div class="telemetry-chip" ${it.action || ''}>
+      <span class="telemetry-chip-label">${escapeHtml(it.label)}</span>
+      <span class="telemetry-chip-value">${escapeHtml(it.value)}${it.unit ? ` <small>${escapeHtml(it.unit)}</small>` : ''}</span>
+    </div>`).join('');
 }
 
 function renderBriefing(text, verdict) {
@@ -823,8 +821,15 @@ function renderBriefing(text, verdict) {
   el.style.display = 'block';
   body.textContent = text;
   if (vEl) {
-    if (verdict) { vEl.textContent = verdict.label; vEl.style.color = metaColor(verdict.tone); }
-    else { vEl.textContent = ''; }
+    if (verdict) {
+      const c = metaColor(verdict.tone);
+      vEl.textContent = verdict.label;
+      vEl.style.color = c;
+      vEl.style.background = `color-mix(in srgb, ${c} 16%, transparent)`;
+    } else {
+      vEl.textContent = '';
+      vEl.style.background = 'transparent';
+    }
   }
 }
 

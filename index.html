@@ -191,20 +191,18 @@
         <span class="text-sm font-bold text-accent-blue">SYNCED</span>
       </div>
 
-      <!-- TIER 1 · Telemetry strip (compact at-a-glance complications) -->
-      <div id="telemetryStrip" class="telemetry-strip" aria-label="Daily telemetry"
-           style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;-webkit-overflow-scrolling:touch;"></div>
+      <!-- TIER 1 · Telemetry strip -->
+      <div id="telemetryStrip" class="telemetry-strip" aria-label="Daily telemetry"></div>
 
-      <!-- TIER 2 · Coach's Briefing (hero, conclusions-first) -->
-      <article id="brainBriefing" class="card-dark" data-action="open-analytics" data-context="coach"
-               style="display:none;cursor:pointer;padding:16px;margin-bottom:18px;border-left:3px solid var(--accent-blue,#3b82f6);"
-               aria-label="Coach's briefing — tap for the full read">
-        <div class="flex-between mb-1">
-          <span class="font-bold" style="font-size:0.62rem;letter-spacing:0.1em;color:var(--accent-blue,#3b82f6);">COACH'S BRIEFING</span>
-          <span id="brainBriefingVerdict" class="font-bold" style="font-size:0.6rem;"></span>
+      <!-- TIER 2 · Coach's Briefing hero -->
+      <article id="brainBriefing" class="brain-briefing" data-action="open-analytics" data-context="coach"
+               style="display:none;" aria-label="Coach's briefing — tap for the full read">
+        <div class="brain-briefing-head">
+          <span class="brain-briefing-label">Coach's Briefing</span>
+          <span id="brainBriefingVerdict" class="brain-briefing-verdict"></span>
         </div>
-        <div id="brainBriefingBody" class="text-inverse" style="font-size:0.92rem;line-height:1.5;"></div>
-        <div class="text-muted mt-2" style="font-size:0.6rem;">Tap for the full read →</div>
+        <div id="brainBriefingBody" class="brain-briefing-body"></div>
+        <div class="brain-briefing-more">Tap for the full read →</div>
       </article>
 
       <!-- TIER 3 · Hybrid Focus (dual track) -->
@@ -212,23 +210,19 @@
 
       <div class="in-focus-carousel">
 
-        <article class="card-dark carousel-card" data-focus-id="strength" data-action="open-analytics" data-context="strength" style="cursor: pointer;">
-          <div class="flex-between mb-2">
-             <div class="card-icon-title text-accent-blue"><span>🏋️</span> Strength • This Week</div>
-          </div>
-          <h3 id="focusStrengthHero" class="text-3xl font-heavy text-inverse leading-tight mb-1">0m</h3>
-          <div id="focusStrengthSub" class="text-muted" style="font-size:0.62rem;margin-bottom:6px;"></div>
-          <div style="height:5px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;margin-bottom:8px;"><div id="focusStrengthBar" style="height:100%;width:0%;background:var(--accent-blue,#3b82f6);transition:width .4s;"></div></div>
+        <article class="card-dark carousel-card focus-card" data-focus-id="strength" data-action="open-analytics" data-context="strength">
+          <div class="card-icon-title text-accent-blue mb-2"><span>🏋️</span> Strength</div>
+          <h3 id="focusStrengthHero" class="focus-card-hero text-inverse">0m</h3>
+          <div id="focusStrengthSub" class="focus-card-sub"></div>
+          <div class="focus-progress"><div id="focusStrengthBar" class="focus-progress-fill" style="background:var(--color-blue);"></div></div>
           <div class="bar-chart-container" id="strengthBarChart"></div>
         </article>
 
-        <article class="card-dark carousel-card" data-focus-id="running" data-action="open-analytics" data-context="running" style="cursor: pointer;">
-          <div class="flex-between mb-2">
-             <div class="card-icon-title text-accent-pink"><span>🏃</span> Running • This Week</div>
-          </div>
-          <h3 id="focusRunHero" class="text-3xl font-heavy text-inverse leading-tight mb-1">0.0 km</h3>
-          <div id="focusRunSub" class="text-muted" style="font-size:0.62rem;margin-bottom:6px;"></div>
-          <div style="height:5px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;margin-bottom:8px;"><div id="focusRunBar" style="height:100%;width:0%;background:var(--accent-pink,#ec4899);transition:width .4s;"></div></div>
+        <article class="card-dark carousel-card focus-card" data-focus-id="running" data-action="open-analytics" data-context="running">
+          <div class="card-icon-title text-accent-pink mb-2"><span>🏃</span> Running</div>
+          <h3 id="focusRunHero" class="focus-card-hero text-inverse">0.0 km</h3>
+          <div id="focusRunSub" class="focus-card-sub"></div>
+          <div class="focus-progress"><div id="focusRunBar" class="focus-progress-fill" style="background:var(--accent-pink,#ec4899);"></div></div>
           <div class="bar-chart-container" id="runBarChart"></div>
         </article>
 
