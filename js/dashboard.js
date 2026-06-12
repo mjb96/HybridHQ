@@ -463,6 +463,151 @@ export const TILE_REGISTRY = [
     },
   },
 
+  // ---- STEPS (Health Connect) --------------------------------
+  {
+    id:        'hc-steps',
+    type:      DashboardTileType.METRIC,
+    icon:      '👟',
+    label:     'Steps',
+    accentVar: '--color-green',
+    navTarget: 'health-steps',
+    order:     12,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || h.steps === 0) {
+          return { hero: '--', sub: 'Sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        const goalSteps = 10000;
+        const pct = Math.min(100, Math.round((h.steps / goalSteps) * 100));
+        return {
+          hero:     h.steps.toLocaleString(),
+          sub:      `${pct}% of 10,000 goal`,
+          tag:      `${pct}%`,
+          tagColor: pct >= 100 ? 'var(--color-green)' : pct >= 60 ? 'var(--color-amber)' : 'var(--color-red)',
+          state:    'loaded',
+        };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- SLEEP (Health Connect) ---------------------------------
+  {
+    id:        'hc-sleep',
+    type:      DashboardTileType.METRIC,
+    icon:      '🌙',
+    label:     'Sleep',
+    accentVar: '--color-blue',
+    navTarget: 'health-sleep',
+    order:     13,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || h.sleepHours === 0) {
+          return { hero: '--h', sub: 'Sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        let tag = 'Good', tagColor = 'var(--color-green)';
+        if (h.sleepHours < 6)       { tag = 'Low';        tagColor = 'var(--color-red)'; }
+        else if (h.sleepHours < 7)  { tag = 'Moderate';   tagColor = 'var(--color-amber)'; }
+        else if (h.sleepHours >= 9) { tag = 'Excellent';  tagColor = 'var(--color-green)'; }
+        const sub = h.sleepScore != null ? `Score ${h.sleepScore}/100` : 'last night';
+        return { hero: `${h.sleepHours}h`, sub, tag, tagColor, state: 'loaded' };
+      } catch {
+        return { hero: '--h', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- RESTING HEART RATE (Health Connect) --------------------
+  {
+    id:        'hc-rhr',
+    type:      DashboardTileType.METRIC,
+    icon:      '💗',
+    label:     'Resting HR',
+    accentVar: '--color-pink',
+    navTarget: 'health-rhr',
+    order:     14,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || (!h.restingHeartRate && !h.averageHeartRate)) {
+          return { hero: '--', sub: 'bpm — sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        const bpm = h.restingHeartRate || h.averageHeartRate;
+        let tag = 'Normal', tagColor = 'var(--color-green)';
+        if (bpm > 80)      { tag = 'Elevated'; tagColor = 'var(--color-red)'; }
+        else if (bpm > 68) { tag = 'Moderate'; tagColor = 'var(--color-amber)'; }
+        const sub = h.restingHeartRate ? 'resting bpm' : 'avg bpm';
+        return { hero: `${bpm}`, sub, tag, tagColor, state: 'loaded' };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- HYBRID SCORE ----------------------------------------
+  {
+    id:        'hybrid-score',
+    type:      DashboardTileType.METRIC,
+    icon:      '🔷',
+    label:     'Hybrid Score',
+    accentVar: '--color-purple',
+    navTarget: 'hybrid-score',
+    order:     15,
+    renderData(appState, defaultDays) {
+      try {
+        const { computeHybridScore } = (typeof window !== 'undefined' && window.__hybridScore)
+          ? window.__hybridScore : { computeHybridScore: null };
+        // Import is handled separately; use appState.health as a proxy
+        const h = appState.health;
+        if (!h) return { hero: '--', sub: 'Sync health + log sessions', tag: 'No data', tagColor: 'var(--text-muted)', state: 'empty' };
+        // Lightweight tile-level approximation (sleep + RHR only)
+        const sleep = h.sleepHours || 0;
+        const rhr   = h.restingHeartRate || 0;
+        const sleepScore = sleep >= 8 ? 100 : sleep >= 7 ? 80 : sleep >= 6 ? 55 : Math.max(0, sleep * 8);
+        const rhrScore   = rhr ? (rhr < 55 ? 100 : rhr < 65 ? 80 : rhr < 75 ? 55 : 30) : null;
+        const approx = rhrScore !== null
+          ? Math.round((sleepScore + rhrScore) / 2)
+          : Math.round(sleepScore);
+        const color = approx >= 75 ? 'var(--color-green)' : approx >= 50 ? 'var(--color-amber)' : 'var(--color-red)';
+        const label = approx >= 75 ? 'Optimal' : approx >= 50 ? 'Building' : 'Fatigued';
+        return { hero: String(approx), sub: 'health component', tag: label, tagColor: color, state: 'loaded' };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- ADAPTATION ------------------------------------------
+  {
+    id:        'adaptation',
+    type:      DashboardTileType.METRIC,
+    icon:      '🔀',
+    label:     'Adaptation',
+    accentVar: '--color-blue',
+    navTarget: 'adaptation',
+    order:     16,
+    renderData(appState) {
+      try {
+        const healthLog = appState.healthLog || [];
+        const last7sleep = healthLog.filter(e => {
+          const d = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+          return e.date >= d && e.sleepHours > 0;
+        });
+        const avgSleep = last7sleep.length
+          ? (last7sleep.reduce((s, e) => s + e.sleepHours, 0) / last7sleep.length).toFixed(1)
+          : null;
+        if (!avgSleep) return { hero: '--', sub: 'Sync health data', tag: 'No data', tagColor: 'var(--text-muted)', state: 'empty' };
+        const color = avgSleep >= 7.5 ? 'var(--color-green)' : avgSleep >= 6.5 ? 'var(--color-amber)' : 'var(--color-red)';
+        return { hero: avgSleep + 'h', sub: '7-day sleep avg', tag: 'Tap for analysis', tagColor: color, state: 'loaded' };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
   // ---- GOAL PROGRESS (NEW) -----------------------------------
   {
     id:        'goal-progress',

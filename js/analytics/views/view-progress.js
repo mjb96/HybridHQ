@@ -8,6 +8,7 @@ import {
   computeStreakView, computeGoalAdherence, computeDynamicMilestones,
   computeWeeklyCaloriesSeries, computeWeeklyCompletionSeries, formatPace,
 } from '../../engine.js';
+import { getLastNDays } from '../../health/healthBaselines.js';
 import { weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
 import { weeklyDistanceSeries, weeklyPaceSeries } from '../../metrics/metrics-running.js';
 import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
@@ -177,4 +178,37 @@ export function renderActiveFuelView(appState, days) {
       emptyMsg: 'Log sessions with calories (or import .FIT) to see your fuel trend.',
     });
   }
+
+  // Health Connect active calories supplement
+  const health    = appState.health;
+  const healthLog = appState.healthLog || [];
+  const hcCals    = health?.activeCalories || 0;
+  const last7hc   = getLastNDays(healthLog, 7).filter(e => e.activeCalories > 0);
+  const avg7hcCals = last7hc.length
+    ? Math.round(last7hc.reduce((s, e) => s + e.activeCalories, 0) / last7hc.length) : 0;
+
+  if (!hcCals && !avg7hcCals) return;
+
+  const fuelSection = document.getElementById('analytics-active-fuel');
+  if (!fuelSection) return;
+
+  let hcPanel = fuelSection.querySelector('.fuel-hc-context');
+  if (!hcPanel) {
+    hcPanel = document.createElement('div');
+    hcPanel.className = 'fuel-hc-context mt-3';
+    fuelSection.appendChild(hcPanel);
+  }
+
+  hcPanel.innerHTML = `
+    <h2 class="section-header">Health Connect — Active Calories</h2>
+    <div class="grid-2-col gap-2 mb-2">
+      ${hcCals > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid rgba(245,158,11,0.3);">
+        <div class="text-xs text-muted mb-1">Today (HC)</div>
+        <div class="font-heavy text-inverse" style="font-size:1.1rem;">${hcCals.toLocaleString()} kcal</div>
+      </article>` : ''}
+      ${avg7hcCals > 0 ? `<article class="card-dark p-3 flex-col flex-center" style="border:1px solid rgba(245,158,11,0.2);">
+        <div class="text-xs text-muted mb-1">7-Day Avg (HC)</div>
+        <div class="font-heavy text-inverse" style="font-size:1.1rem;">${avg7hcCals.toLocaleString()} kcal</div>
+      </article>` : ''}
+    </div>`;
 }

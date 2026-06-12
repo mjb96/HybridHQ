@@ -38,6 +38,8 @@ import {
 import { startWorkoutTimer, dismissRestTimer, checkActiveTimerOnLoad } from './timers.js';
 import { saveMapToDB, saveStreamToDB } from './db.js';
 import { initGarminRunImport, initGarminGymImport } from './garmin.js';
+import { HealthService } from './health/healthService.js';
+import { renderHealthSettings } from './health/healthSettings.js';
 
 document.addEventListener('app:storage-loaded', () => {
   try {
@@ -117,16 +119,31 @@ export function switchProgramMode(mode) {
 
   if (viewBuilder) viewBuilder.style.display = 'none';
 
+  const btnHealth  = document.getElementById('btnProgModeHealth');
+  const viewHealth = document.getElementById('progModeHealthContainer');
+
   if (mode === 'active') {
     btnActive?.classList.add('active');
     btnLibrary?.classList.remove('active');
+    btnHealth?.classList.remove('active');
     viewActive.style.display = 'block';
     viewLibrary.style.display = 'none';
+    if (viewHealth) viewHealth.style.display = 'none';
+  } else if (mode === 'health') {
+    btnHealth?.classList.add('active');
+    btnActive?.classList.remove('active');
+    btnLibrary?.classList.remove('active');
+    if (viewHealth) viewHealth.style.display = 'block';
+    viewActive.style.display = 'none';
+    viewLibrary.style.display = 'none';
+    renderHealthSettings(appState);
   } else {
     btnLibrary?.classList.add('active');
     btnActive?.classList.remove('active');
+    btnHealth?.classList.remove('active');
     viewLibrary.style.display = 'block';
     viewActive.style.display = 'none';
+    if (viewHealth) viewHealth.style.display = 'none';
     renderProgramLibrary();
   }
 }
@@ -501,6 +518,14 @@ document.addEventListener('click', (e) => {
   
   // Analytics
   else if (action === 'log-body-weight') logBodyWeight();
+
+  // Health Connect
+  else if (action === 'sync-health') syncHealthData(false).then(() => {
+    if (document.getElementById('progModeHealthContainer')?.style.display === 'block') {
+      renderHealthSettings(appState);
+    }
+  });
+  else if (action === 'disconnect-health') disconnectHealthData();
 });
 
 document.addEventListener('change', (e) => {
@@ -628,6 +653,38 @@ function checkForAutomaticWeekAdvance() {
   }
 }
 
+async function syncHealthData(silent = true) {
+  if (HealthService.availability() === 'NOT_SUPPORTED') return;
+  try {
+    const snapshot = await HealthService.sync(appState, () => saveStateToLocalStorage(true));
+    if (snapshot.error) {
+      if (!silent) showToast(healthErrorMessage(snapshot.error), true);
+      return;
+    }
+    if (!silent) showToast('Health data synced ✓');
+    hydrateCurrentView();
+  } catch (e) {
+    console.warn('[Health] Sync failed silently:', e);
+  }
+}
+
+function healthErrorMessage(errorCode) {
+  if (errorCode === 'health_connect_not_installed') return 'Health Connect app is not installed.';
+  if (errorCode === 'permissions_denied') return 'Health Connect permissions denied.';
+  return 'Health data unavailable.';
+}
+
+function disconnectHealthData() {
+  appState.health    = null;
+  appState.healthLog = [];
+  saveStateToLocalStorage(true);
+  showToast('Health data disconnected.');
+  if (document.getElementById('progModeHealthContainer')?.style.display === 'block') {
+    renderHealthSettings(appState);
+  }
+  hydrateCurrentView();
+}
+
 async function bootstrapApp() {
   try {
     determineDefaultCalendarDay();
@@ -642,6 +699,10 @@ async function bootstrapApp() {
     switchGlobalAppTab(currentTab);
     checkActiveTimerOnLoad();
     checkForAutomaticWeekAdvance();
+
+    // Health Connect sync fires after the UI is up. Runs silently so a
+    // missing bridge (desktop, iOS) never blocks or notifies the user.
+    syncHealthData(true);
 
   } catch (fatalLifecycleError) {
     console.error("Critical layout generation block runtime defense:", fatalLifecycleError);

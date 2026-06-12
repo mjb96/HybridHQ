@@ -39,7 +39,9 @@ export let appState = {
   _deloadDismissedWeek: null,
   streakData: { current: 0, longest: 0, lastActivityDate: null },
   goalData: { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } },
-  athleteProfile: emptyAthleteProfile()
+  athleteProfile: emptyAthleteProfile(),
+  health: null,
+  healthLog: [],
 };
 
 export let activeTab = 'home';
@@ -353,7 +355,9 @@ export async function pullEngineDataFromStorage() {
     thresholdPaceSeconds: null, deloadApplied: null, _deloadDismissedWeek: null,
     streakData: { current: 0, longest: 0, lastActivityDate: null },
     goalData: { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } },
-    athleteProfile: emptyAthleteProfile()
+    athleteProfile: emptyAthleteProfile(),
+    health: null,
+    healthLog: [],
   };
 
   if (localData) {
@@ -402,6 +406,8 @@ export async function pullEngineDataFromStorage() {
   if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } };
   if (!appState.goalData.goalConfig) appState.goalData.goalConfig = { primaryGoal: null, goalEventDate: null, goalEventName: null };
   if (!appState.athleteProfile) appState.athleteProfile = emptyAthleteProfile();
+  if (!('health' in appState)) appState.health = null;
+  if (!appState.healthLog) appState.healthLog = [];
 
   let _migratedAnyProgram = false;
   appState.customPrograms = (appState.customPrograms || []).map(prog => {
