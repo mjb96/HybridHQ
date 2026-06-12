@@ -46,6 +46,19 @@ function safeParse(raw) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// Wrap an async bridge call (which takes a callbackId as its last argument)
+// in a Promise. The Kotlin side resolves via window.__hcCB[id](jsonString).
+function bridgeAsync(methodName, ...args) {
+  return new Promise((resolve) => {
+    const id = `_hc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    if (typeof window !== 'undefined') {
+      window.__hcCB = window.__hcCB || {};
+      window.__hcCB[id] = resolve;
+    }
+    window.HybridHealthBridge[methodName](...args, id);
+  });
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -80,7 +93,7 @@ export async function requestPermissions() {
   }
 
   try {
-    const raw    = await bridge.requestPermissions(JSON.stringify(HEALTH_RECORD_TYPES));
+    const raw    = await bridgeAsync('requestPermissions', JSON.stringify(HEALTH_RECORD_TYPES));
     const result = safeParse(raw);
     if (!result) {
       return { granted: false, grantedTypes: [], deniedTypes: HEALTH_RECORD_TYPES.slice() };
@@ -109,7 +122,7 @@ export async function readRawHealthData(startTime, endTime) {
   if (!bridge) return null;
 
   try {
-    const raw = await bridge.readHealthData(startTime, endTime);
+    const raw = await bridgeAsync('readHealthData', startTime, endTime);
     return safeParse(raw);
   } catch (e) {
     console.warn('[HealthConnect] Read failed:', e);
