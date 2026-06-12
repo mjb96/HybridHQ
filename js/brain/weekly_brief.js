@@ -124,6 +124,16 @@ export function generateWeekBrief(appState, opts = {}) {
   const balance         = recoveryCostBalance(appState, days, currentWeek, maxWeek);
   const recoveryFindings = analyzeRecovery(appState, days);
   const recoveryScore   = recoveryFindings.length > 0 ? recoveryFindings[0].magnitude : null;
+
+  // Health Connect signals: use sleep quality and resting HR to strengthen or
+  // dampen the recovery assessment when device data is available.
+  const healthData   = appState?.health;
+  const sleepHours   = healthData?.sleepHours   || 0;
+  const rhr          = healthData?.restingHeartRate || 0;
+  const healthNotes  = [];
+  if (sleepHours > 0 && sleepHours < 6) healthNotes.push(`Short sleep (${sleepHours}h)`);
+  if (rhr > 0 && rhr > 70)             healthNotes.push(`Elevated RHR (${rhr} bpm)`);
+
   const hasEnoughData   = balance.hasData || recoveryScore !== null;
 
   if (!hasEnoughData) {
@@ -156,15 +166,19 @@ export function generateWeekBrief(appState, opts = {}) {
   const adjustments = [];
   let headline, directive, rationale, tone;
 
-  // ── Override: low recovery ─────────────────────────────────────────────────
-  if (recoveryScore !== null && recoveryScore < 40) {
+  // ── Override: low recovery (training data or Health Connect signals) ────────
+  const healthDrivenLowRecovery = healthNotes.length >= 2 && (recoveryScore === null || recoveryScore < 60);
+  if ((recoveryScore !== null && recoveryScore < 40) || healthDrivenLowRecovery) {
     tone      = 'risk';
     headline  = 'Recovery is low — protect this week.';
-    directive = `Recovery score is ${recoveryScore}%. Back off intensity in both modalities and prioritise sleep and easy movement.`;
+    const scoreStr = recoveryScore !== null ? `Recovery score is ${recoveryScore}%.` : '';
+    const healthStr = healthNotes.length > 0 ? ` Health signals: ${healthNotes.join(', ')}.` : '';
+    directive = `${scoreStr}${healthStr} Back off intensity in both modalities and prioritise sleep and easy movement.`.trim();
     rationale = 'Training hard from a depleted base suppresses adaptation and raises injury risk.';
     adjustments.push('Replace one hard session with easy walking or complete rest');
     adjustments.push('Hold all volume increases until recovery rises above 50%');
-    return { phase, weeksToGoal, priorityModality: MODALITY.RECOVERY, headline, directive, adjustments, rationale, tone, hasGoal, hasEnoughData: true, acwr, recoveryScore, interferencePresent: !!interference };
+    if (sleepHours > 0 && sleepHours < 6) adjustments.push('Aim for 8+ hours of sleep tonight before reassessing');
+    return { phase, weeksToGoal, priorityModality: MODALITY.RECOVERY, headline, directive, adjustments, rationale, tone, hasGoal, hasEnoughData: true, acwr, recoveryScore, interferencePresent: !!interference, healthNotes };
   }
 
   // ── Taper ──────────────────────────────────────────────────────────────────
@@ -319,5 +333,6 @@ export function generateWeekBrief(appState, opts = {}) {
     acwr,
     recoveryScore,
     interferencePresent: !!interference,
+    healthNotes,
   };
 }

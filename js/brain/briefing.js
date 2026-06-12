@@ -7,9 +7,10 @@
 // ==========================================
 
 // ctx: { dataWeeks, recovery:{score,hasData}, readiness:{score,acwr,hasData},
-//        energy:{bmr,active,total,hasProfile}, focusObservation }
+//        energy:{bmr,active,total,hasProfile}, focusObservation,
+//        health:{sleepHours,sleepScore,restingHeartRate} }
 export function composeBriefing(ctx = {}) {
-  const { dataWeeks, recovery, readiness, energy, focusObservation } = ctx;
+  const { dataWeeks, recovery, readiness, energy, focusObservation, health } = ctx;
 
   if (!dataWeeks || dataWeeks < 1) {
     return 'Log a few sessions and your daily briefing appears here — readiness, recovery and where your training is trending.';
@@ -42,6 +43,18 @@ export function composeBriefing(ctx = {}) {
     parts.push(`Energy out today ≈ ${energy.total.toLocaleString()} kcal (base ${energy.bmr.toLocaleString()} + active ${energy.active.toLocaleString()}).`);
   }
 
+  if (health?.sleepHours > 0) {
+    if (health.sleepHours < 6) {
+      parts.push(`Sleep was short last night (${health.sleepHours}h) — protect intensity today.`);
+    } else if (health.sleepHours >= 8) {
+      parts.push(`Good sleep last night (${health.sleepHours}h) — performance ceiling is high.`);
+    }
+  }
+
+  if (health?.restingHeartRate > 0 && health.restingHeartRate > 65) {
+    parts.push(`Resting HR is elevated at ${health.restingHeartRate} bpm — factor this into today's effort targets.`);
+  }
+
   return parts.length ? parts.join(' ') : 'Keep logging — more sessions sharpen the read.';
 }
 
@@ -62,8 +75,9 @@ export function trainingStatus(readiness) {
 }
 
 // Compact metric complications for the Tier-1 strip. Each: { key, label, value, nav }.
+// ctx may now include health: { steps, sleepHours, restingHeartRate, activeCalories }
 export function buildTelemetry(ctx = {}) {
-  const { recovery, readiness, energy } = ctx;
+  const { recovery, readiness, energy, health } = ctx;
   const out = [];
 
   if (readiness?.hasData) out.push({ key: 'readiness', label: 'Readiness', value: `${readiness.score}`, nav: 'recovery' });
@@ -76,5 +90,16 @@ export function buildTelemetry(ctx = {}) {
   } else {
     out.push({ key: 'profile', label: 'Energy', value: 'Set up', nav: 'profile' });
   }
+
+  if (health?.steps > 0) {
+    out.push({ key: 'steps', label: 'Steps', value: health.steps.toLocaleString(), nav: null });
+  }
+  if (health?.sleepHours > 0) {
+    out.push({ key: 'sleep', label: 'Sleep', value: `${health.sleepHours}h`, nav: null });
+  }
+  if (health?.restingHeartRate > 0) {
+    out.push({ key: 'rhr', label: 'RHR', value: `${health.restingHeartRate}`, unit: 'bpm', nav: null });
+  }
+
   return out;
 }

@@ -151,6 +151,32 @@ function sessionIsLogged(weekData, day) {
   return run > 0;
 }
 
+// ── Health Connect signal modifiers ───────────────────────────────────────────
+
+// Sleep deprivation degrades both neuromuscular output and movement quality.
+// Short sleep amplifies effective pattern fatigue so the conflict threshold is
+// reached sooner; 8+ h sleep slightly attenuates the impact.
+function sleepFatigueScale(healthData) {
+  const hours = healthData?.sleepHours || 0;
+  if (hours <= 0) return 1.0;
+  if (hours < 5)  return 1.35;
+  if (hours < 6)  return 1.20;
+  if (hours < 7)  return 1.10;
+  if (hours >= 8) return 0.92;
+  return 1.0;
+}
+
+// Elevated resting HR is a sympathetic nervous system proxy for systemic
+// stress. >10 bpm above a notional 55 bpm baseline raises the fatigue scale.
+function rhrFatigueScale(healthData) {
+  const rhr = healthData?.restingHeartRate || 0;
+  if (rhr <= 0)  return 1.0;
+  if (rhr > 75)  return 1.20;
+  if (rhr > 68)  return 1.10;
+  if (rhr > 62)  return 1.05;
+  return 1.0;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function generateDailyBrief(appState, opts = {}) {
@@ -190,8 +216,15 @@ export function generateDailyBrief(appState, opts = {}) {
 
   // RPE modifier: high session RPE amplifies pattern fatigue
   const rpeScale = prevRpe >= 9 ? 1.3 : prevRpe >= 7 ? 1.1 : 1.0;
+
+  // Health Connect modifiers: short sleep and elevated RHR raise the effective
+  // fatigue so the conflict threshold is reached at lower raw volumes.
+  const healthData  = appState?.health;
+  const healthScale = sleepFatigueScale(healthData) * rhrFatigueScale(healthData);
+  const combinedScale = rpeScale * healthScale;
+
   const scaledByPattern = Object.fromEntries(
-    Object.entries(prevFatigue.byPattern).map(([k, v]) => [k, v * rpeScale])
+    Object.entries(prevFatigue.byPattern).map(([k, v]) => [k, v * combinedScale])
   );
 
   const effectiveFatigue = computeEffectivePatternFatigue(scaledByPattern, runImpact);
@@ -239,6 +272,16 @@ export function generateDailyBrief(appState, opts = {}) {
     adjustments.push(`${freshPlanned.join(' and ')} unaffected — proceed at full intensity`);
   }
 
+  // Append health-driven adjustment notes when the modifiers fired.
+  const sleepHours = healthData?.sleepHours || 0;
+  const rhr        = healthData?.restingHeartRate || 0;
+  if (sleepHours > 0 && sleepHours < 6) {
+    adjustments.push(`Sleep was short last night (${sleepHours}h) — reduce overall volume and skip top-end intensity`);
+  }
+  if (rhr > 75) {
+    adjustments.push(`Resting HR is elevated (${rhr} bpm) — keep effort below threshold today`);
+  }
+
   return {
     status,
     headline,
@@ -249,5 +292,9 @@ export function generateDailyBrief(appState, opts = {}) {
     sessionLogged: logged,
     prevDayLabel,
     prevFatigueBand: prevFatigue.band,
+    healthSignals: {
+      sleepHours: sleepHours || null,
+      restingHeartRate: rhr || null,
+    },
   };
 }

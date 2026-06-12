@@ -463,6 +463,90 @@ export const TILE_REGISTRY = [
     },
   },
 
+  // ---- STEPS (Health Connect) --------------------------------
+  {
+    id:        'hc-steps',
+    type:      DashboardTileType.METRIC,
+    icon:      '👟',
+    label:     'Steps',
+    accentVar: '--color-green',
+    navTarget: null,
+    order:     12,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || h.steps === 0) {
+          return { hero: '--', sub: 'Sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        const goalSteps = 10000;
+        const pct = Math.min(100, Math.round((h.steps / goalSteps) * 100));
+        return {
+          hero:     h.steps.toLocaleString(),
+          sub:      `${pct}% of 10,000 goal`,
+          tag:      `${pct}%`,
+          tagColor: pct >= 100 ? 'var(--color-green)' : pct >= 60 ? 'var(--color-amber)' : 'var(--color-red)',
+          state:    'loaded',
+        };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- SLEEP (Health Connect) ---------------------------------
+  {
+    id:        'hc-sleep',
+    type:      DashboardTileType.METRIC,
+    icon:      '🌙',
+    label:     'Sleep',
+    accentVar: '--color-blue',
+    navTarget: null,
+    order:     13,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || h.sleepHours === 0) {
+          return { hero: '--h', sub: 'Sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        let tag = 'Good', tagColor = 'var(--color-green)';
+        if (h.sleepHours < 6)       { tag = 'Low';        tagColor = 'var(--color-red)'; }
+        else if (h.sleepHours < 7)  { tag = 'Moderate';   tagColor = 'var(--color-amber)'; }
+        else if (h.sleepHours >= 9) { tag = 'Excellent';  tagColor = 'var(--color-green)'; }
+        const sub = h.sleepScore != null ? `Score ${h.sleepScore}/100` : 'last night';
+        return { hero: `${h.sleepHours}h`, sub, tag, tagColor, state: 'loaded' };
+      } catch {
+        return { hero: '--h', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- RESTING HEART RATE (Health Connect) --------------------
+  {
+    id:        'hc-rhr',
+    type:      DashboardTileType.METRIC,
+    icon:      '💗',
+    label:     'Resting HR',
+    accentVar: '--color-pink',
+    navTarget: 'recovery',
+    order:     14,
+    renderData(appState) {
+      try {
+        const h = appState.health;
+        if (!h || (!h.restingHeartRate && !h.averageHeartRate)) {
+          return { hero: '--', sub: 'bpm — sync Health Connect', tag: 'No data', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        const bpm = h.restingHeartRate || h.averageHeartRate;
+        let tag = 'Normal', tagColor = 'var(--color-green)';
+        if (bpm > 80)      { tag = 'Elevated'; tagColor = 'var(--color-red)'; }
+        else if (bpm > 68) { tag = 'Moderate'; tagColor = 'var(--color-amber)'; }
+        const sub = h.restingHeartRate ? 'resting bpm' : 'avg bpm';
+        return { hero: `${bpm}`, sub, tag, tagColor, state: 'loaded' };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
   // ---- GOAL PROGRESS (NEW) -----------------------------------
   {
     id:        'goal-progress',
