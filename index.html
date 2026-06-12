@@ -91,6 +91,15 @@
       font-weight: 600;
     }
 
+    /* HC context note inside focus cards */
+    .focus-hc-note {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      margin-top: 5px;
+      line-height: 1.4;
+      min-height: 0;
+    }
+
     /* At a Glance 2-col grid */
     .glance-grid {
       display: grid;
@@ -415,6 +424,7 @@
           <div class="focus-progress"><div id="focusStrengthBar" class="focus-progress-fill" style="background:var(--color-blue);"></div></div>
           <div class="bar-chart-container" id="strengthBarChart"></div>
           <div id="focusStrengthMilestone" class="focus-milestone"></div>
+          <div id="focusStrengthHCNote" class="focus-hc-note"></div>
         </article>
 
         <article class="card-dark carousel-card focus-card" data-focus-id="running" data-action="open-analytics" data-context="running">
@@ -424,13 +434,13 @@
           <div class="focus-progress"><div id="focusRunBar" class="focus-progress-fill" style="background:var(--accent-pink,#ec4899);"></div></div>
           <div class="bar-chart-container" id="runBarChart"></div>
           <div id="focusRunMilestone" class="focus-milestone"></div>
+          <div id="focusRunHCNote" class="focus-hc-note"></div>
         </article>
 
       </div>
 
-      <!-- TIER 4 · At a Glance dashboard tiles -->
-      <h2 class="focus-header-text mt-4">At a Glance</h2>
-      <div id="glanceGrid" class="glance-grid"></div>
+      <!-- TIER 4 · Supporting Intelligence -->
+      <div id="homeSupportCards" class="mt-3"></div>
 
     </section>
 
