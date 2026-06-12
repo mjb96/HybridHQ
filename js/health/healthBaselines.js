@@ -232,3 +232,195 @@ export function buildDailySeries(healthLog, field, n = 30) {
   const values = entries.map(e => parseFloat(e[field]) || 0);
   return { labels, values };
 }
+
+// ── Trend-first analytics (Garmin-style: today / yesterday / 7d / 4wk) ─────────
+// These power the "what changed, why, what next" experience. Averages become
+// supporting context; direction-of-change and recent history lead.
+
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Today vs yesterday for one field, with direction of change.
+ *
+ * @param {Object[]} healthLog
+ * @param {string}   field
+ * @returns {{ today: number, yesterday: number, delta: number, pctDelta: number|null, direction: 'up'|'down'|'flat', hasToday: boolean, hasYesterday: boolean }}
+ */
+export function dayOverDay(healthLog, field) {
+  const today     = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const map = buildDateMap(healthLog);
+  const t = parseFloat(map.get(today)?.[field]) || 0;
+  const y = parseFloat(map.get(yesterday)?.[field]) || 0;
+  const delta = t - y;
+  const pctDelta = y > 0 ? Math.round((delta / y) * 100) : null;
+  const direction = Math.abs(delta) < 1e-9 ? 'flat' : delta > 0 ? 'up' : 'down';
+  return { today: t, yesterday: y, delta, pctDelta, direction, hasToday: t > 0, hasYesterday: y > 0 };
+}
+
+/**
+ * Last N calendar days as day-of-week-labelled bars (Garmin daily history).
+ * The most recent entry is the last element and flagged isToday.
+ *
+ * @param {Object[]} healthLog
+ * @param {string}   field
+ * @param {number}   n
+ * @returns {{ labels: string[], values: number[], dates: string[], todayIndex: number }}
+ */
+export function lastNDaysSeries(healthLog, field, n = 7) {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const map = buildDateMap(healthLog);
+  const labels = [], values = [], dates = [];
+  let todayIndex = -1;
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000);
+    const ds = d.toISOString().slice(0, 10);
+    labels.push(DOW[d.getDay()]);
+    values.push(parseFloat(map.get(ds)?.[field]) || 0);
+    dates.push(ds);
+    if (ds === todayStr) todayIndex = labels.length - 1;
+  }
+  return { labels, values, dates, todayIndex };
+}
+
+/**
+ * Last N weeks aggregated (Garmin weekly history). Week buckets are anchored to
+ * the current day; the final bucket is the trailing 7 days ("This week").
+ *
+ * @param {Object[]} healthLog
+ * @param {string}   field
+ * @param {number}   weeks
+ * @param {'avg'|'sum'} agg
+ * @returns {{ labels: string[], values: number[] }}
+ */
+export function lastNWeeksSeries(healthLog, field, weeks = 4, agg = 'avg') {
+  const map = buildDateMap(healthLog);
+  const now = Date.now();
+  const labels = [], values = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    let sum = 0, count = 0;
+    for (let d = 0; d < 7; d++) {
+      const offset = w * 7 + d;
+      const ds = new Date(now - offset * 86400000).toISOString().slice(0, 10);
+      const v = parseFloat(map.get(ds)?.[field]) || 0;
+      if (v > 0) { sum += v; count++; }
+    }
+    labels.push(w === 0 ? 'This wk' : `${w}w ago`);
+    values.push(agg === 'sum' ? Math.round(sum) : (count ? Math.round((sum / count) * 10) / 10 : 0));
+  }
+  return { labels, values };
+}
+
+/**
+ * Best (highest) and lowest non-zero day for a field over the last N days.
+ *
+ * @param {Object[]} healthLog
+ * @param {string}   field
+ * @param {number}   n
+ * @returns {{ best: {date:string,value:number}|null, lowest: {date:string,value:number}|null }}
+ */
+export function extremes(healthLog, field, n = 30) {
+  const entries = getLastNDays(healthLog, n).filter(e => parseFloat(e[field]) > 0);
+  if (entries.length === 0) return { best: null, lowest: null };
+  let best = entries[0], lowest = entries[0];
+  entries.forEach(e => {
+    const v = parseFloat(e[field]);
+    if (v > parseFloat(best[field]))  best = e;
+    if (v < parseFloat(lowest[field])) lowest = e;
+  });
+  return {
+    best:   { date: best.date,   value: parseFloat(best[field]) },
+    lowest: { date: lowest.date, value: parseFloat(lowest[field]) },
+  };
+}
+
+/**
+ * Direction of a numeric series via least-squares slope. Magnitude is expressed
+ * relative to the series mean so it generalises across fields/units.
+ *
+ * @param {number[]} values  Non-zero values in chronological order.
+ * @returns {{ slope: number, direction: 'rising'|'falling'|'steady', pct: number }}
+ */
+export function trendDirection(values) {
+  const v = (values || []).filter(x => x > 0);
+  if (v.length < 2) return { slope: 0, direction: 'steady', pct: 0 };
+  const n = v.length;
+  const meanX = (n - 1) / 2;
+  const meanY = v.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  v.forEach((y, x) => { num += (x - meanX) * (y - meanY); den += (x - meanX) ** 2; });
+  const slope = den ? num / den : 0;
+  const totalChange = slope * (n - 1);
+  const pct = meanY ? Math.round((totalChange / meanY) * 100) : 0;
+  const direction = pct > 5 ? 'rising' : pct < -5 ? 'falling' : 'steady';
+  return { slope, direction, pct };
+}
+
+/**
+ * One-call trend brief for a Health Connect metric. Bundles today/yesterday,
+ * the 7-day daily history, the 4-week history, extremes, weekly direction, and
+ * a Garmin-style "what changed / what next" coaching note so views stay thin.
+ *
+ * @param {Object[]} healthLog
+ * @param {string}   field
+ * @param {Object}   cfg
+ * @param {string}   [cfg.label]           Human label, e.g. 'steps'
+ * @param {string}   [cfg.unit]            Unit suffix for the note
+ * @param {boolean}  [cfg.higherIsBetter]  Directional language (RHR = false)
+ * @param {'avg'|'sum'} [cfg.weeklyAgg]    How to roll up weeks
+ * @param {number}   [cfg.goal]            Optional daily goal
+ * @returns {Object}
+ */
+export function buildTrendBrief(healthLog, field, cfg = {}) {
+  const { label = 'this metric', unit = '', higherIsBetter = true, weeklyAgg = 'avg', goal = null } = cfg;
+  const dod    = dayOverDay(healthLog, field);
+  const daily  = lastNDaysSeries(healthLog, field, 7);
+  const weekly = lastNWeeksSeries(healthLog, field, 4, weeklyAgg);
+  const ext    = extremes(healthLog, field, 30);
+  const weeklyDir = trendDirection(weekly.values);
+
+  const fmt = v => {
+    if (unit === 'h')   return `${(Math.round(v * 10) / 10).toFixed(1)}h`;
+    if (unit === 'bpm') return `${Math.round(v)} bpm`;
+    if (unit === 'kg')  return `${(Math.round(v * 10) / 10).toFixed(1)} kg`;
+    return `${Math.round(v).toLocaleString()}${unit ? ' ' + unit : ''}`;
+  };
+
+  // What changed (day over day)
+  const parts = [];
+  if (dod.hasToday && dod.hasYesterday) {
+    if (dod.direction === 'flat') {
+      parts.push(`${label[0].toUpperCase() + label.slice(1)} is level with yesterday (${fmt(dod.today)}).`);
+    } else {
+      const word = dod.direction === 'up' ? 'up' : 'down';
+      const good = higherIsBetter ? dod.direction === 'up' : dod.direction === 'down';
+      const mag  = dod.pctDelta !== null ? ` ${Math.abs(dod.pctDelta)}%` : '';
+      parts.push(`${label[0].toUpperCase() + label.slice(1)} is ${word}${mag} on yesterday (${fmt(dod.today)} vs ${fmt(dod.yesterday)})${good ? ' — moving the right way.' : '.'}`);
+    }
+  } else if (dod.hasToday) {
+    parts.push(`Today: ${fmt(dod.today)}. No reading yet for yesterday to compare.`);
+  }
+
+  // 4-week direction (why / context)
+  if (weeklyDir.direction !== 'steady' && Math.abs(weeklyDir.pct) >= 5) {
+    const rising = weeklyDir.direction === 'rising';
+    const good = higherIsBetter ? rising : !rising;
+    parts.push(`Over the last 4 weeks the trend is ${rising ? 'rising' : 'falling'} (${Math.abs(weeklyDir.pct)}%)${good ? ', a positive trajectory.' : ' — worth watching.'}`);
+  } else if (weekly.values.filter(v => v > 0).length >= 3) {
+    parts.push('Your 4-week trend is holding steady.');
+  }
+
+  // What next (goal-aware where provided)
+  if (goal && dod.hasToday) {
+    if (dod.today >= goal) parts.push(`You've cleared your ${fmt(goal)} target today.`);
+    else parts.push(`${fmt(goal - dod.today)} to go to hit your ${fmt(goal)} target.`);
+  }
+
+  return {
+    dod, daily, weekly, weeklyDir,
+    best: ext.best, lowest: ext.lowest,
+    note: parts.join(' '),
+    fmt,
+  };
+}

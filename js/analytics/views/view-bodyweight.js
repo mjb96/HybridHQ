@@ -4,7 +4,7 @@
 // Renders the 'bodyweight' analytics context.
 // ==========================================
 import { renderBodyWeightChart } from '../charts.js';
-import { getLastNDays } from '../../health/healthBaselines.js';
+import { getLastNDays, trendDirection, lastNWeeksSeries } from '../../health/healthBaselines.js';
 import { escapeHtml } from '../../util.js';
 
 export function renderBodyweightView(appState) {
@@ -32,14 +32,35 @@ function _renderBodyweightHealthContext(appState, healthLog) {
 
   let panel = section.querySelector('.bw-health-context');
 
-  const hcWeightEntries = getLastNDays(healthLog, 7).filter(e => e.weight > 0);
-  if (hcWeightEntries.length === 0) { if (panel) panel.remove(); return; }
+  const last30 = getLastNDays(healthLog, 30).filter(e => e.weight > 0);
+  if (last30.length === 0) { if (panel) panel.remove(); return; }
 
-  const latest = hcWeightEntries[hcWeightEntries.length - 1];
-  const avg7   = hcWeightEntries.reduce((s, e) => s + e.weight, 0) / hcWeightEntries.length;
-  const delta  = latest.weight - avg7;
-  const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' kg vs 7d avg';
-  const deltaColor = Math.abs(delta) < 0.5 ? '#10b981' : Math.abs(delta) < 1.5 ? '#f59e0b' : '#ef4444';
+  const latest = last30[last30.length - 1];
+
+  // 7-day direction-of-change
+  const last7 = getLastNDays(healthLog, 7).filter(e => e.weight > 0);
+  const dir7  = trendDirection(last7.map(e => e.weight));
+  // 30-day direction-of-change (and weekly aggregation for absolute kg/wk)
+  const dir30 = trendDirection(last30.map(e => e.weight));
+  const weekly = lastNWeeksSeries(healthLog, 'weight', 4, 'avg').values.filter(v => v > 0);
+  const kgPerWeek = weekly.length >= 2 ? (weekly[weekly.length - 1] - weekly[0]) / (weekly.length - 1) : 0;
+
+  const dirWord = d => d.direction === 'rising' ? 'Rising' : d.direction === 'falling' ? 'Falling' : 'Stable';
+  const dirColor = d => d.direction === 'steady' ? '#10b981' : '#f59e0b';
+  const dirArrow = d => d.direction === 'rising' ? '↑' : d.direction === 'falling' ? '↓' : '→';
+
+  // Brain note: direction + rate + interpretation
+  let note;
+  if (Math.abs(kgPerWeek) < 0.15) {
+    note = `Weight is holding steady around ${latest.weight.toFixed(1)} kg over the last 4 weeks — body mass is stable.`;
+  } else {
+    const rate = Math.abs(kgPerWeek).toFixed(1);
+    const goingUp = kgPerWeek > 0;
+    note = `Trending ${goingUp ? 'up' : 'down'} ~${rate} kg/week over the last month (now ${latest.weight.toFixed(1)} kg). `
+      + (goingUp
+          ? 'If this is a build phase, ensure the gain is gradual; rapid rises favour fat over muscle.'
+          : 'On a cut this is healthy progress; keep protein high and monitor strength to preserve muscle.');
+  }
 
   if (!panel) {
     panel = document.createElement('div');
@@ -50,16 +71,25 @@ function _renderBodyweightHealthContext(appState, healthLog) {
   }
 
   panel.innerHTML = `
-    <div class="grid-2-col gap-2 mb-2">
+    <div class="grid-3-col gap-2 mb-2">
       <article class="card-dark p-3 flex-col flex-center" style="border:1px solid rgba(59,130,246,0.3);">
-        <div class="text-xs text-muted mb-1">Latest (HC)</div>
+        <div class="text-xs text-muted mb-1">Current</div>
         <div class="font-heavy text-inverse" style="font-size:1.1rem;">${latest.weight.toFixed(1)} kg</div>
         <div class="text-xs text-muted mt-1">${latest.date}</div>
       </article>
-      <article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${deltaColor} 30%,transparent);">
+      <article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${dirColor(dir7)} 30%,transparent);">
         <div class="text-xs text-muted mb-1">7-Day Trend</div>
-        <div class="font-heavy" style="font-size:1.1rem;color:${deltaColor};">${deltaStr}</div>
-        <div class="text-xs text-muted mt-1">from Health Connect</div>
+        <div class="font-heavy" style="font-size:1.05rem;color:${dirColor(dir7)};">${dirArrow(dir7)} ${dirWord(dir7)}</div>
+        <div class="text-xs text-muted mt-1">${dir7.pct ? Math.abs(dir7.pct) + '%' : 'flat'}</div>
       </article>
-    </div>`;
+      <article class="card-dark p-3 flex-col flex-center" style="border:1px solid color-mix(in srgb,${dirColor(dir30)} 30%,transparent);">
+        <div class="text-xs text-muted mb-1">30-Day Trend</div>
+        <div class="font-heavy" style="font-size:1.05rem;color:${dirColor(dir30)};">${dirArrow(dir30)} ${dirWord(dir30)}</div>
+        <div class="text-xs text-muted mt-1">${kgPerWeek ? (kgPerWeek >= 0 ? '+' : '') + kgPerWeek.toFixed(1) + ' kg/wk' : 'stable'}</div>
+      </article>
+    </div>
+    <article class="card-dark p-3 mb-3" style="border-left:3px solid var(--color-green);">
+      <div class="text-xs font-bold text-muted mb-1" style="text-transform:uppercase;letter-spacing:0.06em;">Coach's Read</div>
+      <div class="text-sm text-inverse" style="line-height:1.5;">${escapeHtml(note)}</div>
+    </article>`;
 }
