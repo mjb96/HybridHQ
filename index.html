@@ -26,25 +26,17 @@
     .focus-header-text { font-size: 1.25rem; font-weight: 800; color: var(--text-inverse); letter-spacing: -0.5px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-icon-title { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
 
-    /* Horizontal Swiping Carousel */
+    /* Hybrid Focus — equal-width dual track (two tiles side by side) */
     .in-focus-carousel {
       display: flex;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      gap: 16px;
-      padding-bottom: 12px;
-      scrollbar-width: none;
-      margin-left: -16px;
-      margin-right: -16px;
-      padding-left: 16px;
-      padding-right: 16px;
+      gap: 12px;
+      width: 100%;
     }
     .in-focus-carousel::-webkit-scrollbar { display: none; }
-    
+
     .carousel-card {
-      min-width: 88%;
-      scroll-snap-align: center;
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-width: 0;
     }
 
     /* Bar Charts */
