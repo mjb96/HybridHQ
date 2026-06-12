@@ -69,8 +69,8 @@ test('recoveryCostBalance yields ACWR on the recovery-cost series', () => {
   const r = recoveryCostBalance(fixture(), DAYS, '2', 2);
   assert.equal(r.hasData, true);
   assert.equal(r.acute, 730);
-  assert.equal(r.chronic, 680);   // (630 + 730) / 2
-  assert.equal(r.acwr, 1.07);     // 730 / 680
+  assert.equal(r.chronic, 630);   // prior week only (excludes the acute week)
+  assert.equal(r.acwr, 1.16);     // 730 / 630
 });
 
 test('loadProfile bundles all three concepts + balance', () => {

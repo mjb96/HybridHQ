@@ -642,9 +642,12 @@ export function weeklyStrengthVolumeSeries(state, days, maxWeek) {
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
   const acute = loadByWeek[cw - 1] || 0;
-  const start = Math.max(0, cw - chronicWeeks);
-  const windowWeeks = loadByWeek.slice(start, cw);
-  const nonZero = windowWeeks.filter(v => v > 0);
+  // Chronic baseline = PRIOR weeks only (exclude the current/acute week). With
+  // the acute week included, a single logged week gives acute===chronic → ACWR
+  // 1.0 → a meaningless "100". Require at least one prior week of load.
+  const start = Math.max(0, cw - 1 - chronicWeeks);
+  const chronicWindow = loadByWeek.slice(start, cw - 1);
+  const nonZero = chronicWindow.filter(v => v > 0);
   if (acute <= 0 || nonZero.length === 0) {
     return { score: 0, acwr: 0, acute, chronic: 0, hasData: false };
   }
