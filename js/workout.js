@@ -592,8 +592,8 @@ export function updateInputState(inputNode) {
   const row = inputNode.closest('.cockpit-set-row');
   if (!row) return;
   
-  const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(row);
-  
+  const sIdx = parseInt(row.getAttribute('data-set-index'), 10);
+
   if (!appState.weeks[wk].lifts[selectedDay]) appState.weeks[wk].lifts[selectedDay] = {};
   if (!appState.weeks[wk].lifts[selectedDay][liftName]) appState.weeks[wk].lifts[selectedDay][liftName] = [];
   if (!appState.weeks[wk].lifts[selectedDay][liftName][sIdx]) {
@@ -709,8 +709,8 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       const selectedDay = _getSelectedDay();
       const wk = appState.currentWeek;
       const liftName = exCard ? exCard.getAttribute('data-liftname') : null;
-      const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
-      
+      const sIdx = parseInt(parentRow.getAttribute('data-set-index'), 10);
+
       if (liftName) {
         const lastPerf = findLastPerformance(appState, liftName, { excludeWeek: wk, excludeDay: selectedDay, days: _getDays() });
         if (lastPerf) {
@@ -740,7 +740,7 @@ export function toggleGymCheckLoggingState(checkboxNode) {
       const wk = appState.currentWeek;
       const selectedDay = _getSelectedDay();
       const liftNameAttr = exCard ? exCard.getAttribute('data-liftname') : null;
-      const sIdx = Array.from(exCard.querySelectorAll('.cockpit-set-row')).indexOf(parentRow);
+      const sIdx = parseInt(parentRow.getAttribute('data-set-index'), 10);
       const wInputNode = parentRow.querySelector('.input-weight-node');
       const rInputNode = parentRow.querySelector('.input-reps-node');
       
@@ -1093,7 +1093,9 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('focusout', (e) => {
   const target = e.target;
-  if (target.matches('.input-weight-node, .input-reps-node, #sessionNotesInput, #sessionGymRpeCockpit, #runInputDist, #runInputTime, #runInputRpeCockpit')) {
+  // weight/reps are already persisted by the change→updateInputState path;
+  // only session-level fields (notes, RPE, run stats) need a full commit here
+  if (target.matches('#sessionNotesInput, #sessionGymRpeCockpit, #runInputDist, #runInputTime, #runInputRpeCockpit')) {
     commitWorkoutUIState();
   }
 });

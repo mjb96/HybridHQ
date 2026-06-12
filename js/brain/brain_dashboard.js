@@ -1,14 +1,11 @@
 // ==========================================
-// COACH'S READ — HOME TILE + DETAIL RENDERER (brain_dashboard.js)
+// COACH'S READ — DETAIL RENDERER (brain_dashboard.js)
 // ------------------------------------------
-// Renders two read-only surfaces from the InsightReport:
-//   • a compact "Coach's Read" tile in the home In-Focus carousel (overall
-//     verdict + top read + category tally), clickable through to…
-//   • the full detail view (every insight as a coach card) shown in the
-//     analytics 'coach' context.
-// Advisory only — no controls mutate state. All athlete text is escaped.
+// Renders the full coach detail view (every insight as a coach card) shown in
+// the analytics 'coach' context. Advisory only — no controls mutate state.
+// All athlete text is escaped.
 // ==========================================
-import { generateInsights, summarizeReport, contextVerdict } from './core.js';
+import { contextVerdict } from './core.js';
 import { escapeHtml } from '../util.js';
 
 export const CATEGORY_META = {
@@ -20,59 +17,6 @@ export const CATEGORY_META = {
 };
 const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;
 const CONF_LABEL = { high: 'High confidence', med: 'Moderate confidence', low: 'Low confidence' };
-const CHIP_ORDER = ['risk', 'opportunity', 'progress', 'recovery', 'goal'];
-
-function buildReport(appState, days, program) {
-  return generateInsights(appState, {
-    days, program,
-    currentWeek: appState?.currentWeek,
-    maxWeek: program?.totalWeeks,
-    topN: 20, // tile/detail want the full prioritised set
-  });
-}
-
-// ---- In-Focus carousel tile -------------------------------------------
-export function renderBrainInsights(appState, days, program) {
-  const tile = document.getElementById('coachReadTile');
-  const body = document.getElementById('coachReadTileBody');
-  if (!tile || !body) return;
-
-  let report;
-  try { report = buildReport(appState, days, program); }
-  catch (e) { console.warn('[coach] insight generation failed:', e); tile.style.display = 'none'; return; }
-
-  const insights = report.allInsights || report.insights;
-  if (!insights.length) {
-    if (report.meta.dataWeeks < 1) { tile.style.display = 'none'; return; }
-    tile.style.display = '';
-    body.innerHTML = `<div class="text-muted" style="font-size:0.72rem;line-height:1.3;">Keep logging — your read appears after a few sessions.</div>`;
-    return;
-  }
-
-  tile.style.display = '';
-  const { focus, counts } = summarizeReport(report);
-  // Surface a second line from a DIFFERENT domain (so e.g. strength focus still
-  // shows a running read), falling back to the next insight.
-  const secondary = insights.find(i => i !== focus && i.domain !== focus?.domain) || insights[1] || null;
-  body.innerHTML = renderTileBody(focus, secondary, contextVerdict(insights), counts, insights.length);
-}
-
-function renderTileBody(focus, secondary, verdict, counts, total) {
-  const vm = verdict ? meta(verdict.tone) : meta('progress');
-  const chips = CHIP_ORDER.filter(c => counts[c] > 0).map(c => {
-    const m = meta(c);
-    return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:0.58rem;font-weight:700;color:${m.color};">${m.icon}${counts[c]}</span>`;
-  }).join(' ');
-  const sm = secondary ? meta(secondary.category) : null;
-  return `
-    ${verdict ? `<div class="font-heavy mb-1" style="font-size:1.15rem;line-height:1.1;color:${vm.color};">${verdict.label}</div>` : ''}
-    <div class="text-inverse mb-1" style="font-size:0.8rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(focus ? focus.observation : '')}</div>
-    ${secondary ? `<div class="text-muted mb-2 flex gap-1 align-center" style="font-size:0.66rem;line-height:1.25;"><span style="color:${sm.color};">${sm.icon}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(secondary.observation)}</span></div>` : '<div class="mb-2"></div>'}
-    <div class="flex-between align-center">
-      <div class="flex gap-2" style="flex-wrap:wrap;">${chips}</div>
-      <span class="text-muted" style="font-size:0.6rem;white-space:nowrap;">${total} insight${total !== 1 ? 's' : ''} →</span>
-    </div>`;
-}
 
 // ---- Full detail view (analytics 'coach' context) ---------------------
 export function renderCoachDetail(report) {

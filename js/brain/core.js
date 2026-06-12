@@ -105,9 +105,7 @@ export const CONTEXT_DOMAINS = Object.freeze({
   'weekly-volume': ['strength'],
   running:         ['aerobic', 'fuel'],
   'active-fuel':   ['fuel', 'aerobic'],
-  recovery:        ['recovery'],
   'recovery-score':['recovery'],
-  'stress-balance':['recovery'],
   progress:        ['adherence', 'strength', 'aerobic'],
   'goal-progress': ['adherence'],
   streak:          ['adherence'],
@@ -115,8 +113,6 @@ export const CONTEXT_DOMAINS = Object.freeze({
   'health-steps':  ['adherence', 'fuel'],
   'health-sleep':  ['recovery'],
   'health-rhr':    ['recovery'],
-  'hybrid-score':  ['recovery', 'adherence', 'strength', 'aerobic'],
-  adaptation:      ['recovery', 'strength', 'aerobic'],
 });
 
 // Prioritised insights relevant to a given analytics context (full list, not

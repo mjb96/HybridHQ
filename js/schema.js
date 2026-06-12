@@ -232,9 +232,9 @@ export function migrateProgramToV2(prog) {
 
 // ==========================================
 // MIGRATE-ON-READ (non-destructive, memoised)
-// Execution resolves a v2 VIEW without mutating the stored program. The
-// destructive at-load migration + schemaVersion stamping lands in Phase 3
-// alongside the v2 builder writer.
+// Resolves a v2 view without mutating the stored object. Custom programs are
+// guaranteed to be v2 after first load (write-through in state.js), so this
+// path is only hit for built-in PROGRAMS constants that have never been stored.
 // ==========================================
 const _v2Cache = new WeakMap();
 

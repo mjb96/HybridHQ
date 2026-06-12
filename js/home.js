@@ -120,6 +120,22 @@ function renderRatioBarTile(config, data) {
   `;
 }
 
+function renderBriefTile(config, data) {
+  const accent = `var(${config.accentVar})`;
+  const tagHTML = data.tag
+    ? `<span style="font-size:0.6rem;font-weight:700;padding:1px 8px;border-radius:999px;color:${data.tagColor || accent};background:color-mix(in srgb, ${data.tagColor || accent} 15%, transparent);">${data.tag}</span>`
+    : '';
+  const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
+  return `
+    <div class="card-icon-title mb-1" style="color:${accent};">
+      <span>${config.icon}</span> ${config.label}
+      ${tagHTML ? `<span style="margin-left:auto;">${tagHTML}</span>` : ''}
+    </div>
+    <div class="font-heavy" style="font-size:0.78rem;line-height:1.3;color:${heroColor};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${data.hero || '–'}</div>
+    ${data.sub ? `<div class="text-muted mt-1" style="font-size:0.6rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${data.sub}</div>` : ''}
+  `;
+}
+
 function renderProgressTile(config, data) {
   const accentColor = `var(${config.accentVar})`;
   return `
@@ -136,6 +152,7 @@ function renderProgressTile(config, data) {
 function renderTileContent(config, data) {
   if (data.state === 'error') return renderTileError(config.label);
   switch (config.type) {
+    case DashboardTileType.BRIEF:     return renderBriefTile(config, data);
     case DashboardTileType.RING:      return renderRingTile(config, data);
     case DashboardTileType.SPLIT_3:   return renderSplit3Tile(config, data);
     case DashboardTileType.RATIO_BAR: return renderRatioBarTile(config, data);
@@ -310,7 +327,7 @@ function renderSupportCards(appState, defaultDays, activeProgram) {
       const label = r.score >= 75 ? 'Ready to train' : r.score >= 50 ? 'Moderate load' : 'High fatigue — prioritise recovery';
       const grad  = `conic-gradient(${color} ${r.score}%, rgba(255,255,255,0.08) 0)`;
       cards.push(`
-        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery">
+        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery-score">
           <div>
             <div class="text-xs text-muted font-bold uppercase tracking-wider mb-1">Readiness</div>
             <div class="font-heavy text-inverse" style="font-size:1.4rem;line-height:1;">${r.score}<span class="text-muted" style="font-size:0.85rem;">/100</span></div>
@@ -322,47 +339,6 @@ function renderSupportCards(appState, defaultDays, activeProgram) {
               <span style="font-size:1rem;font-weight:800;color:${color};">${r.score}</span>
             </div>
           </div>
-        </article>
-      `);
-    }
-  } catch {}
-
-  // Stress Balance (lift/run TSS ratio)
-  try {
-    const wk = appState.currentWeek || '1';
-    const weekData = appState.weeks?.[wk];
-    let gymTSS = 0, runTSS = 0;
-    if (weekData) {
-      defaultDays.forEach(d => {
-        let sets = 0;
-        const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
-        for (const lift in (weekData.lifts?.[d] || {})) {
-          if (Array.isArray(weekData.lifts[d][lift])) sets += weekData.lifts[d][lift].filter(s => isCompletedSet(s)).length;
-        }
-        gymTSS += sets * (gRpe > 0 ? gRpe : 6);
-        const rDist = parseFloat(weekData.runs?.[d]?.dist) || 0;
-        const rRpe  = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-        runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
-      });
-    }
-    if (gymTSS > 0 || runTSS > 0) {
-      const total   = gymTSS + runTSS;
-      const liftPct = Math.round((gymTSS / total) * 100);
-      const runPct  = 100 - liftPct;
-      const advice  = liftPct >= 70 ? 'Heavy lifting bias this week'
-                    : runPct  >= 70 ? 'High running load this week'
-                    : 'Balanced hybrid week';
-      cards.push(`
-        <article class="card-dark p-3 mb-2" style="cursor:pointer;" data-action="open-analytics" data-context="stress-balance">
-          <div class="flex-between mb-2">
-            <div class="text-xs text-muted font-bold uppercase tracking-wider">Stress Balance</div>
-            <div class="text-xs font-bold text-inverse">${liftPct}% lift · ${runPct}% run</div>
-          </div>
-          <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.08);display:flex;overflow:hidden;">
-            <div style="width:${liftPct}%;background:#3b82f6;transition:width 0.4s;"></div>
-            <div style="width:${runPct}%;background:#ec4899;transition:width 0.4s;"></div>
-          </div>
-          <div class="text-xs text-muted mt-2">${advice}</div>
         </article>
       `);
     }
@@ -1118,7 +1094,6 @@ function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readi
   const A = (s) => s; // readability for the raw data-action strings
   const items = [];
   if (recovery?.hasData)  items.push({ label: 'Recovery',  value: `${recovery.score}%`, action: A('data-action="open-analytics" data-context="recovery-score"') });
-  if (readiness?.hasData) items.push({ label: 'Readiness', value: `${readiness.score}`,  action: A('data-action="open-analytics" data-context="recovery"') });
   items.push({ label: 'Streak', value: `${streak.current || 0}d`, action: A('data-action="open-analytics" data-context="streak"') });
 
   if (energy.hasProfile) {

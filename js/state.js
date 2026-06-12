@@ -516,6 +516,12 @@ export function triggerEngineImport(event) {
         appState = { activeProgramId: 'hybrid_engine', weekStartedAt: null, exerciseStats: {}, customExercises: [], customPrograms: [], ...parsedData };
         if (!appState.customExercises) appState.customExercises = [];
         if (!appState.customPrograms) appState.customPrograms = [];
+        let _importMigratedAny = false;
+        appState.customPrograms = appState.customPrograms.map(prog => {
+          if (!prog || prog.schemaVersion === 2) return prog;
+          _importMigratedAny = true;
+          return migrateCustomProgramToV2(prog);
+        });
         saveStateToLocalStorage(true);
         if (_onImportSuccess) _onImportSuccess();
         showToast('Data snapshot mounted successfully.');

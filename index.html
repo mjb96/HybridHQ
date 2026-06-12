@@ -683,34 +683,6 @@
 
       </div>
 
-      <div id="analytics-recovery" class="analytics-section">
-        <h2 class="section-header">Recovery Analytics</h2>
-        <h2 class="section-header mt-2">Fatigue Trend (Avg RPE)</h2>
-        <article class="card-dark p-3 mb-4">
-          <div class="flex gap-4 mb-2" style="align-items:center;font-size:0.68rem;">
-            <span style="color:var(--accent-green);">● Fresh &lt;6</span>
-            <span style="color:var(--accent-amber);">● Accumulating 6–8</span>
-            <span style="color:var(--accent-red);">● CNS Load &gt;8</span>
-          </div>
-          <div id="rpeTrendContainer"></div>
-        </article>
-
-        <h2 class="section-header mt-2">Readiness — Acute vs Chronic Load</h2>
-        <article class="card-dark p-3 mb-4">
-          <div class="grid-3-col gap-2 mb-3">
-            <div class="flex-col flex-center"><div class="text-xs text-muted mb-1">ACWR</div><div id="recoveryAcwr" class="text-lg font-heavy text-inverse">--</div></div>
-            <div class="flex-col flex-center"><div class="text-xs text-muted mb-1">Acute (this wk)</div><div id="recoveryAcute" class="text-lg font-heavy text-inverse">--</div></div>
-            <div class="flex-col flex-center"><div class="text-xs text-muted mb-1">Chronic (4-wk)</div><div id="recoveryChronic" class="text-lg font-heavy text-inverse">--</div></div>
-          </div>
-          <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
-            <span style="color:#3b82f6;">● Lifting load</span>
-            <span style="color:#ec4899;">● Running load</span>
-          </div>
-          <div id="loadTrendContainer"></div>
-          <div class="text-muted mt-2" style="font-size:0.62rem;">Load = session RPE × duration (AU). Sweet spot ACWR ≈ 0.8–1.3.</div>
-        </article>
-      </div>
-
       <div id="analytics-bodyweight" class="analytics-section">
         <h2 class="section-header">Body Weight Tracking</h2>
         <article class="card-dark p-3 mb-4">
@@ -845,29 +817,6 @@
         </article>
       </div>
 
-      <div id="analytics-stress-balance" class="analytics-section">
-        <h2 class="section-header">Stress Balance</h2>
-        <div class="grid-2-col gap-2 mb-4">
-          <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(59,130,246,0.35);">
-            <div class="text-xs text-muted mb-1">Lifting Load Share</div>
-            <div id="stressLiftShare" class="text-lg font-heavy text-inverse">0%</div>
-          </article>
-          <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(236,72,153,0.35);">
-            <div class="text-xs text-muted mb-1">Running Load Share</div>
-            <div id="stressRunShare" class="text-lg font-heavy text-inverse">0%</div>
-          </article>
-        </div>
-        <h2 class="section-header">Weekly Load (Lift vs Run)</h2>
-        <article class="card-dark p-3 mb-4">
-          <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
-            <span style="color:#3b82f6;">● Lifting</span>
-            <span style="color:#ec4899;">● Running</span>
-          </div>
-          <div id="stressChartContainer"></div>
-          <div class="text-muted mt-2" style="font-size:0.62rem;">Load = session RPE × duration (AU), comparable across lifting and running. Sessions without both logged are excluded.</div>
-        </article>
-      </div>
-
       <div id="analytics-health-steps" class="analytics-section">
         <h2 class="section-header">Activity &amp; Steps</h2>
         <div id="healthStepsContent"></div>
@@ -883,15 +832,6 @@
         <div id="healthRhrContent"></div>
       </div>
 
-      <div id="analytics-hybrid-score" class="analytics-section">
-        <h2 class="section-header">Hybrid Score</h2>
-        <div id="hybridScoreContent"></div>
-      </div>
-
-      <div id="analytics-adaptation" class="analytics-section">
-        <h2 class="section-header">Adaptation Signals</h2>
-        <div id="adaptationContent"></div>
-      </div>
 
     </section>
 
