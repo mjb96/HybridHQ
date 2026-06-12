@@ -20,6 +20,8 @@ import {
   isCompletedSet,
 } from '../engine.js';
 import { strengthLoadSeries, enduranceLoadSeries } from './load_models.js';
+import { weeklyPaceSeries } from '../metrics/metrics-running.js';
+import { weeklyE1rmByLift } from '../metrics/metrics-strength.js';
 import { DOMAINS, ENGINES, FINDING_TYPES, THRESHOLDS } from './constants_brain.js';
 import { weekRangeLabel } from '../dates.js';
 
@@ -65,22 +67,6 @@ function trend(series, flat = THRESHOLDS.TREND_FLAT_PCT) {
   };
 }
 
-function weeklyPaceSeries(state, days, maxWeek) {
-  const out = [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wk = state?.weeks?.[String(w)];
-    let totTime = 0, totDist = 0;
-    if (wk) (days || []).forEach(d => {
-      const r = wk.runs?.[d]; if (!r) return;
-      const dist = parseFloat(r.dist) || 0;
-      const pace = paceSecondsPerKm(dist, r.time || '');
-      if (dist > 0 && pace > 0) { totTime += pace * dist; totDist += dist; }
-    });
-    out.push(totDist > 0 ? totTime / totDist : 0);
-  }
-  return out;
-}
-
 // Main compound lifts we track for e1RM trends (excludes isolation work, where
 // estimated-1RM is noisy and low-signal).
 const TRACKED_LIFT_PATTERNS = [
@@ -90,29 +76,6 @@ const TRACKED_LIFT_PATTERNS = [
 ];
 const isTrackedLift = (name) => TRACKED_LIFT_PATTERNS.some(re => re.test(name || ''));
 
-// Best completed-working-set e1RM per lift, per week (warmups excluded). One
-// pass; feeds both trends and the weekly highlight.
-function liftE1rmByWeekAll(state, days, maxWeek) {
-  const out = {};
-  for (let w = 1; w <= maxWeek; w++) {
-    const wk = state?.weeks?.[String(w)];
-    if (!wk?.lifts) continue;
-    (days || []).forEach(d => {
-      const dl = wk.lifts[d] || {};
-      for (const lift in dl) {
-        const arr = dl[lift];
-        if (!Array.isArray(arr)) continue;
-        let best = 0;
-        arr.forEach(s => { if (isCompletedSet(s) && !s.isWarmup) { const e = epley1RM(s.w, s.r); if (e > best) best = e; } });
-        if (best > 0) {
-          if (!out[lift]) out[lift] = new Array(maxWeek).fill(0);
-          if (best > out[lift][w - 1]) out[lift][w - 1] = best;
-        }
-      }
-    });
-  }
-  return out;
-}
 
 // Current-week descriptive rollups — the "what you did this week" base layer
 // that works from a SINGLE logged week (trends need 2–3 weeks to appear).
@@ -159,7 +122,7 @@ function runningWeekSummary(state, days, cw) {
 // ------------------------------------------------------------------
 export function analyzeStrength(state, days, maxWeek, currentWeek) {
   const findings = [];
-  const e1rmAll = liftE1rmByWeekAll(state, days, maxWeek);
+  const e1rmAll = weeklyE1rmByLift(state, days, maxWeek);
 
   Object.keys(e1rmAll).filter(isTrackedLift).forEach(lift => {
     const t = trend(e1rmAll[lift]);
