@@ -120,6 +120,22 @@ function renderRatioBarTile(config, data) {
   `;
 }
 
+function renderBriefTile(config, data) {
+  const accent = `var(${config.accentVar})`;
+  const tagHTML = data.tag
+    ? `<span style="font-size:0.6rem;font-weight:700;padding:1px 8px;border-radius:999px;color:${data.tagColor || accent};background:color-mix(in srgb, ${data.tagColor || accent} 15%, transparent);">${data.tag}</span>`
+    : '';
+  const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
+  return `
+    <div class="card-icon-title mb-1" style="color:${accent};">
+      <span>${config.icon}</span> ${config.label}
+      ${tagHTML ? `<span style="margin-left:auto;">${tagHTML}</span>` : ''}
+    </div>
+    <div class="font-heavy" style="font-size:0.78rem;line-height:1.3;color:${heroColor};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${data.hero || '–'}</div>
+    ${data.sub ? `<div class="text-muted mt-1" style="font-size:0.6rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${data.sub}</div>` : ''}
+  `;
+}
+
 function renderProgressTile(config, data) {
   const accentColor = `var(${config.accentVar})`;
   return `
@@ -136,6 +152,7 @@ function renderProgressTile(config, data) {
 function renderTileContent(config, data) {
   if (data.state === 'error') return renderTileError(config.label);
   switch (config.type) {
+    case DashboardTileType.BRIEF:     return renderBriefTile(config, data);
     case DashboardTileType.RING:      return renderRingTile(config, data);
     case DashboardTileType.SPLIT_3:   return renderSplit3Tile(config, data);
     case DashboardTileType.RATIO_BAR: return renderRatioBarTile(config, data);

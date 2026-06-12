@@ -30,16 +30,19 @@
 import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
          computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence,
          isCompletedSet, parseDurationToMinutes } from './engine.js';
+import { generateInsights, summarizeReport } from './brain/core.js';
+import { generateDailyBrief } from './brain/daily_readiness.js';
 
 // ==========================================
 // TILE TYPE ENUM
 // ==========================================
 export const DashboardTileType = Object.freeze({
   METRIC:    'metric',    // Simple hero number + subtitle
-  RING:      'ring',      // Progress ring (readiness)
+  RING:      'ring',      // Progress ring
   SPLIT_3:   'split_3',  // 3-row mini-table (top lifts)
-  RATIO_BAR: 'ratio_bar', // Dual fill bar (stress balance)
+  RATIO_BAR: 'ratio_bar', // Dual fill bar
   PROGRESS:  'progress',  // Count / total (consistency)
+  BRIEF:     'brief',     // Text headline + status chip (daily brief, top mover)
 });
 
 // ==========================================
@@ -53,6 +56,38 @@ export const DashboardTileType = Object.freeze({
 // ==========================================
 export const TILE_REGISTRY = [
 
+  // ---- DAILY BRIEF (default visible, order 0) ----------------
+  {
+    id:        'daily-brief',
+    type:      DashboardTileType.BRIEF,
+    icon:      '🧠',
+    label:     'Daily Brief',
+    accentVar: '--color-blue',
+    navTarget: 'coach',
+    order:     0,
+    renderData(appState, defaultDays, activeProgram, selectedDay) {
+      try {
+        const brief = generateDailyBrief(appState, {
+          days: defaultDays, program: activeProgram,
+          selectedDay, currentWeek: appState.currentWeek,
+        });
+        if (!brief.hasData) {
+          return { hero: 'Rest day yesterday — fresh to train.', sub: '', tag: 'Fresh', tagColor: 'var(--color-green)', state: 'empty' };
+        }
+        const tagColor = brief.status === 'reduced' ? 'var(--color-red)' : brief.status === 'moderate' ? 'var(--color-amber)' : 'var(--color-green)';
+        const tag      = brief.status === 'reduced' ? 'Reduced' : brief.status === 'moderate' ? 'Moderate' : 'Fresh';
+        return {
+          hero:  brief.headline,
+          sub:   brief.adjustments?.[0] || brief.directive || '',
+          tag, tagColor,
+          state: 'loaded',
+        };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
   // ---- TODAY --------------------------------------------------
   {
     id:        'today',
@@ -61,7 +96,7 @@ export const TILE_REGISTRY = [
     label:     'Today',
     accentVar: '--color-blue',
     navTarget: 'custom:today-summary',
-    order:     0,
+    order:     1,
     renderData(appState, defaultDays, activeProgram, selectedDay) {
       try {
         const wk = appState.currentWeek || '1';
@@ -113,7 +148,7 @@ export const TILE_REGISTRY = [
     label:     'Consistency',
     accentVar: '--color-blue',
     navTarget: 'progress',
-    order:     2,
+    order:     5,
     renderData(appState, defaultDays, activeProgram) {
       try {
         const wk = appState.currentWeek || '1';
@@ -154,7 +189,7 @@ export const TILE_REGISTRY = [
     label:     'Body Weight',
     accentVar: '--color-green',
     navTarget: 'bodyweight',
-    order:     3,
+    order:     6,
     renderData(appState) {
       try {
         const bwLog = appState.bodyWeightLog || [];
@@ -190,7 +225,7 @@ export const TILE_REGISTRY = [
     label:     'Top Lifts (1RM)',
     accentVar: '--color-blue',
     navTarget: 'strength_pr',
-    order:     4,
+    order:     7,
     renderData(appState) {
       try {
         const p = computeBig3Progression(appState);
@@ -225,7 +260,7 @@ export const TILE_REGISTRY = [
     label:     'Active Fuel',
     accentVar: '--color-amber',
     navTarget: 'active-fuel',
-    order:     5,
+    order:     8,
     renderData(appState, defaultDays) {
       try {
         const wk = appState.currentWeek || '1';
@@ -252,7 +287,7 @@ export const TILE_REGISTRY = [
     label:     'Avg Pace',
     accentVar: '--color-pink',
     navTarget: 'running',
-    order:     6,
+    order:     9,
     renderData(appState, defaultDays) {
       try {
         const wk = appState.currentWeek || '1';
@@ -288,7 +323,7 @@ export const TILE_REGISTRY = [
     label:     'Recovery',
     accentVar: '--color-green',
     navTarget: 'recovery-score',
-    order:     8,
+    order:     10,
     renderData(appState, defaultDays) {
       try {
         const r = computeRecoveryScore(appState, defaultDays);
@@ -319,7 +354,7 @@ export const TILE_REGISTRY = [
     label:     'Weekly Volume',
     accentVar: '--color-blue',
     navTarget: 'weekly-volume',
-    order:     9,
+    order:     11,
     renderData(appState, defaultDays) {
       try {
         const wk = appState.currentWeek || '1';
@@ -367,7 +402,7 @@ export const TILE_REGISTRY = [
     label:     'Training Streak',
     accentVar: '--color-amber',
     navTarget: 'streak',
-    order:     10,
+    order:     4,
     renderData(appState) {
       try {
         const sv = computeStreakView(appState.streakData);
@@ -479,7 +514,7 @@ export const TILE_REGISTRY = [
     label:     'Goal Progress',
     accentVar: '--color-blue',
     navTarget: 'goal-progress',
-    order:     11,
+    order:     2,
     renderData(appState, defaultDays, activeProgram) {
       try {
         const wk    = parseInt(appState.currentWeek, 10) || 1;
@@ -493,6 +528,43 @@ export const TILE_REGISTRY = [
           tag:   `${a.pct}% adherence`,
           tagColor: a.pct >= 80 ? 'var(--color-green)' : a.pct >= 50 ? 'var(--color-amber)' : 'var(--color-red)',
           state: a.total > 0 ? 'loaded' : 'empty',
+        };
+      } catch {
+        return { hero: '--', sub: 'Unavailable', state: 'error' };
+      }
+    },
+  },
+
+  // ---- TOP MOVER (default visible, order 3) ------------------
+  {
+    id:        'top-mover',
+    type:      DashboardTileType.BRIEF,
+    icon:      '💡',
+    label:     'Top Mover',
+    accentVar: '--color-amber',
+    navTarget: 'coach',
+    order:     3,
+    renderData(appState, defaultDays, activeProgram) {
+      try {
+        const report = generateInsights(appState, {
+          days: defaultDays, program: activeProgram,
+          currentWeek: appState.currentWeek,
+          maxWeek: activeProgram?.totalWeeks,
+          topN: 5,
+        });
+        const { rest } = summarizeReport(report);
+        const mover = rest[0];
+        if (!mover) {
+          return { hero: 'Keep logging to surface your top mover.', sub: '', tag: 'Pending', tagColor: 'var(--text-secondary)', state: 'empty' };
+        }
+        const CAT_COLOR = { risk: 'var(--color-red)', opportunity: 'var(--color-amber)', progress: 'var(--color-green)', recovery: 'var(--color-blue)', goal: 'var(--color-blue)' };
+        const CAT_LABEL = { risk: 'Risk', opportunity: 'Opportunity', progress: 'Progress', recovery: 'Recovery', goal: 'Goal' };
+        return {
+          hero:     mover.observation,
+          sub:      mover.suggestedAction,
+          tag:      CAT_LABEL[mover.category] || mover.category,
+          tagColor: CAT_COLOR[mover.category] || 'var(--text-secondary)',
+          state:    'loaded',
         };
       } catch {
         return { hero: '--', sub: 'Unavailable', state: 'error' };
