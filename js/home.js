@@ -293,6 +293,105 @@ export function resetTileCustomiser() {
   renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, _getSelectedDay());
 }
 
+function renderSupportCards(appState, defaultDays, activeProgram) {
+  const container = document.getElementById('homeSupportCards');
+  if (!container) return;
+
+  const cards = [];
+
+  // Readiness (ACWR)
+  try {
+    const maxWeek = activeProgram?.totalWeeks || 12;
+    const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
+    const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
+    const r = computeReadiness(totalByWeek, appState.currentWeek);
+    if (r.hasData) {
+      const color = r.score >= 75 ? '#10b981' : r.score >= 50 ? '#f59e0b' : '#ef4444';
+      const label = r.score >= 75 ? 'Ready to train' : r.score >= 50 ? 'Moderate load' : 'High fatigue — prioritise recovery';
+      const grad  = `conic-gradient(${color} ${r.score}%, rgba(255,255,255,0.08) 0)`;
+      cards.push(`
+        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery">
+          <div>
+            <div class="text-xs text-muted font-bold uppercase tracking-wider mb-1">Readiness</div>
+            <div class="font-heavy text-inverse" style="font-size:1.4rem;line-height:1;">${r.score}<span class="text-muted" style="font-size:0.85rem;">/100</span></div>
+            <div class="text-xs mt-1" style="color:${color};">${label}</div>
+            <div class="text-xs text-muted mt-1">ACWR ${r.acwr.toFixed(2)} · tap for full report</div>
+          </div>
+          <div style="width:58px;height:58px;border-radius:50%;background:${grad};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div style="width:44px;height:44px;border-radius:50%;background:var(--bg-card,#0f1929);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:1rem;font-weight:800;color:${color};">${r.score}</span>
+            </div>
+          </div>
+        </article>
+      `);
+    }
+  } catch {}
+
+  // Stress Balance (lift/run TSS ratio)
+  try {
+    const wk = appState.currentWeek || '1';
+    const weekData = appState.weeks?.[wk];
+    let gymTSS = 0, runTSS = 0;
+    if (weekData) {
+      defaultDays.forEach(d => {
+        let sets = 0;
+        const gRpe = parseInt(weekData.gymRpe?.[d], 10) || 0;
+        for (const lift in (weekData.lifts?.[d] || {})) {
+          if (Array.isArray(weekData.lifts[d][lift])) sets += weekData.lifts[d][lift].filter(s => isCompletedSet(s)).length;
+        }
+        gymTSS += sets * (gRpe > 0 ? gRpe : 6);
+        const rDist = parseFloat(weekData.runs?.[d]?.dist) || 0;
+        const rRpe  = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
+        runTSS += rDist * (rRpe > 0 ? rRpe : 6) * 3;
+      });
+    }
+    if (gymTSS > 0 || runTSS > 0) {
+      const total   = gymTSS + runTSS;
+      const liftPct = Math.round((gymTSS / total) * 100);
+      const runPct  = 100 - liftPct;
+      const advice  = liftPct >= 70 ? 'Heavy lifting bias this week'
+                    : runPct  >= 70 ? 'High running load this week'
+                    : 'Balanced hybrid week';
+      cards.push(`
+        <article class="card-dark p-3 mb-2" style="cursor:pointer;" data-action="open-analytics" data-context="stress-balance">
+          <div class="flex-between mb-2">
+            <div class="text-xs text-muted font-bold uppercase tracking-wider">Stress Balance</div>
+            <div class="text-xs font-bold text-inverse">${liftPct}% lift · ${runPct}% run</div>
+          </div>
+          <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.08);display:flex;overflow:hidden;">
+            <div style="width:${liftPct}%;background:#3b82f6;transition:width 0.4s;"></div>
+            <div style="width:${runPct}%;background:#ec4899;transition:width 0.4s;"></div>
+          </div>
+          <div class="text-xs text-muted mt-2">${advice}</div>
+        </article>
+      `);
+    }
+  } catch {}
+
+  // Block Progress
+  try {
+    const wk        = parseInt(appState.currentWeek, 10) || 1;
+    const totalWeeks = activeProgram?.totalWeeks || 12;
+    const pct       = Math.min(100, Math.round((wk / totalWeeks) * 100));
+    const phaseName = WEEK_PHASE_NAMES[String(wk)] || activeProgram?.dossier?.focus || 'Training block';
+    const color     = pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#3b82f6';
+    cards.push(`
+      <article class="card-dark p-3 mb-2" style="cursor:pointer;" data-action="open-analytics" data-context="progress">
+        <div class="flex-between mb-2">
+          <div class="text-xs text-muted font-bold uppercase tracking-wider">Block Progress</div>
+          <div class="text-xs font-bold" style="color:${color};">Week ${wk} of ${totalWeeks}</div>
+        </div>
+        <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;transition:width 0.4s;"></div>
+        </div>
+        <div class="text-xs text-muted mt-2">${phaseName} · ${pct}% complete</div>
+      </article>
+    `);
+  } catch {}
+
+  container.innerHTML = cards.join('');
+}
+
 export function renderHome() {
   const appState = _getState();
   const selectedDay = _getSelectedDay();
@@ -602,21 +701,13 @@ export function renderHome() {
     runChartContainer.innerHTML = runHTML;
   }
 
-  // TIER 1 + TIER 2 — telemetry strip + Coach's Briefing hero.
-  try { renderIntel(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
-  catch (e) { console.warn('[intel] render skipped:', e); }
-
-  // TIER 2.5a — Today's Focus (daily readiness).
-  try { renderDailyReadiness(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
-  catch (e) { console.warn('[daily-readiness] render skipped:', e); }
-
-  // TIER 2.5b — Your Week Ahead.
-  try { renderWeekAhead(appState, DEFAULT_DAYS, activeProgram); }
-  catch (e) { console.warn('[week-ahead] render skipped:', e); }
-
-  // TIER 3 — Hybrid Focus carousel: apply saved order + enable reordering.
+  // Hybrid Focus carousel: apply saved order + enable reordering.
   try { applyFocusOrder(); mountFocusDragAndDrop(); }
   catch (e) { console.warn('[hybrid-focus] reorder skipped:', e); }
+
+  // At a Glance tile grid.
+  try { renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay); mountTileDragAndDrop(); }
+  catch (e) { console.warn('[glance-grid] render skipped:', e); }
 
   const progressPercentage = (() => {
     let total = 0, done = 0;

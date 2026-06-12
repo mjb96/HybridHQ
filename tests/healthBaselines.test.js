@@ -12,6 +12,12 @@ import {
   sleepReadinessNote,
   generateHealthCoachNote,
   buildDailySeries,
+  dayOverDay,
+  lastNDaysSeries,
+  lastNWeeksSeries,
+  extremes,
+  trendDirection,
+  buildTrendBrief,
 } from '../js/health/healthBaselines.js';
 
 // ── Test helpers ───────────────────────────────────────────────────────────────
@@ -252,4 +258,93 @@ test('buildDailySeries handles empty log', () => {
   const { labels, values } = buildDailySeries([], 'steps', 7);
   assert.deepEqual(labels, []);
   assert.deepEqual(values, []);
+});
+
+// ── Trend-first helpers (Garmin-style) ──────────────────────────────────────────
+
+test('dayOverDay reports upward direction and delta', () => {
+  const log = [
+    { date: daysAgo(1), steps: 6000 },
+    { date: daysAgo(0), steps: 9000 },
+  ];
+  const d = dayOverDay(log, 'steps');
+  assert.equal(d.today, 9000);
+  assert.equal(d.yesterday, 6000);
+  assert.equal(d.delta, 3000);
+  assert.equal(d.pctDelta, 50);
+  assert.equal(d.direction, 'up');
+});
+
+test('dayOverDay flags flat when equal', () => {
+  const log = [{ date: daysAgo(1), steps: 8000 }, { date: daysAgo(0), steps: 8000 }];
+  assert.equal(dayOverDay(log, 'steps').direction, 'flat');
+});
+
+test('dayOverDay handles missing yesterday', () => {
+  const log = [{ date: daysAgo(0), steps: 8000 }];
+  const d = dayOverDay(log, 'steps');
+  assert.equal(d.hasYesterday, false);
+  assert.equal(d.pctDelta, null);
+});
+
+test('lastNDaysSeries returns n entries with todayIndex at the end', () => {
+  const log = makeLog([[0, { steps: 5000 }], [1, { steps: 4000 }]]);
+  const s = lastNDaysSeries(log, 'steps', 7);
+  assert.equal(s.labels.length, 7);
+  assert.equal(s.values.length, 7);
+  assert.equal(s.todayIndex, 6);
+  assert.equal(s.values[6], 5000);
+});
+
+test('lastNWeeksSeries sums and averages by bucket', () => {
+  const log = makeLog([[0, { steps: 10000 }], [1, { steps: 8000 }]]);
+  const sum = lastNWeeksSeries(log, 'steps', 4, 'sum');
+  assert.equal(sum.values.length, 4);
+  assert.equal(sum.values[3], 18000); // both days fall in the trailing week
+  const avg = lastNWeeksSeries(log, 'steps', 4, 'avg');
+  assert.equal(avg.values[3], 9000);
+});
+
+test('extremes finds best and lowest non-zero day', () => {
+  const log = [
+    { date: daysAgo(3), steps: 3000 },
+    { date: daysAgo(2), steps: 12000 },
+    { date: daysAgo(1), steps: 0 },
+  ];
+  const e = extremes(log, 'steps', 30);
+  assert.equal(e.best.value, 12000);
+  assert.equal(e.lowest.value, 3000);
+});
+
+test('extremes returns nulls for empty data', () => {
+  const e = extremes([], 'steps', 30);
+  assert.equal(e.best, null);
+  assert.equal(e.lowest, null);
+});
+
+test('trendDirection detects rising and falling', () => {
+  assert.equal(trendDirection([1, 2, 3, 4, 5]).direction, 'rising');
+  assert.equal(trendDirection([5, 4, 3, 2, 1]).direction, 'falling');
+  assert.equal(trendDirection([3, 3, 3]).direction, 'steady');
+});
+
+test('trendDirection is steady with insufficient data', () => {
+  assert.equal(trendDirection([5]).direction, 'steady');
+  assert.equal(trendDirection([]).direction, 'steady');
+});
+
+test('buildTrendBrief bundles dod, daily, weekly, extremes and a note', () => {
+  const log = makeLog([[0, { steps: 11000 }], [1, { steps: 7000 }], [8, { steps: 6000 }]]);
+  const brief = buildTrendBrief(log, 'steps', { label: 'steps', unit: 'steps', higherIsBetter: true, goal: 10000 });
+  assert.equal(brief.daily.values.length, 7);
+  assert.equal(brief.weekly.values.length, 4);
+  assert.ok(brief.best && brief.lowest);
+  assert.ok(typeof brief.note === 'string' && brief.note.length > 0);
+  assert.ok(typeof brief.fmt === 'function');
+});
+
+test('buildTrendBrief note mentions goal cleared when above target', () => {
+  const log = makeLog([[0, { steps: 12000 }], [1, { steps: 11000 }]]);
+  const brief = buildTrendBrief(log, 'steps', { label: 'steps', unit: 'steps', goal: 10000 });
+  assert.match(brief.note, /target/i);
 });

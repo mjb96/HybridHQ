@@ -700,6 +700,52 @@ export function renderTrendLineWithBaseline(container, labels, values, baselineV
 }
 
 // ==========================================
+// HISTORY BARS (Garmin-style daily / weekly history)
+// Short labelled bars with the most-recent bar highlighted, value labels on
+// top, and an optional dashed reference line (baseline or goal). Designed for
+// 7-day (day-of-week) and 4-week (week-ago) recent-history strips.
+// ==========================================
+export function renderHistoryBars(container, labels, values, opts = {}) {
+  if (!container) return;
+  const n = labels.length;
+  const hasData = (values || []).some(v => v > 0);
+  if (!hasData || n === 0) {
+    container.innerHTML = `<p style="color:rgba(255,255,255,0.6);font-size:0.85rem;padding:10px 0;">${opts.emptyMsg || 'No data yet.'}</p>`;
+    return;
+  }
+  const color        = opts.color || '#22d3ee';
+  const dimColor     = opts.dimColor || 'rgba(255,255,255,0.18)';
+  const highlightIdx = opts.highlightIndex != null ? opts.highlightIndex : n - 1;
+  const ref          = opts.refLine || null;       // { value, label }
+  const fmtV         = opts.valueFmt || (v => Math.round(v).toLocaleString());
+  const H = 150;
+  const chartW = W - PAD_L - PAD_R, chartH = H - PAD_B - PAD_T;
+  const maxV = Math.max(...values, ref?.value || 0, 1);
+  const barW = Math.max(8, Math.floor(chartW / n) - 8);
+  const toY = v => PAD_T + chartH - (v / maxV) * chartH;
+
+  let bars = '', xAxis = '', valLabels = '';
+  values.forEach((v, i) => {
+    const x = PAD_L + (i / n) * chartW + (chartW / n - barW) / 2;
+    const y = toY(v);
+    const isHi = i === highlightIdx;
+    const fill = v <= 0 ? dimColor : isHi ? color : `color-mix(in srgb, ${color} 55%, transparent)`;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${(PAD_T + chartH - y).toFixed(1)}" rx="3" fill="${fill}"/>`;
+    if (v > 0) valLabels += `<text x="${(x + barW / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="${isHi ? '#fff' : 'rgba(255,255,255,0.7)'}">${fmtV(v)}</text>`;
+    xAxis += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="${isHi ? '#fff' : 'rgba(255,255,255,0.6)'}" font-weight="${isHi ? '700' : '400'}">${labels[i]}</text>`;
+  });
+
+  let refLine = '';
+  if (ref && ref.value > 0) {
+    const ry = toY(ref.value);
+    refLine = `<line x1="${PAD_L}" y1="${ry.toFixed(1)}" x2="${W - PAD_R}" y2="${ry.toFixed(1)}" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-dasharray="5 4"/>
+               <text x="${(W - PAD_R - 2).toFixed(1)}" y="${(ry - 4).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.45)">${ref.label || 'avg'}</text>`;
+  }
+
+  container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;">${refLine}${bars}${valLabels}${xAxis}</svg>`;
+}
+
+// ==========================================
 // STREAM CHARTS
 // Per-run pace / HR / elevation from IndexedDB FIT stream data.
 // ==========================================
