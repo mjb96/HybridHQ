@@ -349,70 +349,27 @@
   <main id="app-root">
 
     <section id="view-home" class="view-container active" aria-label="Home Dashboard">
-      
+
+      <!-- Hidden state elements referenced by renderHome logic -->
       <div style="display:none;">
-        <span id="homeWeeklyProgressPct">0%</span>
+        <span id="homeWeeklyProgressPct"></span>
         <div id="homeWeeklyProgressBar"></div>
         <span id="homeBlockTypeLabel"></span>
-        <span id="homeWeeklyProgressTasks"></span>
-        <article id="homeEngineAlertCard"><h2 id="homeEngineAlertTitle"></h2><p id="homeEngineAlertDesc"></p></article>
+        <article id="homeEngineAlertCard"><p id="homeEngineAlertDesc"></p></article>
         <article id="homeDeloadSuggestionCard"><p id="homeDeloadReason"></p></article>
         <article id="homeWeekCompareCard"><div id="homeWeekCompareGrid"></div></article>
+        <div id="homeDrillPreviewContainer"></div>
+        <div id="telemetryStrip"></div>
+        <article id="brainBriefing"><span id="tsVerdict"></span><div id="tsStatus"></div><div id="brainBriefingBody"></div><span id="tsLoad"></span><span id="tsBase"></span><span id="tsRecovery"></span><div id="tsLoadMarker"></div></article>
+        <article id="dailyReadinessCard"><span id="drStatusChip"></span><div id="drHeadline"></div><div id="drDirective"></div><ul id="drAdjustments"></ul></article>
+        <article id="weekAheadCard"><span id="weekAheadPhaseChip"></span><span id="weekAheadCountdown"></span><button id="weekAheadGoalBtn"></button><div id="weekAheadHeadline"></div><div id="weekAheadDirective"></div><ul id="weekAheadAdjustments"></ul><div id="weekAheadRationale"></div></article>
+        <span id="homeWeekBlockIndicator"></span>
+        <span id="homeCalendarDayLabel"></span><span id="homeFocusBadge"></span><div id="homeDayAccentBar"></div>
+        <div id="focusStrengthHCNote"></div><div id="focusRunHCNote"></div>
+        <div id="homeSupportCards"></div>
       </div>
 
-      <div class="flex-between mb-4 mt-2">
-        <h1 id="homeWeekBlockIndicator" class="text-sm font-bold text-muted uppercase tracking-wider m-0">Week 1</h1>
-        <span class="text-sm font-bold text-accent-blue">SYNCED</span>
-      </div>
-
-      <!-- TIER 1 · Telemetry strip -->
-      <div id="telemetryStrip" class="telemetry-strip" aria-label="Daily telemetry"></div>
-
-      <!-- TIER 2 · Training Status hero (COROS-style) -->
-      <article id="brainBriefing" class="training-status" data-action="open-analytics" data-context="coach"
-               style="display:none;" aria-label="Training status — tap for the full read">
-        <div class="ts-head">
-          <span class="ts-label">Training Status</span>
-          <span id="tsVerdict" class="ts-verdict"></span>
-        </div>
-        <div id="tsStatus" class="ts-status">—</div>
-        <div id="brainBriefingBody" class="ts-detail"></div>
-        <div class="ts-loadbar"><div id="tsLoadMarker" class="ts-loadbar-marker" style="left:50%;"></div></div>
-        <div class="ts-stats">
-          <div class="ts-stat"><span id="tsLoad" class="ts-stat-v">—</span><span class="ts-stat-l">7-day load</span></div>
-          <div class="ts-stat"><span id="tsBase" class="ts-stat-v">—</span><span class="ts-stat-l">Base fitness</span></div>
-          <div class="ts-stat"><span id="tsRecovery" class="ts-stat-v">—</span><span class="ts-stat-l">Recovery</span></div>
-        </div>
-        <div class="ts-more">Tap for the full read →</div>
-      </article>
-
-      <!-- TIER 2.5a · Today's Focus (daily readiness) -->
-      <article id="dailyReadinessCard" class="card-dark daily-readiness-card mt-3" style="display:none;" aria-label="Today's Focus">
-        <div class="dr-header">
-          <span class="dr-label">Today's Focus</span>
-          <span id="drStatusChip" class="dr-status-chip"></span>
-        </div>
-        <div id="drHeadline" class="dr-headline"></div>
-        <div id="drDirective" class="dr-directive"></div>
-        <ul id="drAdjustments" class="dr-adjustments"></ul>
-      </article>
-
-      <!-- TIER 2.5b · Your Week Ahead -->
-      <article id="weekAheadCard" class="card-dark week-ahead-card mt-3" style="display:none;" aria-label="Your Week Ahead">
-        <div class="week-ahead-header">
-          <div class="week-ahead-meta">
-            <span id="weekAheadPhaseChip" class="week-ahead-phase-chip"></span>
-            <span id="weekAheadCountdown" class="week-ahead-countdown"></span>
-          </div>
-          <button id="weekAheadGoalBtn" class="week-ahead-goal-btn" data-action="open-goal-setup" aria-label="Set training goal"></button>
-        </div>
-        <div id="weekAheadHeadline" class="week-ahead-headline"></div>
-        <div id="weekAheadDirective" class="week-ahead-directive"></div>
-        <ul id="weekAheadAdjustments" class="week-ahead-adjustments"></ul>
-        <div id="weekAheadRationale" class="week-ahead-rationale"></div>
-      </article>
-
-      <!-- TIER 3 · Hybrid Focus (dual track) -->
+      <!-- Hybrid Focus -->
       <h2 class="focus-header-text mt-2">Hybrid Focus</h2>
 
       <div class="in-focus-carousel">
@@ -424,7 +381,6 @@
           <div class="focus-progress"><div id="focusStrengthBar" class="focus-progress-fill" style="background:var(--color-blue);"></div></div>
           <div class="bar-chart-container" id="strengthBarChart"></div>
           <div id="focusStrengthMilestone" class="focus-milestone"></div>
-          <div id="focusStrengthHCNote" class="focus-hc-note"></div>
         </article>
 
         <article class="card-dark carousel-card focus-card" data-focus-id="running" data-action="open-analytics" data-context="running">
@@ -434,13 +390,13 @@
           <div class="focus-progress"><div id="focusRunBar" class="focus-progress-fill" style="background:var(--accent-pink,#ec4899);"></div></div>
           <div class="bar-chart-container" id="runBarChart"></div>
           <div id="focusRunMilestone" class="focus-milestone"></div>
-          <div id="focusRunHCNote" class="focus-hc-note"></div>
         </article>
 
       </div>
 
-      <!-- TIER 4 · Supporting Intelligence -->
-      <div id="homeSupportCards" class="mt-3"></div>
+      <!-- At a Glance -->
+      <h2 class="focus-header-text mt-4">At a Glance</h2>
+      <div id="glanceGrid" class="glance-grid"></div>
 
     </section>
 

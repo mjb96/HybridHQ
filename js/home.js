@@ -701,58 +701,13 @@ export function renderHome() {
     runChartContainer.innerHTML = runHTML;
   }
 
-  // TIER 1 + TIER 2 — telemetry strip + Coach's Briefing hero.
-  try { renderIntel(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
-  catch (e) { console.warn('[intel] render skipped:', e); }
-
-  // TIER 2.5a — Today's Focus (daily readiness).
-  try { renderDailyReadiness(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
-  catch (e) { console.warn('[daily-readiness] render skipped:', e); }
-
-  // TIER 2.5b — Your Week Ahead.
-  try { renderWeekAhead(appState, DEFAULT_DAYS, activeProgram); }
-  catch (e) { console.warn('[week-ahead] render skipped:', e); }
-
-  // HC context inside focus cards — enriches Strength and Running with sleep/RHR/steps.
-  try {
-    const h = appState.health;
-    const strengthHCEl = document.getElementById('focusStrengthHCNote');
-    const runHCEl      = document.getElementById('focusRunHCNote');
-    if (h) {
-      if (strengthHCEl) {
-        const parts = [];
-        if (h.sleepHours > 0) {
-          const tag = h.sleepHours >= 7.5 ? '✓ good rest' : h.sleepHours >= 6 ? 'moderate sleep' : '⚠ low sleep';
-          parts.push(`💤 ${h.sleepHours}h — ${tag}`);
-        }
-        if (h.restingHeartRate) {
-          const tag = h.restingHeartRate < 60 ? 'RHR optimal' : h.restingHeartRate < 70 ? 'RHR normal' : '⚠ RHR elevated';
-          parts.push(`💗 ${h.restingHeartRate} bpm — ${tag}`);
-        }
-        strengthHCEl.textContent = parts.join(' · ');
-      }
-      if (runHCEl) {
-        const parts = [];
-        if (h.sleepHours > 0) {
-          const tag = h.sleepHours >= 7.5 ? 'well rested' : h.sleepHours >= 6 ? 'moderate sleep' : '⚠ low sleep';
-          parts.push(`💤 ${h.sleepHours}h — ${tag}`);
-        }
-        if (h.steps > 0) parts.push(`👟 ${h.steps.toLocaleString()} steps today`);
-        runHCEl.textContent = parts.join(' · ');
-      }
-    } else {
-      if (strengthHCEl) strengthHCEl.textContent = '';
-      if (runHCEl) runHCEl.textContent = '';
-    }
-  } catch (e) { console.warn('[focus-hc-note] skipped:', e); }
-
-  // TIER 3 — Hybrid Focus carousel: apply saved order + enable reordering.
+  // Hybrid Focus carousel: apply saved order + enable reordering.
   try { applyFocusOrder(); mountFocusDragAndDrop(); }
   catch (e) { console.warn('[hybrid-focus] reorder skipped:', e); }
 
-  // TIER 4 — Supporting cards: Readiness, Stress Balance, Block Progress.
-  try { renderSupportCards(appState, DEFAULT_DAYS, activeProgram); }
-  catch (e) { console.warn('[support-cards] render skipped:', e); }
+  // At a Glance tile grid.
+  try { renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay); mountTileDragAndDrop(); }
+  catch (e) { console.warn('[glance-grid] render skipped:', e); }
 
   const progressPercentage = (() => {
     let total = 0, done = 0;
