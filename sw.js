@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v43';
+const CACHE_NAME = 'hybrid-training-v72';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -19,6 +19,8 @@ const ASSETS_TO_CACHE = [
   './js/schema.js',
   './js/debug.js',
   './js/util.js',
+  './js/dates.js',
+  './js/profile.js',
   './js/garmin.js',
   './js/home.js',
   './js/state.js',
@@ -33,15 +35,19 @@ const ASSETS_TO_CACHE = [
   './js/builder-run-editor.js',
   './js/builder-progression.js',
   './js/builder-preview.js',
-  
-  // Hybrid Brain Intelligence Layer
+
+  // Hybrid Brain — intelligence layer
   './js/brain/constants_brain.js',
-  './js/brain/fatigue_models.js',
-  './js/brain/observer.js',
-  './js/brain/patterns.js',
-  './js/brain/analyst.js',
-  './js/brain/insight_prioritizer.js',
-  './js/brain/core.js'
+  './js/brain/load_models.js',
+  './js/brain/analysis.js',
+  './js/brain/attribution.js',
+  './js/brain/insights.js',
+  './js/brain/core.js',
+  './js/brain/brain_dashboard.js',
+  './js/brain/analytics_brain.js',
+  './js/brain/exercise_metadata.js',
+  './js/brain/session_fatigue.js',
+  './js/brain/briefing.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -70,16 +76,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Network-first for JS modules so bug fixes reach users immediately;
-// fall back to cache only when offline.
+// Network-first for code/markup/styles (JS, CSS, HTML) so fixes reach users on
+// the next reload instead of being pinned to a stale cache. Only static media
+// (icons/images/fonts) stays cache-first. Falls back to cache offline.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const isJSModule = url.pathname.startsWith('/js/') || url.pathname.endsWith('.js');
+  const p = url.pathname;
+  const isNetworkFirst =
+    p.startsWith('/js/') || p.endsWith('.js') ||
+    p.endsWith('.css') || p.endsWith('.html') ||
+    p === '/' || p.endsWith('/');
 
-  if (isJSModule) {
-    // Network-first for JS
+  if (isNetworkFirst) {
+    // Network-first for code, styles and markup
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {

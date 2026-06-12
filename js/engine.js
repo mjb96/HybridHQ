@@ -71,7 +71,7 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
         finishedSets.forEach(s => {
           const w_ = parseFloat(s.w) || 0;
           const r_ = parseInt(s.r, 10) || 0;
-          const e = w_ * (1 + r_ / 30);
+          const e = epley1RM(w_, r_);
           if (e > bestE1rm) { bestE1rm = e; bestWeight = w_; bestReps = r_; }
         });
         history.push({ weekNum: w, weight: bestWeight, reps: bestReps, e1rm: bestE1rm });
@@ -235,7 +235,7 @@ export function computeEstimated1RMs() {
           if (s && s.c && !s.isWarmup) {
             const weight = parseFloat(s.w) || 0;
             const reps = parseInt(s.r, 10) || 0;
-            const e1rm = weight * (1 + reps / 30);
+            const e1rm = epley1RM(weight, reps);
             
             if (wKey === wk) {
               if (lKey === 'Back Squat' && e1rm > result.currentSq) result.currentSq = e1rm;
@@ -272,7 +272,7 @@ export function computeExercisePRs(state, stats = {}) {
           if (set && set.c && set.w && set.r && !set.isWarmup) {
             const weight = parseFloat(set.w);
             const reps = parseInt(set.r);
-            const e1RM = weight * (1 + (reps / 30));
+            const e1RM = epley1RM(weight, reps);
             if (e1RM > maxEstimated1RM) maxEstimated1RM = e1RM;
           }
         });
@@ -303,7 +303,7 @@ export function epley1RM(weight, reps) {
   return w * (1 + r / 30);
 }
 
-function isCompletedSet(s) {
+export function isCompletedSet(s) {
   return !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1));
 }
 
@@ -564,6 +564,30 @@ export function parseDurationToMinutes(timeStr) {
   return sec / 60;
 }
 
+// ==========================================
+// PACE PARSING / FORMATTING (canonical)
+// Average pace in seconds/km from distance (km) + an "mm:ss"/"h:mm:ss" time
+// string, plus a display formatter. Single source consumed by analytics (and
+// available to any tile) so pace math/formatting is defined in exactly one place.
+// ==========================================
+export function paceSecondsPerKm(distKm, timeStr) {
+  const dist = parseFloat(distKm) || 0;
+  if (!dist || !timeStr) return 0;
+  const parts = String(timeStr).split(':').map(Number);
+  let totalSecs = 0;
+  if (parts.length === 2) totalSecs = parts[0] * 60 + parts[1];
+  else if (parts.length === 3) totalSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (totalSecs === 0) return 0;
+  return totalSecs / dist;
+}
+
+export function formatPace(secsPerKm) {
+  if (!secsPerKm || secsPerKm === 0) return '--';
+  const m = Math.floor(secsPerKm / 60);
+  const s = Math.round(secsPerKm % 60).toString().padStart(2, '0');
+  return `${m}:${s}/km`;
+}
+
 export function computeWeeklyLoadSeries(state, days, maxWeek) {
   const lift = [], run = [];
   const dayList = Array.isArray(days) ? days : [];
@@ -587,12 +611,43 @@ export function computeWeeklyLoadSeries(state, days, maxWeek) {
   return { lift, run };
 }
 
+// Weekly strength volume (tonnage) series — sum of weight·reps over completed
+// working sets (warmups excluded), per week 1..maxWeek. The shared "Strength
+// Load" descriptive series; mirrors the other computeWeekly* signatures.
+export function weeklyStrengthVolumeSeries(state, days, maxWeek) {
+  const out = [];
+  const dayList = Array.isArray(days) ? days : [];
+  for (let w = 1; w <= maxWeek; w++) {
+    const wkData = state?.weeks?.[String(w)];
+    let vol = 0;
+    if (wkData) {
+      dayList.forEach(d => {
+        const dayLifts = wkData.lifts?.[d] || {};
+        for (const lift in dayLifts) {
+          const arr = dayLifts[lift];
+          if (!Array.isArray(arr)) continue;
+          arr.forEach(s => {
+            if (isCompletedSet(s) && !s.isWarmup) {
+              vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
+            }
+          });
+        }
+      });
+    }
+    out.push(Math.round(vol));
+  }
+  return out;
+}
+
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
   const acute = loadByWeek[cw - 1] || 0;
-  const start = Math.max(0, cw - chronicWeeks);
-  const windowWeeks = loadByWeek.slice(start, cw);
-  const nonZero = windowWeeks.filter(v => v > 0);
+  // Chronic baseline = PRIOR weeks only (exclude the current/acute week). With
+  // the acute week included, a single logged week gives acute===chronic → ACWR
+  // 1.0 → a meaningless "100". Require at least one prior week of load.
+  const start = Math.max(0, cw - 1 - chronicWeeks);
+  const chronicWindow = loadByWeek.slice(start, cw - 1);
+  const nonZero = chronicWindow.filter(v => v > 0);
   if (acute <= 0 || nonZero.length === 0) {
     return { score: 0, acwr: 0, acute, chronic: 0, hasData: false };
   }
@@ -729,7 +784,7 @@ export function getExerciseHistoryLog(state, liftName) {
       if(!sets || !Array.isArray(sets)) continue;
       
       // INCREMENT WARMUP: History Modal only displays working volume/sets
-      const completedSets = sets.filter(s => !!(s && (s.c === true || s.c === 'true' || s.c === 'on' || s.c === 1)) && !s.isWarmup);
+      const completedSets = sets.filter(s => isCompletedSet(s) && !s.isWarmup);
       if(completedSets.length === 0) continue;
 
       let vol = 0;
@@ -739,7 +794,7 @@ export function getExerciseHistoryLog(state, liftName) {
         const w = parseFloat(s.w) || 0;
         const r = parseInt(s.r, 10) || 0;
         vol += (w * r);
-        const e1rm = w * (1 + (r/30));
+        const e1rm = epley1RM(w, r);
         if (e1rm > sessionMaxE1RM) sessionMaxE1RM = e1rm;
       });
 

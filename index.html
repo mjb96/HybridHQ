@@ -18,7 +18,7 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
-  <link rel="stylesheet" href="./css/styles.css">
+  <link rel="stylesheet" href="./css/styles.css?v=70">
   
   <style>
     .hidden-input { display: none; }
@@ -26,25 +26,17 @@
     .focus-header-text { font-size: 1.25rem; font-weight: 800; color: var(--text-inverse); letter-spacing: -0.5px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-icon-title { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
 
-    /* Horizontal Swiping Carousel */
+    /* Hybrid Focus — equal-width dual track (two tiles side by side) */
     .in-focus-carousel {
       display: flex;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      gap: 16px;
-      padding-bottom: 12px;
-      scrollbar-width: none;
-      margin-left: -16px;
-      margin-right: -16px;
-      padding-left: 16px;
-      padding-right: 16px;
+      gap: 12px;
+      width: 100%;
     }
     .in-focus-carousel::-webkit-scrollbar { display: none; }
-    
+
     .carousel-card {
-      min-width: 88%;
-      scroll-snap-align: center;
-      flex: 0 0 auto;
+      flex: 1 1 0;
+      min-width: 0;
     }
 
     /* Bar Charts */
@@ -191,31 +183,51 @@
         <span class="text-sm font-bold text-accent-blue">SYNCED</span>
       </div>
 
-      <h2 class="focus-header-text">In Focus</h2>
-      
+      <!-- TIER 1 · Telemetry strip -->
+      <div id="telemetryStrip" class="telemetry-strip" aria-label="Daily telemetry"></div>
+
+      <!-- TIER 2 · Training Status hero (COROS-style) -->
+      <article id="brainBriefing" class="training-status" data-action="open-analytics" data-context="coach"
+               style="display:none;" aria-label="Training status — tap for the full read">
+        <div class="ts-head">
+          <span class="ts-label">Training Status</span>
+          <span id="tsVerdict" class="ts-verdict"></span>
+        </div>
+        <div id="tsStatus" class="ts-status">—</div>
+        <div id="brainBriefingBody" class="ts-detail"></div>
+        <div class="ts-loadbar"><div id="tsLoadMarker" class="ts-loadbar-marker" style="left:50%;"></div></div>
+        <div class="ts-stats">
+          <div class="ts-stat"><span id="tsLoad" class="ts-stat-v">—</span><span class="ts-stat-l">7-day load</span></div>
+          <div class="ts-stat"><span id="tsBase" class="ts-stat-v">—</span><span class="ts-stat-l">Base fitness</span></div>
+          <div class="ts-stat"><span id="tsRecovery" class="ts-stat-v">—</span><span class="ts-stat-l">Recovery</span></div>
+        </div>
+        <div class="ts-more">Tap for the full read →</div>
+      </article>
+
+      <!-- TIER 3 · Hybrid Focus (dual track) -->
+      <h2 class="focus-header-text mt-2">Hybrid Focus</h2>
+
       <div class="in-focus-carousel">
-        
-        <article class="card-dark carousel-card" data-action="open-analytics" data-context="strength" style="cursor: pointer;">
-          <div class="flex-between mb-2">
-             <div class="card-icon-title text-accent-blue"><span>🏋️</span> Gym Time • This Week</div>
-          </div>
-          <h3 id="focusStrengthHero" class="text-3xl font-heavy text-inverse leading-tight mb-1">0m</h3>
+
+        <article class="card-dark carousel-card focus-card" data-focus-id="strength" data-action="open-analytics" data-context="strength">
+          <div class="card-icon-title text-accent-blue mb-2"><span>🏋️</span> Strength</div>
+          <div id="focusStrengthBlock" class="focus-block text-inverse">—</div>
+          <div id="focusStrengthSub" class="focus-card-sub"></div>
+          <div class="focus-progress"><div id="focusStrengthBar" class="focus-progress-fill" style="background:var(--color-blue);"></div></div>
           <div class="bar-chart-container" id="strengthBarChart"></div>
+          <div id="focusStrengthMilestone" class="focus-milestone"></div>
         </article>
 
-        <article class="card-dark carousel-card" data-action="open-analytics" data-context="running" style="cursor: pointer;">
-          <div class="flex-between mb-2">
-             <div class="card-icon-title text-accent-pink"><span>🏃</span> Run Distance • This Week</div>
-          </div>
-          <h3 id="focusRunHero" class="text-3xl font-heavy text-inverse leading-tight mb-1">0.0 km</h3>
+        <article class="card-dark carousel-card focus-card" data-focus-id="running" data-action="open-analytics" data-context="running">
+          <div class="card-icon-title text-accent-pink mb-2"><span>🏃</span> Running</div>
+          <div id="focusRunBlock" class="focus-block text-inverse">—</div>
+          <div id="focusRunSub" class="focus-card-sub"></div>
+          <div class="focus-progress"><div id="focusRunBar" class="focus-progress-fill" style="background:var(--accent-pink,#ec4899);"></div></div>
           <div class="bar-chart-container" id="runBarChart"></div>
+          <div id="focusRunMilestone" class="focus-milestone"></div>
         </article>
 
       </div>
-
-      <h2 class="focus-header-text mt-2">At a Glance</h2>
-      
-      <div class="glance-grid mb-4" id="glanceGrid" aria-label="At a Glance metrics"></div>
 
     </section>
 
@@ -338,7 +350,12 @@
       <button class="subview-back-btn" data-action="switch-tab" data-target="home">
         ← Back to Dashboard
       </button>
-      
+
+      <div id="analytics-coach" class="analytics-section">
+        <h2 class="section-header">Coach's Read</h2>
+        <div id="coachDetailBody"></div>
+      </div>
+
       <div id="analytics-strength" class="analytics-section">
         <h2 class="section-header">Strength Analytics</h2>
         
@@ -556,7 +573,6 @@
             </table>
           </div>
         </article>
-        <div id="analytics-streak-detail"></div>
         <div id="analytics-goal-detail"></div>
       </div>
 
@@ -889,6 +905,43 @@
       <div class="flex gap-2 mt-4">
         <button class="btn-action-block btn-ghost mt-0" data-action="close-create-program">Cancel</button>
         <button class="btn-action-block btn-blue mt-0" data-action="execute-create-program">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+    <div class="modal-content">
+      <h2 id="profileModalTitle" class="text-2xl font-heavy text-inverse mb-1">Athlete Profile</h2>
+      <p class="text-sm text-muted mb-4">Powers energy & recovery intelligence (BMR, total burn). For training-load context only — no nutrition or calorie targets.</p>
+
+      <div class="flex gap-2 mb-3">
+        <div style="width:100px;">
+          <label class="text-xs-bold block mb-1 text-muted">AGE</label>
+          <input type="number" id="profileAge" inputmode="numeric" min="10" max="100" placeholder="30">
+        </div>
+        <div class="flex-1">
+          <label class="text-xs-bold block mb-1 text-muted">SEX</label>
+          <select id="profileSex" class="native-select" style="text-align:left;font-weight:700;">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-3">
+        <div class="flex-1">
+          <label class="text-xs-bold block mb-1 text-muted">HEIGHT (cm)</label>
+          <input type="number" id="profileHeight" inputmode="numeric" min="120" max="230" placeholder="180">
+        </div>
+        <div class="flex-1">
+          <label class="text-xs-bold block mb-1 text-muted">WEIGHT (kg)</label>
+          <input type="number" id="profileWeight" inputmode="decimal" min="30" max="250" placeholder="80">
+        </div>
+      </div>
+
+      <div class="flex gap-2 mt-4">
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-profile">Cancel</button>
+        <button class="btn-action-block btn-blue mt-0" data-action="save-profile">Save</button>
       </div>
     </div>
   </div>

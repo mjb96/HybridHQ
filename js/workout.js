@@ -6,7 +6,7 @@ import { getDisplayBlueprint } from './schema.js';
 import { logActivityForStreak } from './state.js';
 import { getSessionSourceDay, loadSessionIntoDay, resetSessionForDay } from './state.js';
 import { CONFIG } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog } from './engine.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog, epley1RM } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast } from './state.js'; 
@@ -482,7 +482,7 @@ export function checkAndTriggerPR(appState, liftName, weight, reps) {
   const r = parseInt(reps, 10);
   if (w <= 0 || r <= 0) return;
   
-  const currentE1RM = w * (1 + r / 30);
+  const currentE1RM = epley1RM(w, r);
   const stats = appState.exerciseStats && appState.exerciseStats[liftName];
   const historicalMax = stats ? (stats.allTimeMax || 0) : 0;
   

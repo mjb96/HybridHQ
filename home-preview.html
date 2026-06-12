@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HybridHQ · Home preview</title>
+<style>
+  :root{
+    --bg-app:#020408; --bg-card:#090e1a; --bg-input:#111728;
+    --text-primary:#f8fafc; --text-secondary:#64748b;
+    --color-blue:#3b82f6; --color-green:#10b981; --color-amber:#f59e0b; --color-red:#ef4444; --accent-pink:#ec4899;
+    --blue-alpha:rgba(59,130,246,0.10); --glass-border:rgba(255,255,255,0.07);
+    --overlay-md:rgba(255,255,255,0.06);
+    --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;
+    --text-xxs:0.62rem;--text-xs:0.65rem;--text-sm:0.72rem;--text-base:0.80rem;--text-lg:0.85rem;--text-xl:0.95rem;
+    --radius-md:8px;--radius-lg:12px;--radius-xl:16px;
+    --ease-out:cubic-bezier(0.25,0.80,0.25,1); --duration-base:180ms;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg-app);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       max-width:480px;margin:0 auto;padding:18px 16px 40px;-webkit-font-smoothing:antialiased;}
+  .text-secondary{color:var(--text-secondary);}
+  .card-dark{background:var(--bg-card);border:1px solid var(--glass-border);border-radius:var(--radius-xl);
+             padding:22px;box-shadow:0 8px 24px rgba(0,0,0,0.40);}
+
+  /* header */
+  .home-head{display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;}
+  .home-week{font-size:var(--text-sm);font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-secondary);}
+  .home-sync{font-size:var(--text-sm);font-weight:700;color:var(--color-blue);}
+  .section-title{font-size:var(--text-lg);font-weight:800;letter-spacing:0.02em;margin:6px 0 10px;}
+
+  /* TIER 1 telemetry */
+  .telemetry-strip{display:grid;grid-template-columns:repeat(3,1fr);background:var(--bg-card);border:1px solid var(--glass-border);
+    border-radius:var(--radius-lg);overflow:hidden;margin-bottom:var(--space-4);box-shadow:0 6px 18px rgba(0,0,0,0.30);}
+  .telemetry-item{padding:14px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    text-align:center;border-right:1px solid var(--glass-border);border-top:1px solid var(--glass-border);}
+  .telemetry-item:nth-child(-n+3){border-top:none;}
+  .telemetry-item:nth-child(3n){border-right:none;}
+  .telemetry-value{font-size:1.1rem;font-weight:800;line-height:1;white-space:nowrap;}
+  .telemetry-value small{font-size:var(--text-xxs);color:var(--text-secondary);font-weight:600;}
+  .telemetry-label{font-size:var(--text-xxs);text-transform:uppercase;letter-spacing:0.07em;color:var(--text-secondary);white-space:nowrap;}
+
+  /* TIER 2 · Training status hero (COROS-style) */
+  .training-status{padding:var(--space-5);margin-bottom:var(--space-5);
+    background:linear-gradient(160deg,var(--blue-alpha),transparent 60%),var(--bg-card);
+    border:1px solid var(--glass-border);border-radius:var(--radius-xl);box-shadow:0 10px 30px rgba(0,0,0,0.40);}
+  .ts-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);}
+  .ts-label{font-size:var(--text-xxs);font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-secondary);}
+  .ts-verdict{font-size:var(--text-xxs);font-weight:800;padding:2px 9px;border-radius:999px;color:var(--color-green);background:rgba(16,185,129,0.16);}
+  .ts-status{font-size:2rem;font-weight:850;line-height:1.05;margin-bottom:var(--space-3);letter-spacing:-0.01em;color:var(--color-green);}
+  .ts-detail{font-size:var(--text-base);line-height:1.5;margin-bottom:var(--space-4);}
+  .ts-loadbar{position:relative;height:6px;border-radius:3px;margin-bottom:var(--space-4);
+    background:linear-gradient(90deg,var(--color-blue) 0%,var(--color-green) 38%,var(--color-green) 62%,var(--color-amber) 80%,var(--color-red) 100%);opacity:0.9;}
+  .ts-loadbar-marker{position:absolute;top:-3px;width:3px;height:12px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px var(--bg-card);transform:translateX(-50%);}
+  .ts-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);border-top:1px solid var(--glass-border);padding-top:var(--space-3);}
+  .ts-stat{display:flex;flex-direction:column;gap:2px;align-items:center;}
+  .ts-stat-v{font-size:var(--text-xl);font-weight:800;}
+  .ts-stat-v small{font-size:0.5rem;color:var(--text-secondary);font-weight:600;}
+  .ts-stat-l{font-size:0.5rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);}
+  .ts-more{font-size:var(--text-xxs);color:var(--text-secondary);margin-top:var(--space-3);text-align:right;}
+
+  /* TIER 3 hybrid focus */
+  .in-focus-carousel{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:var(--space-3);margin-bottom:var(--space-4);}
+  .focus-card{padding:var(--space-4);min-width:0;}
+  .card-icon-title{display:flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:800;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+  .blue{color:var(--color-blue);} .pink{color:var(--accent-pink);} .green{color:var(--color-green);}
+  .focus-block{font-size:var(--text-base);font-weight:800;line-height:1.15;margin-bottom:2px;}
+  .focus-card-sub{font-size:var(--text-xxs);color:var(--text-secondary);margin-bottom:var(--space-2);line-height:1.3;}
+  .focus-progress{height:5px;border-radius:3px;background:var(--overlay-md);overflow:hidden;margin-bottom:10px;}
+  .focus-progress-fill{height:100%;border-radius:3px;}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:46px;margin-bottom:8px;}
+  .bar{flex:1;border-radius:3px 3px 0 0;}
+  .focus-milestone{font-size:var(--text-xxs);color:var(--text-secondary);display:flex;justify-content:space-between;gap:6px;}
+  .focus-milestone b{color:var(--text-primary);font-weight:700;}
+
+  /* even, screen-fitting focus cards */
+  .in-focus-carousel{align-items:stretch;}
+  .focus-card{display:flex;flex-direction:column;overflow:hidden;}
+  .focus-block{line-height:1.25;min-height:2.5em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .focus-card-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .focus-milestone{margin-top:auto;padding-top:8px;align-items:baseline;}
+  .focus-milestone span:first-child{flex:0 0 auto;}
+  .focus-milestone b{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+</style>
+</head>
+<body>
+
+  <div class="home-head">
+    <span class="home-week">Week 3 · Peaking</span>
+    <span class="home-sync">SYNCED</span>
+  </div>
+
+  <!-- TIER 1 · Telemetry strip -->
+  <div class="telemetry-strip">
+    <div class="telemetry-item"><span class="telemetry-value">92%</span><span class="telemetry-label">Recovery</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">88</span><span class="telemetry-label">Readiness</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">12d</span><span class="telemetry-label">Streak</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">1,820 <small>kcal</small></span><span class="telemetry-label">Base</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">850 <small>kcal</small></span><span class="telemetry-label">Active</span></div>
+    <div class="telemetry-item"><span class="telemetry-value">2,670 <small>kcal</small></span><span class="telemetry-label">Burned</span></div>
+  </div>
+
+  <!-- TIER 2 · Coach's Briefing hero -->
+  <article class="training-status">
+    <div class="ts-head">
+      <span class="ts-label">Training Status</span>
+      <span class="ts-verdict">ACWR 1.05</span>
+    </div>
+    <div class="ts-status">Productive</div>
+    <div class="ts-detail">Recovery is at 92% — a good window to push intensity. Load is sustainable and bench is trending up (+8% e1RM over 4 weeks) while running fatigue stays low. Energy out today ≈ 2,670 kcal.</div>
+    <div class="ts-loadbar"><div class="ts-loadbar-marker" style="left:52%;"></div></div>
+    <div class="ts-stats">
+      <div class="ts-stat"><span class="ts-stat-v">940 <small>AU</small></span><span class="ts-stat-l">7-day load</span></div>
+      <div class="ts-stat"><span class="ts-stat-v">706 <small>AU</small></span><span class="ts-stat-l">Base fitness</span></div>
+      <div class="ts-stat"><span class="ts-stat-v">92%</span><span class="ts-stat-l">Recovery</span></div>
+    </div>
+    <div class="ts-more">Tap for the full read →</div>
+  </article>
+
+  <!-- TIER 3 · Hybrid Focus (dual track) -->
+  <h2 class="section-title">Hybrid Focus</h2>
+  <div class="in-focus-carousel">
+
+    <article class="card-dark focus-card">
+      <div class="card-icon-title blue"><span>🏋️</span> Strength</div>
+      <div class="focus-block">Squat Peaking Block</div>
+      <div class="focus-card-sub">Week 3 of 6 · 50% through</div>
+      <div class="focus-progress"><div class="focus-progress-fill" style="width:50%;background:var(--color-blue);"></div></div>
+      <div class="bars">
+        <div class="bar" style="height:55%;background:var(--color-blue);"></div>
+        <div class="bar" style="height:70%;background:var(--color-blue);"></div>
+        <div class="bar" style="height:40%;background:var(--color-blue);opacity:.5;"></div>
+        <div class="bar" style="height:85%;background:var(--color-blue);"></div>
+        <div class="bar" style="height:60%;background:var(--color-blue);"></div>
+        <div class="bar" style="height:30%;background:var(--color-blue);opacity:.5;"></div>
+        <div class="bar" style="height:20%;background:var(--color-blue);opacity:.25;"></div>
+      </div>
+      <div class="focus-milestone"><span>Next PR</span><b>Squat 165 kg</b></div>
+    </article>
+
+    <article class="card-dark focus-card">
+      <div class="card-icon-title pink"><span>🏃</span> Running</div>
+      <div class="focus-block">Base Building</div>
+      <div class="focus-card-sub">38.0 / 45 km this week · 84%</div>
+      <div class="focus-progress"><div class="focus-progress-fill" style="width:84%;background:var(--accent-pink);"></div></div>
+      <div class="bars">
+        <div class="bar" style="height:30%;background:var(--accent-pink);"></div>
+        <div class="bar" style="height:0%;background:var(--accent-pink);opacity:.25;"></div>
+        <div class="bar" style="height:55%;background:var(--accent-pink);"></div>
+        <div class="bar" style="height:0%;background:var(--accent-pink);opacity:.25;"></div>
+        <div class="bar" style="height:45%;background:var(--accent-pink);"></div>
+        <div class="bar" style="height:90%;background:var(--accent-pink);"></div>
+        <div class="bar" style="height:0%;background:var(--accent-pink);opacity:.25;"></div>
+      </div>
+      <div class="focus-milestone"><span>Long run</span><b>16 km · Sat</b></div>
+    </article>
+
+  </div>
+
+  <p style="font-size:0.6rem;color:var(--text-secondary);text-align:center;margin-top:18px;">
+    Static preview with mock data · matches the live home layout/styling
+  </p>
+
+</body>
+</html>

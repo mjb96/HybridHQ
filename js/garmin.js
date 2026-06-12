@@ -1,9 +1,23 @@
-import { Buffer } from 'https://esm.sh/buffer'; 
-import FitParser from 'https://esm.sh/fit-file-parser';
+// CDN deps (Buffer, fit-file-parser) are imported LAZILY when a .FIT file is
+// actually parsed — never at app load. A static top-level import from esm.sh
+// would otherwise blank the entire app if the CDN is unreachable (offline,
+// network policy, outage), since app.js statically imports this module.
 import { showToast } from './state.js';
 import { downsampleStream, derivePaceSeries } from './engine.js';
 
-window.Buffer = Buffer; 
+let _fitDeps = null;
+async function loadFitDeps() {
+  if (_fitDeps) return _fitDeps;
+  const [bufMod, parserMod] = await Promise.all([
+    import('https://esm.sh/buffer'),
+    import('https://esm.sh/fit-file-parser'),
+  ]);
+  const Buffer = bufMod.Buffer || bufMod.default?.Buffer || bufMod.default;
+  const FitParser = parserMod.default || parserMod.FitParser || parserMod;
+  if (typeof window !== 'undefined') window.Buffer = Buffer;
+  _fitDeps = { Buffer, FitParser };
+  return _fitDeps;
+}
 
 export function initGarminRunImport(onDataExtracted) {
   setupUploader('fitUpload', true, onDataExtracted);
@@ -26,9 +40,10 @@ function setupUploader(inputId, isRun, onDataExtracted) {
     showToast('Parsing Garmin file...');
 
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
+
+    reader.onload = async (e) => {
       try {
+        const { Buffer, FitParser } = await loadFitDeps();
         const arrayBuffer = e.target.result;
         const nodeBuffer = Buffer.from(arrayBuffer);
 
@@ -37,7 +52,7 @@ function setupUploader(inputId, isRun, onDataExtracted) {
           speedUnit: 'km/h',
           lengthUnit: 'km',
           elapsedRecordField: true,
-          mode: 'list', 
+          mode: 'list',
         });
 
         fitParser.parse(nodeBuffer, (error, data) => {
