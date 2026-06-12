@@ -4,22 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>HybridHQ</title>
-  <script>
-    // Catch module load / runtime errors and surface them visibly
-    window.onerror = function(msg, src, line, col, err) {
-      const d = document.getElementById('_dbgOverlay');
-      if (d) d.style.display = 'block';
-      const t = document.getElementById('_dbgText');
-      if (t) t.textContent = (err ? err.stack : msg) + '\n\n' + src + ':' + line;
-    };
-    window.addEventListener('unhandledrejection', function(e) {
-      const d = document.getElementById('_dbgOverlay');
-      if (d) d.style.display = 'block';
-      const t = document.getElementById('_dbgText');
-      if (t) t.textContent = String(e.reason?.stack || e.reason || e);
-    });
-  </script>
-
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#070a12">
 
@@ -1225,15 +1209,5 @@
   </div>
 
   <script type="module" src="./js/app.js"></script>
-  <div id="_dbgOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#0a0a0a;color:#ff4444;padding:20px;overflow:auto;font-family:monospace;font-size:12px;white-space:pre-wrap;"></div>
-  <div id="_dbgText" style="display:none;"></div>
-  <script>
-    // Wire debug text into overlay once DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
-      const overlay = document.getElementById('_dbgOverlay');
-      const textEl  = document.getElementById('_dbgText');
-      if (overlay && textEl) { overlay.appendChild(textEl); textEl.style.display = ''; }
-    });
-  </script>
 </body>
 </html>
