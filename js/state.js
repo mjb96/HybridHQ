@@ -25,11 +25,11 @@ try {
 const STORAGE_KEY = 'hybrid_engine_v2_state';
 
 // Base state configuration
-export let appState = { 
-  currentWeek: "1", 
-  activeProgramId: "hybrid_engine", 
-  weekStartedAt: null, 
-  weeks: {}, 
+export let appState = {
+  currentWeek: "1",
+  activeProgramId: "hybrid_engine",
+  weekStartedAt: null,
+  weeks: {},
   exerciseStats: {},
   customExercises: [],
   customPrograms: [],
@@ -38,7 +38,7 @@ export let appState = {
   deloadApplied: null,
   _deloadDismissedWeek: null,
   streakData: { current: 0, longest: 0, lastActivityDate: null },
-  goalData: { milestones: [], completedCount: 0 },
+  goalData: { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } },
   athleteProfile: emptyAthleteProfile()
 };
 
@@ -347,12 +347,12 @@ export async function pullEngineDataFromStorage() {
     console.error('Failed to parse local storage:', e);
   }
 
-  const baseDefaults = { 
-    currentWeek: '1', activeProgramId: 'hybrid_engine', weekStartedAt: null, 
-    weeks: {}, exerciseStats: {}, customExercises: [], customPrograms: [], bodyWeightLog: [], 
+  const baseDefaults = {
+    currentWeek: '1', activeProgramId: 'hybrid_engine', weekStartedAt: null,
+    weeks: {}, exerciseStats: {}, customExercises: [], customPrograms: [], bodyWeightLog: [],
     thresholdPaceSeconds: null, deloadApplied: null, _deloadDismissedWeek: null,
     streakData: { current: 0, longest: 0, lastActivityDate: null },
-    goalData: { milestones: [], completedCount: 0 },
+    goalData: { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } },
     athleteProfile: emptyAthleteProfile()
   };
 
@@ -399,7 +399,8 @@ export async function pullEngineDataFromStorage() {
   if (appState.thresholdPaceSeconds === undefined) appState.thresholdPaceSeconds = null;
   if (appState.deloadApplied === undefined) appState.deloadApplied = null;
   if (!appState.streakData) appState.streakData = { current: 0, longest: 0, lastActivityDate: null };
-  if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0 };
+  if (!appState.goalData) appState.goalData = { milestones: [], completedCount: 0, goalConfig: { primaryGoal: null, goalEventDate: null, goalEventName: null } };
+  if (!appState.goalData.goalConfig) appState.goalData.goalConfig = { primaryGoal: null, goalEventDate: null, goalEventName: null };
   if (!appState.athleteProfile) appState.athleteProfile = emptyAthleteProfile();
 
   let _migratedAnyProgram = false;

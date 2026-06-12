@@ -150,6 +150,116 @@
     
     .analytics-section { display: none; }
     .analytics-section.active { display: block; }
+
+    /* ── Your Week Ahead card ─────────────────────────────────── */
+    .week-ahead-card {
+      padding: 14px 14px 12px;
+      border-left: 3px solid var(--wa-accent, #3b82f6);
+      cursor: default;
+    }
+    .week-ahead-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .week-ahead-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .week-ahead-phase-chip {
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--wa-accent, #3b82f6) 18%, transparent);
+      color: var(--wa-accent, #3b82f6);
+    }
+    .week-ahead-countdown {
+      font-size: 0.62rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .week-ahead-goal-btn {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      padding: 3px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .week-ahead-goal-btn:hover { background: rgba(255,255,255,0.1); }
+    .week-ahead-headline {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--text-inverse);
+      line-height: 1.25;
+      margin-bottom: 6px;
+    }
+    .week-ahead-directive {
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .week-ahead-adjustments {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 6px;
+    }
+    .week-ahead-adjustments li {
+      font-size: 0.7rem;
+      line-height: 1.4;
+      color: var(--text-primary);
+      padding: 3px 0 3px 14px;
+      position: relative;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .week-ahead-adjustments li:first-child { border-top: none; }
+    .week-ahead-adjustments li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--wa-accent, #3b82f6);
+      font-weight: 700;
+    }
+    .week-ahead-rationale {
+      font-size: 0.62rem;
+      line-height: 1.4;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 6px;
+      margin-top: 4px;
+    }
+
+    /* ── Goal Setup Modal ─────────────────────────────────────── */
+    .goal-type-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .goal-type-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 8px;
+      background: rgba(255,255,255,0.04);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .goal-type-btn.selected {
+      border-color: var(--accent-blue, #3b82f6);
+      background: rgba(59,130,246,0.12);
+    }
+    .goal-type-btn:hover:not(.selected) { background: rgba(255,255,255,0.08); }
+    .goal-type-icon { font-size: 1.4rem; }
+    .goal-type-label { font-size: 0.65rem; font-weight: 700; color: var(--text-inverse); text-align: center; line-height: 1.3; }
   </style>
 </head>
 <body>
@@ -202,6 +312,21 @@
           <div class="ts-stat"><span id="tsRecovery" class="ts-stat-v">—</span><span class="ts-stat-l">Recovery</span></div>
         </div>
         <div class="ts-more">Tap for the full read →</div>
+      </article>
+
+      <!-- TIER 2.5 · Your Week Ahead -->
+      <article id="weekAheadCard" class="card-dark week-ahead-card mt-3" style="display:none;" aria-label="Your Week Ahead">
+        <div class="week-ahead-header">
+          <div class="week-ahead-meta">
+            <span id="weekAheadPhaseChip" class="week-ahead-phase-chip"></span>
+            <span id="weekAheadCountdown" class="week-ahead-countdown"></span>
+          </div>
+          <button id="weekAheadGoalBtn" class="week-ahead-goal-btn" data-action="open-goal-setup" aria-label="Set training goal"></button>
+        </div>
+        <div id="weekAheadHeadline" class="week-ahead-headline"></div>
+        <div id="weekAheadDirective" class="week-ahead-directive"></div>
+        <ul id="weekAheadAdjustments" class="week-ahead-adjustments"></ul>
+        <div id="weekAheadRationale" class="week-ahead-rationale"></div>
       </article>
 
       <!-- TIER 3 · Hybrid Focus (dual track) -->
@@ -989,6 +1114,53 @@
       <div class="flex gap-2">
         <button class="btn-action-block btn-ghost mt-0" data-action="close-deload-modal">Cancel</button>
         <button class="btn-action-block btn-amber mt-0" data-action="execute-deload-week">Apply Deload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal Setup Modal -->
+  <div class="modal-overlay" id="goalSetupModal" role="dialog" aria-modal="true" aria-labelledby="goalSetupModalTitle">
+    <div class="modal-content">
+      <h2 id="goalSetupModalTitle" class="text-2xl font-heavy text-inverse mb-1">Training Goal</h2>
+      <p class="text-sm text-muted mb-4">Tell the Brain what you're training for. It uses this to personalise your weekly brief and prioritise coaching insights.</p>
+
+      <div class="mb-4">
+        <label class="text-xs-bold block mb-2 text-muted">PRIMARY GOAL</label>
+        <div class="goal-type-grid" id="goalTypeGrid">
+          <button class="goal-type-btn" data-goal="strength">
+            <span class="goal-type-icon">🏋️</span>
+            <span class="goal-type-label">Strength Peak</span>
+          </button>
+          <button class="goal-type-btn" data-goal="endurance">
+            <span class="goal-type-icon">🏃</span>
+            <span class="goal-type-label">Endurance / Race</span>
+          </button>
+          <button class="goal-type-btn" data-goal="hybrid">
+            <span class="goal-type-icon">⚡</span>
+            <span class="goal-type-label">Hybrid Performance</span>
+          </button>
+          <button class="goal-type-btn" data-goal="recomp">
+            <span class="goal-type-icon">🔄</span>
+            <span class="goal-type-label">Body Recomposition</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="text-xs-bold block mb-1 text-muted">GOAL EVENT NAME (optional)</label>
+        <input type="text" id="goalEventName" placeholder="e.g. Edinburgh Half Marathon, Powerlifting Meet" maxlength="80">
+      </div>
+
+      <div class="mb-4">
+        <label class="text-xs-bold block mb-1 text-muted">GOAL EVENT DATE (optional)</label>
+        <input type="date" id="goalEventDate">
+        <p class="text-xs text-muted mt-1" style="line-height:1.4;">Used to detect your training phase (Base → Build → Peak → Taper) and calibrate directives week-by-week.</p>
+      </div>
+
+      <div class="flex gap-2 mt-4">
+        <button class="btn-action-block btn-ghost mt-0" data-action="close-goal-setup">Cancel</button>
+        <button class="btn-action-block btn-ghost mt-0" data-action="clear-goal-setup" style="color:var(--accent-red,#ef4444);border-color:var(--accent-red,#ef4444);">Clear Goal</button>
+        <button class="btn-action-block btn-blue mt-0" data-action="save-goal-setup">Save</button>
       </div>
     </div>
   </div>
