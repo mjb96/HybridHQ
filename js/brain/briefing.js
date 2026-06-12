@@ -45,6 +45,22 @@ export function composeBriefing(ctx = {}) {
   return parts.length ? parts.join(' ') : 'Keep logging — more sessions sharpen the read.';
 }
 
+// COROS-style training status from the acute:chronic load ratio. Returns a
+// status word + tone + the acute/chronic load figures for the hero.
+export function trainingStatus(readiness) {
+  if (!readiness || !readiness.hasData) {
+    return { status: 'Building', tone: 'progress', hasData: false };
+  }
+  const acwr = readiness.acwr;
+  let status, tone;
+  if (acwr < 0.8)       { status = 'Detraining';   tone = 'recovery'; }
+  else if (acwr <= 1.0) { status = 'Maintaining';  tone = 'progress'; }
+  else if (acwr <= 1.3) { status = 'Productive';   tone = 'progress'; }
+  else if (acwr <= 1.5) { status = 'Overreaching'; tone = 'opportunity'; }
+  else                  { status = 'Strained';     tone = 'risk'; }
+  return { status, tone, hasData: true, acwr, acute: readiness.acute, chronic: readiness.chronic };
+}
+
 // Compact metric complications for the Tier-1 strip. Each: { key, label, value, nav }.
 export function buildTelemetry(ctx = {}) {
   const { recovery, readiness, energy } = ctx;

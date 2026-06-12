@@ -41,16 +41,24 @@
   .telemetry-value small{font-size:0.5rem;color:var(--text-secondary);font-weight:600;}
   .telemetry-label{font-size:0.5rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-secondary);white-space:nowrap;}
 
-  /* TIER 2 briefing */
-  .brain-briefing{padding:var(--space-4);margin-bottom:var(--space-5);
-    background:linear-gradient(180deg,var(--blue-alpha),transparent 55%),var(--bg-card);
-    border:1px solid var(--glass-border);border-left:3px solid var(--color-blue);border-radius:var(--radius-lg);
-    box-shadow:0 8px 24px rgba(0,0,0,0.35);}
-  .brain-briefing-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);}
-  .brain-briefing-label{font-size:var(--text-xxs);font-weight:800;letter-spacing:0.12em;color:var(--color-blue);text-transform:uppercase;}
-  .brain-briefing-verdict{font-size:var(--text-xxs);font-weight:800;padding:2px 9px;border-radius:999px;color:var(--color-green);background:rgba(16,185,129,0.16);}
-  .brain-briefing-body{font-size:var(--text-lg);line-height:1.55;}
-  .brain-briefing-more{font-size:var(--text-xxs);color:var(--text-secondary);margin-top:var(--space-2);}
+  /* TIER 2 · Training status hero (COROS-style) */
+  .training-status{padding:var(--space-5);margin-bottom:var(--space-5);
+    background:linear-gradient(160deg,var(--blue-alpha),transparent 60%),var(--bg-card);
+    border:1px solid var(--glass-border);border-radius:var(--radius-xl);box-shadow:0 10px 30px rgba(0,0,0,0.40);}
+  .ts-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);}
+  .ts-label{font-size:var(--text-xxs);font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-secondary);}
+  .ts-verdict{font-size:var(--text-xxs);font-weight:800;padding:2px 9px;border-radius:999px;color:var(--color-green);background:rgba(16,185,129,0.16);}
+  .ts-status{font-size:2rem;font-weight:850;line-height:1.05;margin-bottom:var(--space-3);letter-spacing:-0.01em;color:var(--color-green);}
+  .ts-detail{font-size:var(--text-base);line-height:1.5;margin-bottom:var(--space-4);}
+  .ts-loadbar{position:relative;height:6px;border-radius:3px;margin-bottom:var(--space-4);
+    background:linear-gradient(90deg,var(--color-blue) 0%,var(--color-green) 38%,var(--color-green) 62%,var(--color-amber) 80%,var(--color-red) 100%);opacity:0.9;}
+  .ts-loadbar-marker{position:absolute;top:-3px;width:3px;height:12px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px var(--bg-card);transform:translateX(-50%);}
+  .ts-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);border-top:1px solid var(--glass-border);padding-top:var(--space-3);}
+  .ts-stat{display:flex;flex-direction:column;gap:2px;align-items:center;}
+  .ts-stat-v{font-size:var(--text-xl);font-weight:800;}
+  .ts-stat-v small{font-size:0.5rem;color:var(--text-secondary);font-weight:600;}
+  .ts-stat-l{font-size:0.5rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);}
+  .ts-more{font-size:var(--text-xxs);color:var(--text-secondary);margin-top:var(--space-3);text-align:right;}
 
   /* TIER 3 hybrid focus */
   .in-focus-carousel{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4);}
@@ -85,13 +93,20 @@
   </div>
 
   <!-- TIER 2 · Coach's Briefing hero -->
-  <article class="brain-briefing">
-    <div class="brain-briefing-head">
-      <span class="brain-briefing-label">Coach's Briefing</span>
-      <span class="brain-briefing-verdict">On track</span>
+  <article class="training-status">
+    <div class="ts-head">
+      <span class="ts-label">Training Status</span>
+      <span class="ts-verdict">ACWR 1.05</span>
     </div>
-    <div class="brain-briefing-body">Recovery is at 92% — a good window to push intensity. Acute:chronic load sits at 1.05, so current training load is sustainable. Bench is trending up (+8% e1RM over 4 weeks) while running fatigue stays low. Energy out today ≈ 2,670 kcal.</div>
-    <div class="brain-briefing-more">Tap for the full read →</div>
+    <div class="ts-status">Productive</div>
+    <div class="ts-detail">Recovery is at 92% — a good window to push intensity. Load is sustainable and bench is trending up (+8% e1RM over 4 weeks) while running fatigue stays low. Energy out today ≈ 2,670 kcal.</div>
+    <div class="ts-loadbar"><div class="ts-loadbar-marker" style="left:52%;"></div></div>
+    <div class="ts-stats">
+      <div class="ts-stat"><span class="ts-stat-v">940 <small>AU</small></span><span class="ts-stat-l">7-day load</span></div>
+      <div class="ts-stat"><span class="ts-stat-v">706 <small>AU</small></span><span class="ts-stat-l">Base fitness</span></div>
+      <div class="ts-stat"><span class="ts-stat-v">92%</span><span class="ts-stat-l">Recovery</span></div>
+    </div>
+    <div class="ts-more">Tap for the full read →</div>
   </article>
 
   <!-- TIER 3 · Hybrid Focus (dual track) -->

@@ -194,15 +194,22 @@
       <!-- TIER 1 · Telemetry strip -->
       <div id="telemetryStrip" class="telemetry-strip" aria-label="Daily telemetry"></div>
 
-      <!-- TIER 2 · Coach's Briefing hero -->
-      <article id="brainBriefing" class="brain-briefing" data-action="open-analytics" data-context="coach"
-               style="display:none;" aria-label="Coach's briefing — tap for the full read">
-        <div class="brain-briefing-head">
-          <span class="brain-briefing-label">Coach's Briefing</span>
-          <span id="brainBriefingVerdict" class="brain-briefing-verdict"></span>
+      <!-- TIER 2 · Training Status hero (COROS-style) -->
+      <article id="brainBriefing" class="training-status" data-action="open-analytics" data-context="coach"
+               style="display:none;" aria-label="Training status — tap for the full read">
+        <div class="ts-head">
+          <span class="ts-label">Training Status</span>
+          <span id="tsVerdict" class="ts-verdict"></span>
         </div>
-        <div id="brainBriefingBody" class="brain-briefing-body"></div>
-        <div class="brain-briefing-more">Tap for the full read →</div>
+        <div id="tsStatus" class="ts-status">—</div>
+        <div id="brainBriefingBody" class="ts-detail"></div>
+        <div class="ts-loadbar"><div id="tsLoadMarker" class="ts-loadbar-marker" style="left:50%;"></div></div>
+        <div class="ts-stats">
+          <div class="ts-stat"><span id="tsLoad" class="ts-stat-v">—</span><span class="ts-stat-l">7-day load</span></div>
+          <div class="ts-stat"><span id="tsBase" class="ts-stat-v">—</span><span class="ts-stat-l">Base fitness</span></div>
+          <div class="ts-stat"><span id="tsRecovery" class="ts-stat-v">—</span><span class="ts-stat-l">Recovery</span></div>
+        </div>
+        <div class="ts-more">Tap for the full read →</div>
       </article>
 
       <!-- TIER 3 · Hybrid Focus (dual track) -->

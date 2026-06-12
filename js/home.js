@@ -11,7 +11,7 @@ import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashb
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
 import { CATEGORY_META } from './brain/brain_dashboard.js';
 import { generateInsights, contextVerdict } from './brain/core.js';
-import { composeBriefing } from './brain/briefing.js';
+import { composeBriefing, trainingStatus } from './brain/briefing.js';
 import { energyProfile, activeCaloriesForDay } from './profile.js';
 import { escapeHtml } from './util.js';
 
@@ -782,7 +782,7 @@ function renderIntel(appState, days, program, selectedDay) {
   };
 
   renderTelemetryStrip(buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readiness));
-  renderBriefing(composeBriefing(ctx), contextVerdict(all));
+  renderTrainingStatus(composeBriefing(ctx), trainingStatus(readiness), readiness, recovery);
 }
 
 // Always-substantive Tier-1 complications from data we always have, plus
@@ -834,24 +834,35 @@ function renderTelemetryStrip(items) {
     </div>`).join('');
 }
 
-function renderBriefing(text, verdict) {
+function renderTrainingStatus(text, status, readiness, recovery) {
   const el = document.getElementById('brainBriefing');
   const body = document.getElementById('brainBriefingBody');
-  const vEl = document.getElementById('brainBriefingVerdict');
   if (!el || !body) return;
   el.style.display = 'block';
   body.textContent = text;
+
+  const c = metaColor(status.tone);
+  const setTxt = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+
+  const sEl = document.getElementById('tsStatus');
+  if (sEl) { sEl.textContent = status.status; sEl.style.color = c; }
+
+  const vEl = document.getElementById('tsVerdict');
   if (vEl) {
-    if (verdict) {
-      const c = metaColor(verdict.tone);
-      vEl.textContent = verdict.label;
-      vEl.style.color = c;
-      vEl.style.background = `color-mix(in srgb, ${c} 16%, transparent)`;
-    } else {
-      vEl.textContent = '';
-      vEl.style.background = 'transparent';
-    }
+    vEl.textContent = status.hasData ? `ACWR ${status.acwr.toFixed(2)}` : 'New';
+    vEl.style.color = c;
+    vEl.style.background = `color-mix(in srgb, ${c} 16%, transparent)`;
   }
+
+  const marker = document.getElementById('tsLoadMarker');
+  if (marker) {
+    marker.style.left = (status.hasData ? Math.max(3, Math.min(97, (status.acwr / 2) * 100)) : 50) + '%';
+    marker.style.display = status.hasData ? 'block' : 'none';
+  }
+
+  setTxt('tsLoad', status.hasData ? `${Math.round(status.acute).toLocaleString()}` : '—');
+  setTxt('tsBase', status.hasData ? `${Math.round(status.chronic).toLocaleString()}` : '—');
+  setTxt('tsRecovery', recovery?.hasData ? `${recovery.score}%` : '—');
 }
 
 // ==========================================

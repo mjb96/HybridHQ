@@ -1796,3 +1796,40 @@ td {
 .focus-block { font-size: var(--text-base); font-weight: 800; line-height: 1.15; margin-bottom: 2px; }
 .focus-milestone { font-size: var(--text-xxs); color: var(--text-secondary); display: flex; justify-content: space-between; gap: 6px; margin-top: 6px; }
 .focus-milestone b { color: var(--text-primary); font-weight: 700; white-space: nowrap; }
+
+/* ==========================================================================
+   COROS-STYLE TRAINING STATUS HERO (Tier 2)
+   ========================================================================== */
+.training-status {
+  display: block;
+  cursor: pointer;
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+  background: linear-gradient(160deg, var(--blue-alpha), transparent 60%), var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.40);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.training-status:active { transform: scale(0.99); }
+.ts-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+.ts-label { font-size: var(--text-xxs); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-secondary); }
+.ts-verdict { font-size: var(--text-xxs); font-weight: 800; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.ts-status { font-size: 2rem; font-weight: 850; line-height: 1.05; margin-bottom: var(--space-3); letter-spacing: -0.01em; }
+.ts-detail { font-size: var(--text-base); line-height: 1.5; color: var(--text-primary); margin-bottom: var(--space-4); }
+.ts-loadbar {
+  position: relative; height: 6px; border-radius: 3px; margin-bottom: var(--space-4);
+  background: linear-gradient(90deg, var(--color-blue) 0%, var(--color-green) 38%, var(--color-green) 62%, var(--color-amber) 80%, var(--color-red) 100%);
+  opacity: 0.9;
+}
+.ts-loadbar-marker {
+  position: absolute; top: -3px; width: 3px; height: 12px; border-radius: 2px;
+  background: #fff; box-shadow: 0 0 0 2px var(--bg-card); transform: translateX(-50%);
+  transition: left 0.5s var(--ease-out);
+}
+.ts-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); border-top: 1px solid var(--glass-border); padding-top: var(--space-3); }
+.ts-stat { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.ts-stat-v { font-size: var(--text-xl); font-weight: 800; color: var(--text-primary); }
+.ts-stat-v small { font-size: 0.5rem; color: var(--text-secondary); font-weight: 600; }
+.ts-stat-l { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+.ts-more { font-size: var(--text-xxs); color: var(--text-secondary); margin-top: var(--space-3); text-align: right; }
