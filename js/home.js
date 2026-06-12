@@ -3,13 +3,17 @@
 // ==========================================
 import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
-import { getProgramById } from './state.js';
+import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries } from './engine.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
-import { renderBrainInsights } from './brain/brain_dashboard.js';
+import { CATEGORY_META } from './brain/brain_dashboard.js';
+import { generateInsights, contextVerdict } from './brain/core.js';
+import { composeBriefing, buildTelemetry } from './brain/briefing.js';
+import { energyProfile, activeCaloriesForDay } from './profile.js';
+import { escapeHtml } from './util.js';
 
 let _getState;
 let _getSelectedDay;
@@ -562,15 +566,13 @@ export function renderHome() {
     runChartContainer.innerHTML = runHTML;
   }
 
-  renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay);
+  // TIER 1 + TIER 2 — telemetry strip + Coach's Briefing hero.
+  try { renderIntel(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
+  catch (e) { console.warn('[intel] render skipped:', e); }
 
-  // Coach's Read — read-only coaching tile in the In-Focus carousel.
-  try { renderBrainInsights(appState, DEFAULT_DAYS, activeProgram); }
-  catch (e) { console.warn('[coach] render skipped:', e); }
-
-  // In-Focus carousel: apply the saved order and enable long-press reordering.
+  // TIER 3 — Hybrid Focus carousel: apply saved order + enable reordering.
   try { applyFocusOrder(); mountFocusDragAndDrop(); }
-  catch (e) { console.warn('[in-focus] reorder skipped:', e); }
+  catch (e) { console.warn('[hybrid-focus] reorder skipped:', e); }
 
   const progressPercentage = (() => {
     let total = 0, done = 0;
@@ -712,6 +714,99 @@ export function renderHome() {
 }
 
 // ==========================================
+// TIER 1/2 — TELEMETRY STRIP + COACH'S BRIEFING
+// ==========================================
+function metaColor(tone) {
+  const m = CATEGORY_META[tone] || CATEGORY_META.progress;
+  return m ? m.color : 'var(--accent-blue,#3b82f6)';
+}
+
+function renderIntel(appState, days, program, selectedDay) {
+  const wk = appState.currentWeek || '1';
+  const maxWeek = program?.totalWeeks || 12;
+
+  let report = { insights: [], allInsights: [], meta: { dataWeeks: 0 } };
+  try { report = generateInsights(appState, { days, program, currentWeek: wk, maxWeek, topN: 20 }); } catch {}
+
+  let recovery = { hasData: false };
+  try { recovery = computeRecoveryScore(appState, days); } catch {}
+
+  let readiness = { hasData: false };
+  try {
+    const load = computeWeeklyLoadSeries(appState, days, maxWeek);
+    const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
+    readiness = computeReadiness(totalByWeek, wk);
+  } catch {}
+
+  const active = activeCaloriesForDay(appState, wk, selectedDay);
+  const energy = energyProfile(appState.athleteProfile, active);
+  const all = report.allInsights || report.insights || [];
+  const ctx = {
+    dataWeeks: report.meta?.dataWeeks || 0,
+    recovery, readiness, energy,
+    focusObservation: all[0]?.observation,
+  };
+
+  renderTelemetryStrip(buildTelemetry(ctx));
+  renderBriefing(composeBriefing(ctx), contextVerdict(all));
+}
+
+function renderTelemetryStrip(items) {
+  const el = document.getElementById('telemetryStrip');
+  if (!el) return;
+  el.innerHTML = (items || []).map(it => {
+    const action = it.nav === 'profile'
+      ? 'data-action="open-profile"'
+      : it.nav ? `data-action="open-analytics" data-context="${it.nav}"` : '';
+    const cursor = it.nav ? 'cursor:pointer;' : '';
+    return `<div class="card-dark" ${action} style="flex:0 0 auto;min-width:84px;padding:8px 12px;border-radius:10px;${cursor}">
+      <div class="text-muted" style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.06em;">${escapeHtml(it.label)}</div>
+      <div class="font-heavy text-inverse" style="font-size:0.95rem;line-height:1.1;white-space:nowrap;">${escapeHtml(it.value)}${it.unit ? ` <span class="text-muted" style="font-size:0.6rem;">${escapeHtml(it.unit)}</span>` : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderBriefing(text, verdict) {
+  const el = document.getElementById('brainBriefing');
+  const body = document.getElementById('brainBriefingBody');
+  const vEl = document.getElementById('brainBriefingVerdict');
+  if (!el || !body) return;
+  el.style.display = 'block';
+  body.textContent = text;
+  if (vEl) {
+    if (verdict) { vEl.textContent = verdict.label; vEl.style.color = metaColor(verdict.tone); }
+    else { vEl.textContent = ''; }
+  }
+}
+
+// ==========================================
+// ATHLETE PROFILE CAPTURE
+// ==========================================
+function openProfileModal() {
+  const p = _getState().athleteProfile || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
+  set('profileAge', p.age);
+  set('profileHeight', p.heightCm);
+  set('profileWeight', p.weightKg);
+  const sex = document.getElementById('profileSex'); if (sex && p.sex) sex.value = p.sex;
+  document.getElementById('profileModal')?.classList.add('active');
+}
+function closeProfileModal() { document.getElementById('profileModal')?.classList.remove('active'); }
+function saveAthleteProfile() {
+  const appState = _getState();
+  const num = (id) => parseFloat(document.getElementById(id)?.value);
+  appState.athleteProfile = {
+    age: parseInt(document.getElementById('profileAge')?.value, 10) || null,
+    sex: document.getElementById('profileSex')?.value || null,
+    heightCm: num('profileHeight') || null,
+    weightKg: num('profileWeight') || null,
+  };
+  saveStateToLocalStorage(true);
+  closeProfileModal();
+  try { renderHome(); } catch {}
+}
+
+// ==========================================
 // EVENT DELEGATION ROUTER
 // ==========================================
 document.addEventListener('click', (e) => {
@@ -727,5 +822,11 @@ document.addEventListener('click', (e) => {
     closeTileCustomiser(apply);
   } else if (action === 'reset-tile-customiser') {
     resetTileCustomiser();
+  } else if (action === 'open-profile') {
+    openProfileModal();
+  } else if (action === 'close-profile') {
+    closeProfileModal();
+  } else if (action === 'save-profile') {
+    saveAthleteProfile();
   }
 });

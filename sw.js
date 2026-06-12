@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v57';
+const CACHE_NAME = 'hybrid-training-v58';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -46,7 +46,8 @@ const ASSETS_TO_CACHE = [
   './js/brain/brain_dashboard.js',
   './js/brain/analytics_brain.js',
   './js/brain/exercise_metadata.js',
-  './js/brain/session_fatigue.js'
+  './js/brain/session_fatigue.js',
+  './js/brain/briefing.js'
 ];
 
 self.addEventListener('install', (event) => {
