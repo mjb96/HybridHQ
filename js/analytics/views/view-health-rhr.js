@@ -9,7 +9,7 @@ import {
   buildTrendBrief, generateHealthCoachNote,
 } from '../../health/healthBaselines.js';
 import { renderHistoryBars, renderTrendLineWithBaseline } from '../charts.js';
-import { escapeHtml } from '../../util.js';
+import { escapeHtml, getLocalDateKey } from '../../util.js';
 import { computeReadiness, computeWeeklyLoadSeries } from '../../engine.js';
 import { getProgramById } from '../../state.js';
 import { emptyState, dayOverDayChip, extremesRow, supportingAverages } from './_healthTrend.js';
@@ -81,7 +81,7 @@ export function renderHealthRhrView(appState, days) {
   } catch { /* non-fatal */ }
 
   // Sleep correlation
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterday = getLocalDateKey(new Date(Date.now() - 86400000));
   const yesterdayLog = healthLog.find(e => e.date === yesterday);
   let sleepNote = '';
   if (yesterdayLog?.sleepHours > 0 && rhr > 0 && rhrBaseline.baseline) {

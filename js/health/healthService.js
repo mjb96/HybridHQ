@@ -24,6 +24,7 @@ import {
   readRawHealthData,
   HealthConnectAvailability,
 } from './healthConnect.js';
+import { getLocalDateKey } from '../util.js';
 import { buildHealthSnapshot } from './healthCalculations.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ function appendToHealthLog(appState, snapshot, raw) {
   if (!appState) return;
   if (!Array.isArray(appState.healthLog)) appState.healthLog = [];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateKey();
 
   // Extract sleep stages from raw bridge payload when available.
   // Health Connect SleepStage constants: AWAKE=0, SLEEPING=1, OUT_OF_BED=2,
