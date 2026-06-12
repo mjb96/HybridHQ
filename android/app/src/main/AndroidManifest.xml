@@ -36,10 +36,22 @@
             </intent-filter>
         </activity>
 
-        <!-- Health Connect permission rationale activity (required by Play Store policy) -->
-        <activity
-            android:name="androidx.health.connect.client.PermissionController"
-            android:exported="false" />
+        <!--
+            Required by Health Connect: an activity-alias that handles the
+            VIEW_PERMISSION_USAGE intent so Health Connect can show users which
+            data this app reads and why. Without this the permission request
+            is silently rejected before the system dialog ever appears.
+        -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
     </application>
 
