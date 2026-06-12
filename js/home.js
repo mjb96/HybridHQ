@@ -13,6 +13,7 @@ import { CATEGORY_META } from './brain/brain_dashboard.js';
 import { generateInsights, contextVerdict } from './brain/core.js';
 import { composeBriefing, trainingStatus } from './brain/briefing.js';
 import { generateWeekBrief, PHASES, PHASE_TONES } from './brain/weekly_brief.js';
+import { generateDailyBrief } from './brain/daily_readiness.js';
 import { energyProfile, activeCaloriesForDay } from './profile.js';
 import { escapeHtml } from './util.js';
 
@@ -605,7 +606,11 @@ export function renderHome() {
   try { renderIntel(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
   catch (e) { console.warn('[intel] render skipped:', e); }
 
-  // TIER 2.5 — Your Week Ahead.
+  // TIER 2.5a — Today's Focus (daily readiness).
+  try { renderDailyReadiness(appState, DEFAULT_DAYS, activeProgram, selectedDay); }
+  catch (e) { console.warn('[daily-readiness] render skipped:', e); }
+
+  // TIER 2.5b — Your Week Ahead.
   try { renderWeekAhead(appState, DEFAULT_DAYS, activeProgram); }
   catch (e) { console.warn('[week-ahead] render skipped:', e); }
 
@@ -753,7 +758,64 @@ export function renderHome() {
 }
 
 // ==========================================
-// TIER 2.5 — YOUR WEEK AHEAD CARD
+// TIER 2.5a — TODAY'S FOCUS (daily readiness)
+// ==========================================
+
+const DR_TONE = { fresh: '#10b981', moderate: '#f59e0b', reduced: '#ef4444' };
+
+export function renderDailyReadiness(appState, days, program, selectedDay) {
+  const card = document.getElementById('dailyReadinessCard');
+  if (!card) return;
+
+  let brief;
+  try {
+    brief = generateDailyBrief(appState, {
+      days,
+      program,
+      selectedDay,
+      currentWeek: appState.currentWeek,
+    });
+  } catch (e) {
+    console.warn('[daily-readiness] brief failed:', e);
+    card.style.display = 'none';
+    return;
+  }
+
+  // Hide when session is already logged (already done for today)
+  if (brief.sessionLogged) { card.style.display = 'none'; return; }
+  // Hide when there's no data from yesterday (nothing to say)
+  if (!brief.hasData) { card.style.display = 'none'; return; }
+
+  card.style.display = '';
+  const accent = DR_TONE[brief.status] || DR_TONE.fresh;
+  card.style.setProperty('--dr-accent', accent);
+  card.style.borderLeftColor = accent;
+
+  const chip     = document.getElementById('drStatusChip');
+  const headline = document.getElementById('drHeadline');
+  const directive = document.getElementById('drDirective');
+  const list     = document.getElementById('drAdjustments');
+
+  if (chip) {
+    chip.textContent = brief.status === 'fresh' ? 'Fresh' : brief.status === 'moderate' ? 'Moderate' : 'Reduced';
+    chip.style.background = `color-mix(in srgb, ${accent} 16%, transparent)`;
+    chip.style.color = accent;
+  }
+  if (headline)  headline.textContent  = brief.headline  || '';
+  if (directive) directive.textContent = brief.directive || '';
+  if (list) {
+    if (brief.adjustments && brief.adjustments.length > 0) {
+      list.innerHTML = brief.adjustments.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+      list.style.display = '';
+    } else {
+      list.innerHTML = '';
+      list.style.display = 'none';
+    }
+  }
+}
+
+// ==========================================
+// TIER 2.5b — YOUR WEEK AHEAD CARD
 // ==========================================
 
 const TONE_COLORS = {

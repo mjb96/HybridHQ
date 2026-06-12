@@ -151,6 +151,69 @@
     .analytics-section { display: none; }
     .analytics-section.active { display: block; }
 
+    /* ── Today's Focus (daily readiness) ─────────────────────── */
+    .daily-readiness-card {
+      padding: 12px 14px 10px;
+      border-left: 3px solid var(--dr-accent, #10b981);
+    }
+    .dr-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+    .dr-label {
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .dr-status-chip {
+      font-size: 0.6rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--dr-accent, #10b981) 16%, transparent);
+      color: var(--dr-accent, #10b981);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .dr-headline {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-inverse);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+    .dr-directive {
+      font-size: 0.7rem;
+      line-height: 1.4;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .dr-adjustments {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .dr-adjustments li {
+      font-size: 0.68rem;
+      line-height: 1.4;
+      color: var(--text-primary);
+      padding: 3px 0 3px 14px;
+      position: relative;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .dr-adjustments li:first-child { border-top: none; }
+    .dr-adjustments li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--dr-accent, #10b981);
+      font-weight: 700;
+    }
+
     /* ── Your Week Ahead card ─────────────────────────────────── */
     .week-ahead-card {
       padding: 14px 14px 12px;
@@ -314,7 +377,18 @@
         <div class="ts-more">Tap for the full read →</div>
       </article>
 
-      <!-- TIER 2.5 · Your Week Ahead -->
+      <!-- TIER 2.5a · Today's Focus (daily readiness) -->
+      <article id="dailyReadinessCard" class="card-dark daily-readiness-card mt-3" style="display:none;" aria-label="Today's Focus">
+        <div class="dr-header">
+          <span class="dr-label">Today's Focus</span>
+          <span id="drStatusChip" class="dr-status-chip"></span>
+        </div>
+        <div id="drHeadline" class="dr-headline"></div>
+        <div id="drDirective" class="dr-directive"></div>
+        <ul id="drAdjustments" class="dr-adjustments"></ul>
+      </article>
+
+      <!-- TIER 2.5b · Your Week Ahead -->
       <article id="weekAheadCard" class="card-dark week-ahead-card mt-3" style="display:none;" aria-label="Your Week Ahead">
         <div class="week-ahead-header">
           <div class="week-ahead-meta">
