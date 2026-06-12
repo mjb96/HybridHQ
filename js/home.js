@@ -618,6 +618,10 @@ export function renderHome() {
   try { applyFocusOrder(); mountFocusDragAndDrop(); }
   catch (e) { console.warn('[hybrid-focus] reorder skipped:', e); }
 
+  // TIER 4 — At a Glance dashboard tiles.
+  try { renderGlanceGrid(appState, DEFAULT_DAYS, activeProgram, selectedDay); mountTileDragAndDrop(); }
+  catch (e) { console.warn('[glance-grid] render skipped:', e); }
+
   const progressPercentage = (() => {
     let total = 0, done = 0;
     DEFAULT_DAYS.forEach(dKey => {
