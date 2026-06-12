@@ -1833,3 +1833,12 @@ td {
 .ts-stat-v small { font-size: 0.5rem; color: var(--text-secondary); font-weight: 600; }
 .ts-stat-l { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
 .ts-more { font-size: var(--text-xxs); color: var(--text-secondary); margin-top: var(--space-3); text-align: right; }
+
+/* Tier 3 · mini trend bar-chart inside the focus cards (was unstyled = broken) */
+.bar-chart-container { display: flex; align-items: flex-end; gap: 4px; height: 56px; margin-top: 2px; }
+.bar-column { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; min-width: 0; height: 100%; }
+.bar-fill-wrap { display: flex; align-items: flex-end; flex: 1; }
+.bar-fill { width: 100%; max-width: 12px; border-radius: 3px 3px 0 0; }
+.bar-label { font-size: 0.5rem; color: var(--text-secondary); margin-top: 3px; }
+/* tighter padding so two cards sit comfortably side-by-side */
+.in-focus-carousel .carousel-card { padding: var(--space-3); }

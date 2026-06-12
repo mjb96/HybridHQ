@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v64';
+const CACHE_NAME = 'hybrid-training-v65';
 
 const ASSETS_TO_CACHE = [
   './',
