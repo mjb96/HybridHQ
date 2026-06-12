@@ -14,7 +14,6 @@ const CONTEXT_SECTION = {
   strength:        'analytics-strength',
   strength_pr:     'analytics-strength_pr',
   running:         'analytics-running',
-  recovery:        'analytics-recovery',
   'recovery-score':'analytics-recovery-score',
   bodyweight:      'analytics-bodyweight',
   progress:        'analytics-progress',

@@ -11,7 +11,7 @@ import { renderContextBanner } from './brain/analytics_brain.js';
 import { renderCoachDetail } from './brain/brain_dashboard.js';
 import { renderStrengthView, renderStrengthPrView, renderWeeklyVolumeView } from './analytics/views/view-strength.js';
 import { renderRunningView } from './analytics/views/view-running.js';
-import { renderRecoveryView, renderRecoveryScoreView } from './analytics/views/view-recovery.js';
+import { renderRecoveryScoreView } from './analytics/views/view-recovery.js';
 import { renderBodyweightView } from './analytics/views/view-bodyweight.js';
 import { renderProgressView, renderStreakView, renderGoalProgressView, renderActiveFuelView } from './analytics/views/view-progress.js';
 import { renderHealthStepsView } from './analytics/views/view-health-steps.js';
@@ -100,9 +100,6 @@ export function renderAnalytics() {
       renderRunningView(appState, days);
       break;
     case 'recovery':
-      document.getElementById('analytics-recovery').classList.add('active');
-      renderRecoveryView(appState, days);
-      break;
     case 'recovery-score':
       document.getElementById('analytics-recovery-score').classList.add('active');
       renderRecoveryScoreView(appState, days);

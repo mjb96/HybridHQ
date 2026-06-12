@@ -105,7 +105,6 @@ export const CONTEXT_DOMAINS = Object.freeze({
   'weekly-volume': ['strength'],
   running:         ['aerobic', 'fuel'],
   'active-fuel':   ['fuel', 'aerobic'],
-  recovery:        ['recovery'],
   'recovery-score':['recovery'],
   progress:        ['adherence', 'strength', 'aerobic'],
   'goal-progress': ['adherence'],

@@ -105,34 +105,6 @@ export const TILE_REGISTRY = [
     },
   },
 
-  // ---- READINESS ----------------------------------------------
-  {
-    id:        'readiness',
-    type:      DashboardTileType.RING,
-    icon:      '❤️',
-    label:     'Readiness',
-    accentVar: '--color-green',
-    navTarget: 'recovery',
-    order:     1,
-    renderData(appState, defaultDays, activeProgram) {
-      try {
-        const maxWeek = activeProgram?.totalWeeks || 12;
-        const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
-        const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
-        const r = computeReadiness(totalByWeek, appState.currentWeek);
-        if (!r.hasData) {
-          return { hero: '--', sub: 'Log RPE + duration', ringPct: 0, ringColor: 'var(--color-blue)', state: 'empty' };
-        }
-        let ringColor = 'var(--color-green)';
-        if (r.score < 50) ringColor = 'var(--color-red)';
-        else if (r.score < 75) ringColor = 'var(--color-amber)';
-        return { hero: `${r.score}`, sub: `ACWR ${r.acwr.toFixed(2)}`, ringPct: r.score, ringColor, state: 'loaded' };
-      } catch {
-        return { hero: '--', sub: 'Unavailable', ringPct: 0, ringColor: 'var(--color-blue)', state: 'error' };
-      }
-    },
-  },
-
   // ---- CONSISTENCY -------------------------------------------
   {
     id:        'consistency',
@@ -313,7 +285,7 @@ export const TILE_REGISTRY = [
     id:        'recovery-score',
     type:      DashboardTileType.METRIC,
     icon:      '🛌',
-    label:     'Recovery Score',
+    label:     'Recovery',
     accentVar: '--color-green',
     navTarget: 'recovery-score',
     order:     8,

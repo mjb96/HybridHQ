@@ -1,12 +1,11 @@
 // ==========================================
 // ANALYTICS VIEW — RECOVERY (view-recovery.js)
 // ------------------------------------------
-// Renders the 'recovery' and 'recovery-score' contexts.
+// Renders the 'recovery-score' context (primary hero + load-trend context).
 // ==========================================
 import { computeRecoveryScore, computeWeeklyLoadSeries, computeReadiness } from '../../engine.js';
 import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
 import { getProgramById } from '../../state.js';
-import { setText } from '../utils.js';
 import { renderRpeChart, renderStackedLoadChart } from '../charts.js';
 import { computeBaseline } from '../../health/healthBaselines.js';
 import { escapeHtml } from '../../util.js';
@@ -64,94 +63,7 @@ function renderHealthSignalsPanel(section, health, healthLog) {
     </article>` : ''}`;
 }
 
-// ---- Recovery overview (RPE summary cards + RPE trend + ACWR) --------------
-export function renderRecoveryView(appState, days) {
-  const activeProgram = getProgramById(appState.activeProgramId);
-  const maxWeek    = activeProgram?.totalWeeks || 12;
-  const weekLabels = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
-  const rpeData    = weeklyRpeSeries(appState, days, maxWeek);
-
-  const wk      = appState.currentWeek || '1';
-  const weekData = appState.weeks?.[wk];
-
-  let totalRpe = 0, rpeCount = 0;
-  if (weekData) {
-    days.forEach(d => {
-      const rRpe = parseInt(weekData.runs?.[d]?.rpe, 10) || 0;
-      const gRpe = parseInt(weekData.gymRpe?.[d], 10)   || 0;
-      if (rRpe > 0) { totalRpe += rRpe; rpeCount++; }
-      if (gRpe > 0) { totalRpe += gRpe; rpeCount++; }
-    });
-  }
-
-  const avgRpe = rpeCount > 0 ? (totalRpe / rpeCount) : 0;
-  let statusLabel = '--', statusColor = 'var(--text-muted)', interpretation = 'Log workouts to see recovery status.';
-  if (rpeCount > 0) {
-    if (avgRpe < 6) {
-      statusLabel    = 'Fresh';
-      statusColor    = '#10b981';
-      interpretation = 'Low fatigue this week. Good time to push intensity.';
-    } else if (avgRpe < 8) {
-      statusLabel    = 'Accumulating';
-      statusColor    = '#f59e0b';
-      interpretation = 'Moderate fatigue. Stick to planned volume and prioritise sleep.';
-    } else {
-      statusLabel    = 'High Load';
-      statusColor    = '#ef4444';
-      interpretation = 'High fatigue this week. Consider reducing volume or taking a rest day.';
-    }
-  }
-
-  const section = document.getElementById('analytics-recovery');
-  if (!section) return;
-
-  renderHealthSignalsPanel(section, appState.health, appState.healthLog);
-
-  let summaryEl = section.querySelector('.recovery-summary-cards');
-  if (!summaryEl) {
-    summaryEl = document.createElement('div');
-    summaryEl.className = 'recovery-summary-cards grid-2-col gap-2 mb-3';
-    const chartArticle = section.querySelector('article');
-    if (chartArticle) section.insertBefore(summaryEl, chartArticle);
-    else section.appendChild(summaryEl);
-  }
-  summaryEl.innerHTML = `
-    <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(16,185,129,0.3);">
-      <div class="text-xs text-muted mb-1">Avg RPE This Week</div>
-      <div class="text-lg font-heavy" style="color:${statusColor};">${rpeCount > 0 ? avgRpe.toFixed(1) : '--'}</div>
-      <div class="text-xs font-bold mt-1" style="color:${statusColor};">${statusLabel}</div>
-    </article>
-    <article class="card-dark flex-col flex-center p-3" style="border:1px solid rgba(59,130,246,0.3);">
-      <div class="text-xs text-muted mb-1">Sessions Logged</div>
-      <div class="text-lg font-heavy text-inverse">${rpeCount}</div>
-      <div class="text-xs text-muted mt-1">this week</div>
-    </article>
-  `;
-
-  let interpEl = section.querySelector('.recovery-interpretation');
-  if (!interpEl) {
-    interpEl = document.createElement('article');
-    interpEl.className = 'recovery-interpretation card-dark p-3 mb-3';
-    const chartArticle = section.querySelector('article:not(.recovery-summary-cards article)');
-    if (chartArticle) section.insertBefore(interpEl, chartArticle);
-    else section.appendChild(interpEl);
-  }
-  interpEl.innerHTML = `<div class="text-sm text-muted" style="line-height:1.5;">${interpretation}</div>`;
-
-  renderRpeChart(document.getElementById('rpeTrendContainer'), weekLabels, rpeData);
-
-  const load = computeWeeklyLoadSeries(appState, days, maxWeek);
-  const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
-  const readiness = computeReadiness(totalByWeek, appState.currentWeek);
-
-  setText('recoveryAcwr',    readiness.hasData ? readiness.acwr.toFixed(2) : '--');
-  setText('recoveryAcute',   readiness.hasData ? readiness.acute.toLocaleString() + ' AU' : '--');
-  setText('recoveryChronic', readiness.hasData ? readiness.chronic.toLocaleString() + ' AU' : '--');
-
-  renderStackedLoadChart(document.getElementById('loadTrendContainer'), load.lift, load.run);
-}
-
-// ---- Recovery score detail (score breakdown + RPE trend + drivers) ----------
+// ---- Recovery score detail (score breakdown + RPE trend + drivers + load context) ----------
 export function renderRecoveryScoreView(appState, days) {
   const activeProgram = getProgramById(appState.activeProgramId);
   const maxWeek    = activeProgram?.totalWeeks || 12;
@@ -178,6 +90,59 @@ export function renderRecoveryScoreView(appState, days) {
   if (trendEl) renderRpeChart(trendEl, weekLabels, rpeData);
 
   _renderRecoveryDrivers(appState, days, r);
+  _renderLoadContext(appState, days, activeProgram, maxWeek);
+}
+
+function _renderLoadContext(appState, days, activeProgram, maxWeek) {
+  const section = document.getElementById('analytics-recovery-score');
+  if (!section) return;
+
+  let panel = section.querySelector('.recovery-load-context');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'recovery-load-context';
+    section.appendChild(panel);
+  }
+
+  const load = computeWeeklyLoadSeries(appState, days, maxWeek);
+  const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
+  const readiness = computeReadiness(totalByWeek, appState.currentWeek);
+
+  if (!readiness.hasData) { panel.innerHTML = ''; return; }
+
+  const acwr = readiness.acwr;
+  const acwrColor = acwr > 1.3 ? '#ef4444' : acwr < 0.8 ? '#f59e0b' : '#10b981';
+  const acwrLabel = acwr > 1.3 ? 'Overreaching' : acwr < 0.8 ? 'Underloading' : 'In range';
+  const pctVsAvg = Math.round((acwr - 1) * 100);
+  const contextNote = `Load is ${pctVsAvg >= 0 ? '+' : ''}${pctVsAvg}% vs your 4-week average (ACWR ${acwr.toFixed(2)}). Sweet spot: 0.8–1.3.`;
+
+  panel.innerHTML = `
+    <h2 class="section-header mt-2">Load Trend</h2>
+    <article class="card-dark p-3 mb-4">
+      <div class="grid-3-col gap-2 mb-3">
+        <div class="flex-col flex-center">
+          <div class="text-xs text-muted mb-1">ACWR</div>
+          <div class="text-lg font-heavy" style="color:${acwrColor};">${acwr.toFixed(2)}</div>
+          <div class="text-xs font-bold mt-1" style="color:${acwrColor};">${acwrLabel}</div>
+        </div>
+        <div class="flex-col flex-center">
+          <div class="text-xs text-muted mb-1">This week</div>
+          <div class="text-lg font-heavy text-inverse">${readiness.acute.toLocaleString()} AU</div>
+        </div>
+        <div class="flex-col flex-center">
+          <div class="text-xs text-muted mb-1">4-week avg</div>
+          <div class="text-lg font-heavy text-inverse">${readiness.chronic.toLocaleString()} AU</div>
+        </div>
+      </div>
+      <div class="flex gap-3 mb-2 font-bold" style="font-size:0.65rem;">
+        <span style="color:#3b82f6;">● Lifting</span>
+        <span style="color:#ec4899;">● Running</span>
+      </div>
+      <div class="recovery-load-chart"></div>
+      <div class="text-muted mt-2" style="font-size:0.62rem;">${escapeHtml(contextNote)}</div>
+    </article>`;
+
+  renderStackedLoadChart(panel.querySelector('.recovery-load-chart'), load.lift, load.run);
 }
 
 function _driverRow(label, impact, note, positive) {

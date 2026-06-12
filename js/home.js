@@ -310,7 +310,7 @@ function renderSupportCards(appState, defaultDays, activeProgram) {
       const label = r.score >= 75 ? 'Ready to train' : r.score >= 50 ? 'Moderate load' : 'High fatigue — prioritise recovery';
       const grad  = `conic-gradient(${color} ${r.score}%, rgba(255,255,255,0.08) 0)`;
       cards.push(`
-        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery">
+        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery-score">
           <div>
             <div class="text-xs text-muted font-bold uppercase tracking-wider mb-1">Readiness</div>
             <div class="font-heavy text-inverse" style="font-size:1.4rem;line-height:1;">${r.score}<span class="text-muted" style="font-size:0.85rem;">/100</span></div>
@@ -1077,7 +1077,6 @@ function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readi
   const A = (s) => s; // readability for the raw data-action strings
   const items = [];
   if (recovery?.hasData)  items.push({ label: 'Recovery',  value: `${recovery.score}%`, action: A('data-action="open-analytics" data-context="recovery-score"') });
-  if (readiness?.hasData) items.push({ label: 'Readiness', value: `${readiness.score}`,  action: A('data-action="open-analytics" data-context="recovery"') });
   items.push({ label: 'Streak', value: `${streak.current || 0}d`, action: A('data-action="open-analytics" data-context="streak"') });
 
   if (energy.hasProfile) {
