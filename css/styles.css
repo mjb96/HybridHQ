@@ -1848,3 +1848,5 @@ td {
 .focus-milestone { margin-top: auto; padding-top: 8px; align-items: baseline; }
 .focus-milestone span:first-child { flex: 0 0 auto; }
 .focus-milestone b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.in-focus-carousel { width: 100%; }
