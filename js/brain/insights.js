@@ -213,9 +213,10 @@ function template(f) {
 
   if (f.type === 'strength_summary') {
     const sessions = ev(f, 'sessions');
+    const wl = ev(f, 'week_label');
     return {
       category: CAT.PROGRESS,
-      observation: `This week: ${sessions} lifting session${sessions !== 1 ? 's' : ''} · ${ev(f, 'sets')} sets · ${Math.round(ev(f, 'volume')).toLocaleString()} kg lifted.`,
+      observation: `This week${wl ? ` (${wl})` : ''}: ${sessions} lifting session${sessions !== 1 ? 's' : ''} · ${ev(f, 'sets')} sets · ${Math.round(ev(f, 'volume')).toLocaleString()} kg lifted.`,
       explanation: `Your completed working sets logged so far this week.`,
       whyItMatters: `This is your current strength workload — the base the week-over-week trends build on.`,
       suggestedAction: `Keep logging; e1RM and volume trends unlock once you have a couple of weeks.`,
@@ -225,9 +226,10 @@ function template(f) {
   if (f.type === 'running_summary') {
     const runs = ev(f, 'runs');
     const elev = ev(f, 'elev');
+    const wl = ev(f, 'week_label');
     return {
       category: CAT.PROGRESS,
-      observation: `This week: ${runs} run${runs !== 1 ? 's' : ''} · ${ev(f, 'dist')} km · avg pace ${ev(f, 'avg_pace')}.`,
+      observation: `This week${wl ? ` (${wl})` : ''}: ${runs} run${runs !== 1 ? 's' : ''} · ${ev(f, 'dist')} km · avg pace ${ev(f, 'avg_pace')}.`,
       explanation: `Your logged runs so far this week${elev > 0 ? `, +${elev} m elevation` : ''}.`,
       whyItMatters: `This is your current running load — pace and load trends build on it.`,
       suggestedAction: `Log a few more runs to unlock pace and load trends.`,

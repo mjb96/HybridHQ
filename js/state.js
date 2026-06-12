@@ -4,6 +4,7 @@
 import { PROGRAMS } from './constants.js';
 import { prescribeSetsForLift, isCompletedSet } from './engine.js';
 import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2, migrateProgramToV2 } from './schema.js';
+import { estimateWeekStart } from './dates.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
@@ -231,6 +232,16 @@ export function verifyWeekStorageSchema(wk) {
   DEFAULT_DAYS.forEach(d => {
     if (!appState.weeks[wk].supersets[d]) appState.weeks[wk].supersets[d] = {};
   });
+
+  // TIME-AXIS: stamp a real calendar start date on the week (the Monday of the
+  // training week). New weeks inherit the current week-start; historical weeks
+  // are backfilled by estimating 7-day-week offsets so the timeline is monotonic.
+  if (!appState.weeks[wk].startedAt) {
+    appState.weeks[wk].startedAt =
+      estimateWeekStart(appState.weekStartedAt, appState.currentWeek, wk) ||
+      appState.weekStartedAt ||
+      new Date().toISOString();
+  }
 }
 
 // ==========================================

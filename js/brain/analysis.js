@@ -21,6 +21,7 @@ import {
 } from '../engine.js';
 import { strengthLoadSeries, enduranceLoadSeries } from './load_models.js';
 import { DOMAINS, ENGINES, FINDING_TYPES, THRESHOLDS } from './constants_brain.js';
+import { weekRangeLabel } from '../dates.js';
 
 const DEFAULT_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -130,7 +131,7 @@ function strengthWeekSummary(state, days, cw) {
     }
     if (dayHas) sessions.add(d);
   });
-  return sets > 0 ? { sessions: sessions.size, sets, vol: Math.round(vol) } : null;
+  return sets > 0 ? { sessions: sessions.size, sets, vol: Math.round(vol), label: weekRangeLabel(wk.startedAt) } : null;
 }
 
 function runningWeekSummary(state, days, cw) {
@@ -149,7 +150,7 @@ function runningWeekSummary(state, days, cw) {
   });
   if (runs === 0) return null;
   const avgPace = pDist > 0 ? pwTime / pDist : 0;
-  return { runs, dist: Math.round(dist * 10) / 10, avgPaceFmt: avgPace > 0 ? formatPace(avgPace) : '—', elev: Math.round(elev) };
+  return { runs, dist: Math.round(dist * 10) / 10, avgPaceFmt: avgPace > 0 ? formatPace(avgPace) : '—', elev: Math.round(elev), label: weekRangeLabel(wk.startedAt) };
 }
 
 // ------------------------------------------------------------------
@@ -223,7 +224,7 @@ export function analyzeStrength(state, days, maxWeek, currentWeek) {
     findings.push(makeFinding({
       engine: ENGINES.STRENGTH, domain: DOMAINS.STRENGTH, type: FINDING_TYPES.STRENGTH_SUMMARY,
       subject: 'week', direction: null, magnitude: sSum.vol, unit: 'kg', window: { toWeek: cw },
-      evidence: [{ metric: 'sessions', value: sSum.sessions }, { metric: 'sets', value: sSum.sets }, { metric: 'volume', value: sSum.vol }],
+      evidence: [{ metric: 'sessions', value: sSum.sessions }, { metric: 'sets', value: sSum.sets }, { metric: 'volume', value: sSum.vol }, { metric: 'week_label', value: sSum.label }],
       dataPoints: sSum.sessions, severity: 0.15,
     }));
   }
@@ -248,6 +249,7 @@ export function analyzeRunning(state, days, maxWeek, currentWeek) {
       evidence: [
         { metric: 'runs', value: rSum.runs }, { metric: 'dist', value: rSum.dist },
         { metric: 'avg_pace', value: rSum.avgPaceFmt }, { metric: 'elev', value: rSum.elev },
+        { metric: 'week_label', value: rSum.label },
       ],
       dataPoints: rSum.runs, severity: 0.15,
     }));
