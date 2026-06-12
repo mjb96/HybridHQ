@@ -1850,3 +1850,19 @@ td {
 .focus-milestone b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .in-focus-carousel { width: 100%; }
+
+/* DEFINITIVE: equal full-width focus cards (overrides any prior rule) */
+.in-focus-carousel {
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+.in-focus-carousel > .carousel-card {
+  flex: 1 1 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin-bottom: 0 !important;
+}
