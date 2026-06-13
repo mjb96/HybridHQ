@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.webkit.FileChooserParams
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -231,7 +230,7 @@ class MainActivity : AppCompatActivity() {
         override fun onShowFileChooser(
             webView: WebView,
             filePathCallback: ValueCallback<Array<Uri>>,
-            fileChooserParams: FileChooserParams,
+            fileChooserParams: WebChromeClient.FileChooserParams,
         ): Boolean {
             // Cancel any pending callback to avoid locking the input element.
             fileChooserCallback?.onReceiveValue(null)
