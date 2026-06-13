@@ -9,6 +9,7 @@ import {
   allLiftsStats,
   big3Progression,
   big3Maxes,
+  weeklyVolumeByMuscle,
 } from '../js/metrics/metrics-strength.js';
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -193,6 +194,90 @@ test('big3Progression handles empty state', () => {
   assert.equal(result.squat.allTime, 0);
   assert.equal(result.bench.allTime, 0);
   assert.equal(result.deadlift.allTime, 0);
+});
+
+// ---- weeklyVolumeByMuscle ----------------------------------------------
+test('weeklyVolumeByMuscle credits primary muscles at 1.0 per set', () => {
+  // Back Squat: primary = ['quads', 'glutes'] — 2 completed working sets in wk1
+  const state = {
+    currentWeek: '1',
+    weeks: {
+      '1': {
+        lifts: {
+          mon: {
+            'Back Squat': [
+              { w: '100', r: '5', c: true },
+              { w: '100', r: '5', c: true },
+              { w: '60', r: '5', c: true, isWarmup: true }, // excluded
+            ],
+          },
+        },
+      },
+    },
+  };
+  const result = weeklyVolumeByMuscle(state, DAYS, 1);
+  assert.equal(result['quads']?.[0], 2, 'quads should get 2 set credits');
+  assert.equal(result['glutes']?.[0], 2, 'glutes should get 2 set credits');
+});
+
+test('weeklyVolumeByMuscle credits secondary muscles at 0.5 per set', () => {
+  // Back Squat: secondary = ['erectors', 'adductors'] — 2 completed sets
+  const state = {
+    currentWeek: '1',
+    weeks: {
+      '1': { lifts: { mon: { 'Back Squat': [{ w: '100', r: '5', c: true }, { w: '100', r: '5', c: true }] } } },
+    },
+  };
+  const result = weeklyVolumeByMuscle(state, DAYS, 1);
+  assert.equal(result['erectors']?.[0], 1, 'secondary muscle should get 0.5 × 2 = 1 credit');
+});
+
+test('weeklyVolumeByMuscle returns one entry per week up to maxWeek', () => {
+  const state = {
+    currentWeek: '1',
+    weeks: { '1': { lifts: { mon: { 'Back Squat': [{ w: '100', r: '5', c: true }] } } } },
+  };
+  const result = weeklyVolumeByMuscle(state, DAYS, 4);
+  assert.equal(result['quads']?.length, 4, 'should have 4 weekly entries');
+  assert.equal(result['quads'][0], 1, 'wk1 has one set');
+  assert.equal(result['quads'][1], 0, 'wk2 has zero sets');
+});
+
+test('weeklyVolumeByMuscle excludes warmups', () => {
+  const state = {
+    currentWeek: '1',
+    weeks: {
+      '1': { lifts: { mon: { 'Bench Press': [
+        { w: '80', r: '10', c: true, isWarmup: true }, // warmup excluded
+        { w: '100', r: '5', c: true },
+      ] } } },
+    },
+  };
+  const result = weeklyVolumeByMuscle(state, DAYS, 1);
+  assert.equal(result['chest']?.[0], 1, 'only 1 working set should be counted');
+});
+
+test('weeklyVolumeByMuscle returns empty object for empty state', () => {
+  const result = weeklyVolumeByMuscle({ weeks: {} }, DAYS, 3);
+  assert.deepEqual(result, {});
+});
+
+test('weeklyVolumeByMuscle accumulates across multiple exercises targeting same muscle', () => {
+  // Bench Press (primary: chest) + Incline Bench Press (primary: upper_chest, front_delts)
+  // Both have front_delts as primary → front_delts should accumulate from Bench Press secondary (1×0.5)
+  // and Standing OHP primary (1×1.0)
+  const state = {
+    currentWeek: '1',
+    weeks: {
+      '1': { lifts: { mon: {
+        'Bench Press':         [{ w: '100', r: '5', c: true }],   // primary: chest, front_delts; secondary: triceps
+        'Standing Barbell OHP': [{ w: '70', r: '5', c: true }],   // primary: front_delts; secondary: triceps, upper_chest, core
+      } } },
+    },
+  };
+  const result = weeklyVolumeByMuscle(state, DAYS, 1);
+  // front_delts: 1 from Bench (primary) + 1 from OHP (primary) = 2
+  assert.ok(result['front_delts']?.[0] >= 2, `front_delts should be ≥2, got ${result['front_delts']?.[0]}`);
 });
 
 // ---- big3Maxes ---------------------------------------------------------
