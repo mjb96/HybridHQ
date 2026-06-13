@@ -13,6 +13,38 @@ export function initEngine(getStateFn, getDaysFn) {
 }
 
 // ==========================================
+// STABLE EXERCISE ID HELPERS
+// ------------------------------------------
+// Storage keys in lifts[day] are opaque IDs (lift_xxxxxxxx) after migration.
+// These three functions are the single translation layer between display names
+// and storage keys. Every module that reads or writes lifts[day] must use them.
+// ==========================================
+export function getLiftId(state, displayName) {
+  const key = String(displayName || '').trim();
+  if (!key) return key;
+  if (!state.liftIdMap) state.liftIdMap = {};
+  if (!state.liftNames) state.liftNames = {};
+  if (state.liftIdMap[key]) return state.liftIdMap[key];
+  const id = 'lift_' + Math.random().toString(36).slice(2, 10);
+  state.liftIdMap[key] = id;
+  state.liftNames[id] = key;
+  return id;
+}
+
+export function getLiftDisplayName(state, idOrName) {
+  if (!idOrName) return String(idOrName ?? '');
+  return state?.liftNames?.[String(idOrName)] || String(idOrName);
+}
+
+export function resolveLiftKey(state, nameOrId) {
+  if (!nameOrId) return String(nameOrId ?? '');
+  const key = String(nameOrId).trim();
+  // If it's a display name that has a registered ID, return the ID.
+  // If it's already an ID (or an unregistered name), return as-is.
+  return state?.liftIdMap?.[key] || key;
+}
+
+// ==========================================
 // TEXT DESCRIPTION PARSER ENGINE
 // ==========================================
 export function parseTargetFromDescription(descString, liftName) {
@@ -60,12 +92,13 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   const cWk = parseInt(currentWeekString, 10);
   if (isNaN(cWk) || cWk <= 1 || !appState.weeks) return result;
 
+  const storageKey = resolveLiftKey(appState, liftName);
   const history = [];
   for (let w = cWk - 1; w >= 1; w--) {
     const wData = appState.weeks[w.toString()];
-    if (wData && wData.lifts && wData.lifts[dayKey]?.[liftName]) {
+    if (wData && wData.lifts && wData.lifts[dayKey]?.[storageKey]) {
       // INCREMENT WARMUP: Exclude warmups from diagnostics and suggestions
-      const finishedSets = wData.lifts[dayKey][liftName].filter(s => s && s.c && s.w && s.r && !s.isWarmup);
+      const finishedSets = wData.lifts[dayKey][storageKey].filter(s => s && s.c && s.w && s.r && !s.isWarmup);
       if (finishedSets.length > 0) {
         let bestE1rm = 0, bestWeight = 0, bestReps = 0;
         finishedSets.forEach(s => {
@@ -99,7 +132,7 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   if (pastWkData) {
     // Prefer per-set RPE logged on this lift's last session; fall back to
     // session-level RPE across all days when per-set data is absent.
-    const prevSets = (pastWkData.lifts?.[dayKey]?.[liftName] || [])
+    const prevSets = (pastWkData.lifts?.[dayKey]?.[storageKey] || [])
       .filter(s => s && !s.isWarmup && isCompletedSet(s));
     const perSetRpes = prevSets
       .map(s => parseFloat(s.rpe))
@@ -241,21 +274,22 @@ export function computeEstimated1RMs() {
         const setsArr = dayLifts[lKey];
         if (!Array.isArray(setsArr)) continue;
         
+        const lName = getLiftDisplayName(appState, lKey);
         setsArr.forEach(s => {
           // INCREMENT WARMUP: Exclude warmups from global max
           if (s && s.c && !s.isWarmup) {
             const weight = parseFloat(s.w) || 0;
             const reps = parseInt(s.r, 10) || 0;
             const e1rm = epley1RM(weight, reps);
-            
+
             if (wKey === wk) {
-              if (lKey === 'Back Squat' && e1rm > result.currentSq) result.currentSq = e1rm;
-              if (lKey === 'Bench Press' && e1rm > result.currentBp) result.currentBp = e1rm;
-              if (lKey === 'Deadlift' && e1rm > result.currentDl) result.currentDl = e1rm;
+              if (lName === 'Back Squat' && e1rm > result.currentSq) result.currentSq = e1rm;
+              if (lName === 'Bench Press' && e1rm > result.currentBp) result.currentBp = e1rm;
+              if (lName === 'Deadlift' && e1rm > result.currentDl) result.currentDl = e1rm;
             }
-            if (lKey === 'Back Squat' && e1rm > result.globalMaxSq) result.globalMaxSq = e1rm;
-            if (lKey === 'Bench Press' && e1rm > result.globalMaxBp) result.globalMaxBp = e1rm;
-            if (lKey === 'Deadlift' && e1rm > result.globalMaxDl) result.globalMaxDl = e1rm;
+            if (lName === 'Back Squat' && e1rm > result.globalMaxSq) result.globalMaxSq = e1rm;
+            if (lName === 'Bench Press' && e1rm > result.globalMaxBp) result.globalMaxBp = e1rm;
+            if (lName === 'Deadlift' && e1rm > result.globalMaxDl) result.globalMaxDl = e1rm;
           }
         });
       }
@@ -289,15 +323,16 @@ export function computeExercisePRs(state, stats = {}) {
         });
 
         if (maxEstimated1RM > 0) {
-          if (!stats[lift]) {
-            stats[lift] = { allTimeMax: 0, currentEstimatedMax: 0 };
+          const liftKey = getLiftDisplayName(state, lift);
+          if (!stats[liftKey]) {
+            stats[liftKey] = { allTimeMax: 0, currentEstimatedMax: 0 };
           }
-          if (maxEstimated1RM > stats[lift].allTimeMax) {
-            stats[lift].allTimeMax = maxEstimated1RM;
+          if (maxEstimated1RM > stats[liftKey].allTimeMax) {
+            stats[liftKey].allTimeMax = maxEstimated1RM;
           }
           if (wKey === state.currentWeek) {
-            if (maxEstimated1RM > (stats[lift].currentEstimatedMax || 0)) {
-              stats[lift].currentEstimatedMax = maxEstimated1RM;
+            if (maxEstimated1RM > (stats[liftKey].currentEstimatedMax || 0)) {
+              stats[liftKey].currentEstimatedMax = maxEstimated1RM;
             }
           }
         }
@@ -403,7 +438,7 @@ export function findLastPerformance(state, liftName, opts = {}) {
     for (let i = dayList.length - 1; i >= 0; i--) {
       const d = dayList[i];
       if (excludeWeek != null && String(w) === String(excludeWeek) && d === excludeDay) continue;
-      const arr = wkData.lifts[d]?.[liftName];
+      const arr = wkData.lifts[d]?.[resolveLiftKey(state, liftName)];
       if (!Array.isArray(arr)) continue;
 
       const workingSets = arr.filter(s => !s.isWarmup);
@@ -687,7 +722,7 @@ export function getExerciseHistoryLog(state, liftName) {
     if(!wData || !wData.lifts) continue;
     
     for(let d in wData.lifts) {
-      const sets = wData.lifts[d][liftName];
+      const sets = wData.lifts[d][resolveLiftKey(state, liftName)];
       if(!sets || !Array.isArray(sets)) continue;
       
       // INCREMENT WARMUP: History Modal only displays working volume/sets

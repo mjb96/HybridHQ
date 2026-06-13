@@ -13,6 +13,7 @@ import {
   epley1RM,
   isCompletedSet,
   classifyBig3Lift,
+  getLiftDisplayName,
 } from '../engine.js';
 
 // ==========================================
@@ -61,13 +62,14 @@ export function weeklyE1rmByLift(state, days, maxWeek) {
     dayList.forEach(d => {
       const dayLifts = wkData.lifts?.[d] || {};
       for (const lift in dayLifts) {
-        if (!out[lift]) out[lift] = new Array(maxWeek).fill(0);
+        const liftName = getLiftDisplayName(state, lift);
+        if (!out[liftName]) out[liftName] = new Array(maxWeek).fill(0);
         const arr = dayLifts[lift];
         if (!Array.isArray(arr)) continue;
         arr.forEach(s => {
           if (!isCompletedSet(s) || s.isWarmup) return;
           const e = epley1RM(s.w, s.r);
-          if (e > out[lift][w - 1]) out[lift][w - 1] = e;
+          if (e > out[liftName][w - 1]) out[liftName][w - 1] = e;
         });
       }
     });
@@ -94,16 +96,17 @@ export function allLiftsStats(state, days) {
     dayList.forEach(d => {
       const dayLifts = wkData.lifts[d] || {};
       for (const lift in dayLifts) {
+        const liftName = getLiftDisplayName(state, lift);
         const arr = dayLifts[lift];
         if (!Array.isArray(arr)) continue;
-        if (!out[lift]) out[lift] = { allTimeMax: 0, currentWeekMax: 0, prevWeekMax: 0 };
+        if (!out[liftName]) out[liftName] = { allTimeMax: 0, currentWeekMax: 0, prevWeekMax: 0 };
         arr.forEach(s => {
           if (!isCompletedSet(s) || s.isWarmup) return;
           const e = epley1RM(s.w, s.r);
           if (e <= 0) return;
-          if (e > out[lift].allTimeMax) out[lift].allTimeMax = e;
-          if (wKey === currentWeek && e > out[lift].currentWeekMax) out[lift].currentWeekMax = e;
-          if (wKey === prevWeek    && e > out[lift].prevWeekMax)    out[lift].prevWeekMax = e;
+          if (e > out[liftName].allTimeMax) out[liftName].allTimeMax = e;
+          if (wKey === currentWeek && e > out[liftName].currentWeekMax) out[liftName].currentWeekMax = e;
+          if (wKey === prevWeek    && e > out[liftName].prevWeekMax)    out[liftName].prevWeekMax = e;
         });
       }
     });
@@ -131,7 +134,7 @@ export function big3Progression(state) {
       const dayLifts = wkData.lifts[dKey];
       if (!dayLifts) continue;
       for (const lift in dayLifts) {
-        const cat = classifyBig3Lift(lift);
+        const cat = classifyBig3Lift(getLiftDisplayName(state, lift));
         if (!cat) continue;
         const arr = dayLifts[lift];
         if (!Array.isArray(arr)) continue;

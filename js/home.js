@@ -5,7 +5,7 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, paceSecondsPerKm, formatPace } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, paceSecondsPerKm, formatPace, getLiftDisplayName } from './engine.js';
 import { big3Maxes } from './metrics/metrics-strength.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
@@ -510,11 +510,7 @@ export function renderHome() {
       }
       for (let liftName in todayLifts) {
         const expectedSets = Array.isArray(todayLifts[liftName]) ? todayLifts[liftName].length : 4;
-        let displayLiftName = liftName;
-        if (!isNaN(liftName) && homeBlueprint.lifts && homeBlueprint.lifts[parseInt(liftName, 10)]) {
-          displayLiftName = homeBlueprint.lifts[parseInt(liftName, 10)];
-        }
-        previewContainer.innerHTML += buildLiftPreviewRow(displayLiftName, expectedSets);
+        previewContainer.innerHTML += buildLiftPreviewRow(getLiftDisplayName(appState, liftName), expectedSets);
       }
       if (selectedDay === 'sun' || (Object.keys(todayLifts).length === 0 && selectedDay === 'sat')) {
         previewContainer.innerHTML = buildRestDayPreview();
