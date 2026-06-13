@@ -25,14 +25,14 @@ android {
         // Keys: KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
         // For local overrides add them to android/local.properties (never commit that file).
         create("release") {
-            val props = rootProject.file("local.properties").takeIf { it.exists() }?.let { f ->
-                java.util.Properties().also { p -> p.load(f.inputStream()) }
-            }
-            fun env(key: String) = System.getenv(key) ?: props?.getProperty(key)
+            val propFile = rootProject.file("local.properties")
+            val props = Properties()
+            if (propFile.exists()) props.load(propFile.inputStream())
+            fun env(key: String): String? = System.getenv(key) ?: props.getProperty(key)
             storeFile   = env("KEYSTORE_PATH")?.let { file(it) }
-            storePassword = env("KEYSTORE_PASSWORD") ?: ""
-            keyAlias    = env("KEY_ALIAS") ?: ""
-            keyPassword = env("KEY_PASSWORD") ?: ""
+            storePassword = env("KEYSTORE_PASSWORD").orEmpty()
+            keyAlias    = env("KEY_ALIAS").orEmpty()
+            keyPassword = env("KEY_PASSWORD").orEmpty()
         }
     }
 
