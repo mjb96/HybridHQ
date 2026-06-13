@@ -319,51 +319,6 @@ export function classifyBig3Lift(name) {
   return null;
 }
 
-export function computeBig3Progression(state) {
-  const cats = ['squat', 'bench', 'deadlift'];
-  const out = {};
-  cats.forEach(c => { out[c] = { current: 0, allTime: 0, byWeek: {} }; });
-  if (!state || !state.weeks) return out;
-
-  const currentWeek = state.currentWeek;
-
-  for (const wKey in state.weeks) {
-    const weekObj = state.weeks[wKey];
-    if (!weekObj || !weekObj.lifts) continue;
-
-    for (const dKey in weekObj.lifts) {
-      const dayLifts = weekObj.lifts[dKey];
-      if (!dayLifts) continue;
-
-      for (const lift in dayLifts) {
-        const cat = classifyBig3Lift(lift);
-        if (!cat) continue;
-        const setsArr = dayLifts[lift];
-        if (!Array.isArray(setsArr)) continue;
-
-        setsArr.forEach(s => {
-          // INCREMENT WARMUP: Exclude warmups from Big 3 Charts
-          if (!isCompletedSet(s) || s.isWarmup) return;
-          const e = epley1RM(s.w, s.r);
-          if (e <= 0) return;
-          if (e > (out[cat].byWeek[wKey] || 0)) out[cat].byWeek[wKey] = e;
-          if (e > out[cat].allTime) out[cat].allTime = e;
-          if (wKey === currentWeek && e > out[cat].current) out[cat].current = e;
-        });
-      }
-    }
-  }
-  return out;
-}
-
-export function computeBig3Maxes(state) {
-  const prog = computeBig3Progression(state);
-  return {
-    squat:    prog.squat.allTime,
-    bench:    prog.bench.allTime,
-    deadlift: prog.deadlift.allTime,
-  };
-}
 
 export function downsampleStream(stream, maxPoints = 500) {
   if (!stream || typeof stream !== 'object') return stream;
@@ -611,33 +566,6 @@ export function computeWeeklyLoadSeries(state, days, maxWeek) {
   return { lift, run };
 }
 
-// Weekly strength volume (tonnage) series — sum of weight·reps over completed
-// working sets (warmups excluded), per week 1..maxWeek. The shared "Strength
-// Load" descriptive series; mirrors the other computeWeekly* signatures.
-export function weeklyStrengthVolumeSeries(state, days, maxWeek) {
-  const out = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let vol = 0;
-    if (wkData) {
-      dayList.forEach(d => {
-        const dayLifts = wkData.lifts?.[d] || {};
-        for (const lift in dayLifts) {
-          const arr = dayLifts[lift];
-          if (!Array.isArray(arr)) continue;
-          arr.forEach(s => {
-            if (isCompletedSet(s) && !s.isWarmup) {
-              vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
-            }
-          });
-        }
-      });
-    }
-    out.push(Math.round(vol));
-  }
-  return out;
-}
 
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
@@ -697,38 +625,6 @@ export function computeDynamicMilestones(totalWeeks) {
   ];
 }
 
-export function computeWeeklyHrSeries(state, days, maxWeek) {
-  const avgHr = [], maxHr = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let sum = 0, cnt = 0, mx = 0;
-    if (wkData) dayList.forEach(d => {
-      const a = parseFloat(wkData.runs?.[d]?.avgHR) || 0;
-      const m = parseFloat(wkData.runs?.[d]?.maxHR) || 0;
-      if (a > 0) { sum += a; cnt++; }
-      if (m > mx) mx = m;
-    });
-    avgHr.push(cnt > 0 ? Math.round(sum / cnt) : 0);
-    maxHr.push(Math.round(mx));
-  }
-  return { avgHr, maxHr };
-}
-
-export function computeWeeklyTrainingEffectSeries(state, days, maxWeek) {
-  const out = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let sum = 0, cnt = 0;
-    if (wkData) dayList.forEach(d => {
-      const te = parseFloat(wkData.runs?.[d]?.trainingEffect) || 0;
-      if (te > 0) { sum += te; cnt++; }
-    });
-    out.push(cnt > 0 ? Math.round((sum / cnt) * 10) / 10 : 0);
-  }
-  return out;
-}
 
 export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
   const out = [];

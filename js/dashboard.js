@@ -27,9 +27,10 @@
 //   state:       'loaded'|'empty'|'error'
 // }
 
-import { computeBig3Maxes, computeBig3Progression, computeStreakView, computeRecoveryScore,
+import { computeStreakView, computeRecoveryScore,
          computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence,
          isCompletedSet, parseDurationToMinutes } from './engine.js';
+import { big3Progression } from './metrics/metrics-strength.js';
 import { generateInsights, summarizeReport } from './brain/core.js';
 import { generateDailyBrief } from './brain/daily_readiness.js';
 
@@ -226,7 +227,7 @@ export const TILE_REGISTRY = [
     order:     7,
     renderData(appState) {
       try {
-        const p = computeBig3Progression(appState);
+        const p = big3Progression(appState);
         // Show current-block best; mark ★ when it's also the all-time PR. If the
         // lift hasn't been trained this block, fall back to the all-time PR.
         const fmt = (cat) => {

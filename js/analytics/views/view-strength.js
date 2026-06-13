@@ -1,9 +1,9 @@
 // ==========================================
 // ANALYTICS VIEW — STRENGTH (view-strength.js)
 // ==========================================
-import { computeBig3Progression, isCompletedSet } from '../../engine.js';
+import { isCompletedSet } from '../../engine.js';
 import { getProgramById } from '../../state.js';
-import { allLiftsStats, weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
+import { allLiftsStats, weeklyTonnageSeries, big3Progression } from '../../metrics/metrics-strength.js';
 import { weeklyDistanceSeries } from '../../metrics/metrics-running.js';
 import { setText } from '../utils.js';
 import { renderVolumeChart, renderBig3ProgressionChart } from '../charts.js';
@@ -96,7 +96,7 @@ export function renderStrengthPrView(appState, days) {
   if (prContainer) _render1RMList(prContainer, allLiftsStats(appState, days));
 
   const big3El = document.getElementById('big3ProgressionContainer');
-  if (big3El) renderBig3ProgressionChart(big3El, computeBig3Progression(appState), weekLabels);
+  if (big3El) renderBig3ProgressionChart(big3El, big3Progression(appState), weekLabels);
 }
 
 // ---- Weekly volume detail (current-week breakdown + volume chart) ----------

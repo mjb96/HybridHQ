@@ -5,7 +5,8 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, computeBig3Maxes, paceSecondsPerKm, formatPace } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, paceSecondsPerKm, formatPace } from './engine.js';
+import { big3Maxes } from './metrics/metrics-strength.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
@@ -578,7 +579,7 @@ export function renderHome() {
   setTxt('focusStrengthBlock', phase);
   setTxt('focusStrengthSub', `Week ${wkNum} of ${totalWeeks} · ${formatMinutesToHoursMins(currentWeekGymTimeSum)} trained`);
   setW('focusStrengthBar', Math.min(100, Math.round((wkNum / totalWeeks) * 100)));
-  const b3 = computeBig3Maxes(appState);
+  const b3 = big3Maxes(appState);
   const top = [['Squat', b3.squat], ['Bench', b3.bench], ['Deadlift', b3.deadlift]].sort((a, b) => b[1] - a[1])[0];
   setHTML('focusStrengthMilestone', top && top[1] > 0
     ? `<span>Top lift</span><b>${top[0]} ${Math.round(top[1])} kg</b>`
