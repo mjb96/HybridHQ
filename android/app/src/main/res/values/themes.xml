@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The primary app theme. WindowCompat.setDecorFitsSystemWindows(false) in
+        MainActivity enables edge-to-edge; the WebView draws behind the bars.
+    -->
+    <style name="Theme.HybridApp" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <!-- Light icons (dark background). -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!--
+        Splash theme — shown by the system during cold-start before onCreate runs.
+        Transitions to Theme.HybridApp via postSplashScreenTheme.
+    -->
+    <style name="Theme.HybridApp.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/bg_dark</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.HybridApp</item>
+    </style>
+</resources>

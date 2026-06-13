@@ -717,7 +717,9 @@ async function bootstrapApp() {
     console.error("Critical layout generation block runtime defense:", fatalLifecycleError);
   }
 
-  if ('serviceWorker' in navigator) {
+  // Skip SW in the Android APK: WebViewAssetLoader serves assets locally and the
+  // SW's internal fetch calls can't reach the appassets origin from inside the worker.
+  if (!window.HybridHealthBridge && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => reg.update())  // always check for a fresh SW on every load
       .catch(err => {
@@ -733,6 +735,44 @@ window.addEventListener('pagehide', () => { flushCloudSyncNow(); });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushCloudSyncNow();
 });
+
+// ─── Android back-button bridge ───────────────────────────────────────────────
+// Called by MainActivity via evaluateJavascript. Returns 'handled' if the back
+// event was consumed by the web layer, or 'exit' to let native handle it.
+window.__onAndroidBack = function() {
+  // 1. Close any active modal (.active class pattern).
+  const activeModal = document.querySelector('.modal-overlay.active');
+  if (activeModal) { activeModal.classList.remove('active'); return 'handled'; }
+
+  // 2. Close any active bottom sheet (tileCustomiserSheet uses its own close fn).
+  const activeSheet = document.querySelector('.bottom-sheet.active');
+  if (activeSheet) {
+    if (activeSheet.id === 'tileCustomiserSheet') {
+      closeTileCustomiser(false);
+    } else {
+      activeSheet.classList.remove('active');
+      document.querySelector('.sheet-backdrop.active')?.classList.remove('active');
+    }
+    return 'handled';
+  }
+
+  // 3. todaySummaryModal uses inline style.display rather than .active.
+  const summaryModal = document.getElementById('todaySummaryModal');
+  if (summaryModal && summaryModal.style.display === 'flex') {
+    closeTodaySummaryModal(); return 'handled';
+  }
+
+  // 4. authOverlay uses initial inline display:flex; close sets display:none.
+  const authEl = document.getElementById('authOverlay');
+  if (authEl && authEl.style.display === 'flex') {
+    authEl.style.display = 'none'; return 'handled';
+  }
+
+  // 5. Navigate home if not already there.
+  if (activeTab !== 'home') { switchGlobalAppTab('home'); return 'handled'; }
+
+  return 'exit';
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener("DOMContentLoaded", bootstrapApp);

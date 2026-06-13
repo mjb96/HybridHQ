@@ -555,10 +555,16 @@ export async function pullEngineDataFromStorage() {
 // DATA EXPORT / IMPORT
 // ==========================================
 export function triggerEngineExport() {
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(appState));
+  const filename = 'hybrid_v2_meso_snapshot_wk' + appState.currentWeek + '.json';
+  const json = JSON.stringify(appState);
+  if (window.HybridHealthBridge?.saveTextFile) {
+    window.HybridHealthBridge.saveTextFile(filename, json, 'application/json');
+    return;
+  }
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(json);
   const anchorNode = document.createElement('a');
   anchorNode.setAttribute('href', dataStr);
-  anchorNode.setAttribute('download', 'hybrid_v2_meso_snapshot_wk' + appState.currentWeek + '.json');
+  anchorNode.setAttribute('download', filename);
   document.body.appendChild(anchorNode);
   anchorNode.click();
   anchorNode.remove();
@@ -603,6 +609,10 @@ export function triggerCSVExport() {
       }
     });
   });
+  if (window.HybridHealthBridge?.saveTextFile) {
+    window.HybridHealthBridge.saveTextFile('hybrid_data_export.csv', csv, 'text/csv');
+    return;
+  }
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
