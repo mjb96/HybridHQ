@@ -386,6 +386,41 @@ export function downsampleStream(stream, maxPoints = 500) {
   return out;
 }
 
+/**
+ * Compute grade-adjusted pace (s/km) for each stream point.
+ * Uses the Minetti et al. (2002) 5th-order metabolic cost polynomial normalised
+ * at grade=0 (flat). Grade is clamped to ±40% to suppress GPS noise spikes.
+ * Returns an array of the same length as the shortest input; missing altitude
+ * or distance data yields an empty array.
+ *
+ * @param {number[]} distKm      Cumulative distance in km per point.
+ * @param {number[]} elapsedSec  Cumulative elapsed seconds per point.
+ * @param {number[]} altitude    Altitude in metres per point.
+ * @returns {number[]}           GAP values in s/km (0 where pace/data is absent).
+ */
+export function computeGAP(distKm, elapsedSec, altitude) {
+  const n = Math.min(distKm?.length || 0, elapsedSec?.length || 0, altitude?.length || 0);
+  if (n < 2) return new Array(n).fill(0);
+
+  const out = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const dDistKm = (parseFloat(distKm[i])   || 0) - (parseFloat(distKm[i - 1])   || 0);
+    const dTime   = (parseFloat(elapsedSec[i]) || 0) - (parseFloat(elapsedSec[i - 1]) || 0);
+    const dElev   = (parseFloat(altitude[i])  || 0) - (parseFloat(altitude[i - 1])  || 0);
+    if (dDistKm <= 0 || dTime <= 0) continue;
+
+    const paceSec  = dTime / dDistKm;
+    const grade    = Math.max(-0.4, Math.min(0.4, dElev / (dDistKm * 1000)));
+    const g2 = grade * grade, g3 = g2 * grade, g4 = g2 * g2, g5 = g4 * grade;
+    // Minetti metabolic cost (J/kg/m): c(g) = 155.4g⁵ − 30.4g⁴ − 43.3g³ + 46.3g² + 19.5g + 3.6
+    const costGrade = 155.4*g5 - 30.4*g4 - 43.3*g3 + 46.3*g2 + 19.5*grade + 3.6;
+    const factor = Math.max(0.5, Math.min(3.0, costGrade / 3.6)); // 3.6 = cost at grade 0
+    out[i] = paceSec / factor;
+  }
+  out[0] = out[1];
+  return out;
+}
+
 export function derivePaceSeries(distKm, elapsedSec) {
   const n = Math.min(distKm?.length || 0, elapsedSec?.length || 0);
   const out = new Array(n).fill(0);

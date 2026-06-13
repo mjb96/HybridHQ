@@ -21,6 +21,7 @@ import {
   getLiftDisplayName,
   resolveLiftKey,
   findLastPerformance,
+  computeGAP,
 } from '../js/engine.js';
 
 // ---- epley1RM (D1) --------------------------------------------------------
@@ -187,6 +188,52 @@ test('resolveLiftKey maps display name to ID after registration', () => {
 test('resolveLiftKey falls back to the raw string for unregistered names', () => {
   const state = { liftIdMap: {}, liftNames: {} };
   assert.equal(resolveLiftKey(state, 'Unknown'), 'Unknown');
+});
+
+// ---- computeGAP (D10) --------------------------------------------------------
+
+test('computeGAP: flat course returns pace ≈ actual pace', () => {
+  // 5 km at 6:00/km (360 s/km), flat altitude
+  const distKm    = [0, 1, 2, 3, 4, 5];
+  const elapsedSec = [0, 360, 720, 1080, 1440, 1800];
+  const altitude   = [100, 100, 100, 100, 100, 100];
+  const gap = computeGAP(distKm, elapsedSec, altitude);
+  // All points should be close to 360 s/km (grade=0 → factor=1)
+  for (let i = 1; i < gap.length; i++) {
+    assert.ok(Math.abs(gap[i] - 360) < 1, `point ${i}: expected ~360, got ${gap[i]}`);
+  }
+});
+
+test('computeGAP: uphill makes GAP faster than actual pace', () => {
+  // 1 km/360s on 10% grade (100m elevation gain per km)
+  const distKm    = [0, 1];
+  const elapsedSec = [0, 360];
+  const altitude   = [0, 100];
+  const gap = computeGAP(distKm, elapsedSec, altitude);
+  assert.ok(gap[1] < 360, `uphill GAP should be < actual pace (was ${gap[1]})`);
+  assert.ok(gap[1] > 50,  `GAP should remain positive and sane (was ${gap[1]})`);
+});
+
+test('computeGAP: downhill makes GAP slower than actual pace', () => {
+  // 1 km/360s on −10% grade
+  const distKm    = [0, 1];
+  const elapsedSec = [0, 360];
+  const altitude   = [100, 0];
+  const gap = computeGAP(distKm, elapsedSec, altitude);
+  assert.ok(gap[1] > 360, `downhill GAP should be > actual pace (was ${gap[1]})`);
+});
+
+test('computeGAP: returns zeros for missing altitude', () => {
+  const distKm    = [0, 1, 2];
+  const elapsedSec = [0, 360, 720];
+  const gap = computeGAP(distKm, elapsedSec, []);
+  assert.equal(gap.length, 0);
+});
+
+test('computeGAP: returns empty for single-point arrays', () => {
+  const gap = computeGAP([0], [0], [100]);
+  assert.equal(gap.length, 1);
+  assert.equal(gap[0], 0);
 });
 
 // ---- findLastPerformance with ID-keyed storage (D9) -------------------------
