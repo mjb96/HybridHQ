@@ -1,13 +1,18 @@
 package com.hybridapp
 
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
@@ -59,12 +64,16 @@ class HybridHealthBridge(
     private val context: Context,
     private val webView: WebView,
     private val launchPermissions: (Set<String>) -> Unit,
+    private val requestNotificationPermission: (() -> Unit) = {},
 ) {
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val pendingPermCallbackId = AtomicReference<String?>()
 
     companion object {
+        const val NOTIFICATION_CHANNEL_ID  = "rest_timer"
+        private const val NOTIFICATION_ID_REST_TIMER = 1001
+
         // Historical data access (records older than 30 days). Requested alongside
         // the per-type read permissions; graceful degradation if denied.
         private const val PERMISSION_READ_HEALTH_DATA_HISTORY =
@@ -154,6 +163,35 @@ class HybridHealthBridge(
             val json = runCatching { fetchByDay(startIso, endIso) }.getOrElse { "{\"days\":[]}" }
             resolveCallback(callbackId, json)
         }
+    }
+
+    @JavascriptInterface
+    fun notifyRestComplete(title: String, body: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                // Ask for permission; the next timer completion will fire the notification.
+                webView.post { requestNotificationPermission() }
+                return
+            }
+        }
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(NOTIFICATION_ID_REST_TIMER, notification)
     }
 
     @JavascriptInterface

@@ -11,12 +11,27 @@ android {
         applicationId = "com.hybridapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Bump via CI: export VERSION_CODE=$(git rev-list --count HEAD) before the build.
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = "1.0.0"
 
-        // WebViewAssetLoader origin. Override in debug with a dev-server URL if needed:
-        // buildConfigField("String", "APP_URL", "\"http://10.0.2.2:8080/index.html\"")
         buildConfigField("String", "APP_URL", "\"https://appassets.androidplatform.net/assets/www/index.html\"")
+    }
+
+    signingConfigs {
+        // Release key supplied via CI environment variables or local.properties.
+        // Keys: KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+        // For local overrides add them to android/local.properties (never commit that file).
+        create("release") {
+            val props = rootProject.file("local.properties").takeIf { it.exists() }?.let { f ->
+                java.util.Properties().also { p -> p.load(f.inputStream()) }
+            }
+            fun env(key: String) = System.getenv(key) ?: props?.getProperty(key)
+            storeFile   = env("KEYSTORE_PATH")?.let { file(it) }
+            storePassword = env("KEYSTORE_PASSWORD") ?: ""
+            keyAlias    = env("KEY_ALIAS") ?: ""
+            keyPassword = env("KEY_PASSWORD") ?: ""
+        }
     }
 
     buildFeatures {
@@ -26,9 +41,12 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
+            // Uncomment to use a local dev server instead of bundled assets:
+            // buildConfigField("String", "APP_URL", "\"http://10.0.2.2:8080/index.html\"")
         }
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -65,6 +83,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.health.connect)
     implementation(libs.kotlinx.coroutines.android)
 }

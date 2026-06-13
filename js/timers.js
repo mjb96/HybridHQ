@@ -117,6 +117,11 @@ export function triggerRestTimerEngine(liftName = null, setRpe = null) {
           clockDisplay.style.color = 'var(--accent-green, #10b981)';
           
           if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+
+          // Fire a native notification when the app is backgrounded on Android.
+          if (document.visibilityState === 'hidden' && window.HybridHealthBridge?.notifyRestComplete) {
+            window.HybridHealthBridge.notifyRestComplete('Rest Complete', 'Ready for your next set!');
+          }
         }
       }
     }

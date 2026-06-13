@@ -2,8 +2,11 @@ package com.hybridapp
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.webkit.FileChooserParams
@@ -19,10 +22,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import java.net.URLDecoder
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
@@ -47,6 +55,10 @@ class MainActivity : AppCompatActivity() {
         cb?.onReceiveValue(if (uri != null) arrayOf(uri) else null)
     }
 
+    private val requestNotifPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* result is handled on the next notifyRestComplete call */ }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -56,16 +68,27 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContentView(R.layout.activity_main)
+        createNotificationChannels()
 
         webView = findViewById(R.id.webView)
         bridge = HybridHealthBridge(
             context = this,
             webView = webView,
             launchPermissions = { permissions -> requestPermissions.launch(permissions) },
+            requestNotificationPermission = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    requestNotifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
         )
 
         configureWebView()
+        // Registers OnBackPressedCallback for API 26+. AndroidX activity:1.8+ automatically
+        // bridges this to OnBackInvokedCallback on API 33+ when
+        // android:enableOnBackInvokedCallback="true" is set in the manifest, giving full
+        // predictive-back gesture support without duplicate registration.
         registerBackHandler()
+        scheduleHealthSync()
     }
 
     override fun onResume() {
@@ -161,6 +184,31 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Press back again to exit", Toast.LENGTH_SHORT).show()
             lastBackPressTime = now
         }
+    }
+
+    private fun createNotificationChannels() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(
+            NotificationChannel(
+                HybridHealthBridge.NOTIFICATION_CHANNEL_ID,
+                "Rest Timer",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Notifies when a rest period ends during a backgrounded session"
+            }
+        )
+    }
+
+    private fun scheduleHealthSync() {
+        if (HealthConnectClient.getSdkStatus(this) != HealthConnectClient.SDK_AVAILABLE) return
+        val req = PeriodicWorkRequestBuilder<HealthSyncWorker>(8, TimeUnit.HOURS)
+            .setInitialDelay(8, TimeUnit.HOURS)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            HealthSyncWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            req,
+        )
     }
 
     private inner class AppWebViewClient(
