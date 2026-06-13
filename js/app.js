@@ -13,6 +13,7 @@ import {
   determineDefaultCalendarDay,
   verifyWeekStorageSchema,
   saveStateToLocalStorage,
+  flushCloudSyncNow,
   pullEngineDataFromStorage,
   triggerEngineExport,
   triggerCSVExport,
@@ -75,7 +76,8 @@ export function switchGlobalAppTab(targetViewID) {
   if (activeTab === 'workout') {
     try { commitWorkoutUIState(); } catch(e) { console.warn(e); }
   }
-  
+  flushCloudSyncNow();
+
   document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   
@@ -716,6 +718,14 @@ async function bootstrapApp() {
       });
   }
 }
+
+// Flush any pending cloud write when the user leaves (tab close, navigate away,
+// background on mobile). localStorage already holds the data; this just makes
+// the cloud copy current before the page is unloaded.
+window.addEventListener('pagehide', () => { flushCloudSyncNow(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushCloudSyncNow();
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener("DOMContentLoaded", bootstrapApp);

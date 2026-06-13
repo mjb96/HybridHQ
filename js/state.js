@@ -376,33 +376,66 @@ export function resetSessionForDay(targetDay) {
 // ==========================================
 // CLOUD PERSISTENCE
 // ==========================================
-export async function saveStateToLocalStorage(suppressToast = false) {
+export const CLOUD_SYNC_DEBOUNCE_MS = 2000;
+
+// Debounce state — module-scoped so all callers share a single timer.
+let _syncTimer = null;
+let _pendingToast = false;
+
+// Perform the actual Supabase upsert. Called by the timer and by flushCloudSyncNow.
+async function _flushCloudSync() {
+  _syncTimer = null;
+  const wantToast = _pendingToast;
+  _pendingToast = false;
+
+  if (!supabaseClient) return;
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    if (!sessionData?.session) {
+      if (wantToast) showToast('Session Saved Locally ✓');
+      return;
+    }
+    const { error } = await supabaseClient
+      .from('user_data')
+      .upsert({ user_id: sessionData.session.user.id, state_data: appState }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (wantToast) showToast('Session Saved to Cloud ✓');
+  } catch (err) {
+    console.error('Supabase Save Error:', err);
+    showToast('DB Reject: ' + (err.message || 'Unknown error').substring(0, 40), true);
+  }
+}
+
+function scheduleCloudSync(wantToast) {
+  clearTimeout(_syncTimer);
+  if (wantToast) _pendingToast = true;
+  _syncTimer = setTimeout(_flushCloudSync, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+// localStorage write is always synchronous and immediate.
+// Cloud upsert is coalesced: rapid saves share one network write 2 s after the last call.
+export function saveStateToLocalStorage(suppressToast = false) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (e) {
     console.error('Failed to save state locally:', e);
   }
 
-  if (supabaseClient) {
-    try {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      if (!sessionData?.session) {
-        if (!suppressToast) showToast('Session Saved Locally ✓');
-        return;
-      }
-      const { error } = await supabaseClient
-        .from('user_data')
-        .upsert({ user_id: sessionData.session.user.id, state_data: appState }, { onConflict: 'user_id' });
-
-      if (error) throw error;
-      if (!suppressToast) showToast('Session Saved to Cloud ✓');
-    } catch (err) {
-      console.error('Supabase Save Error:', err);
-      if (!suppressToast) showToast('DB Reject: ' + (err.message || 'Unknown error').substring(0, 40), true);
-    }
-  } else {
-     if (!suppressToast) showToast('Session Saved Locally ✓');
+  if (!supabaseClient) {
+    if (!suppressToast) showToast('Session Saved Locally ✓');
+    return;
   }
+
+  scheduleCloudSync(!suppressToast);
+}
+
+// Bypass the debounce and upsert immediately — call before tab switches,
+// session close, page unload, or any other "commit" moment.
+export async function flushCloudSyncNow() {
+  clearTimeout(_syncTimer);
+  _syncTimer = null;
+  if (!supabaseClient) return;
+  await _flushCloudSync();
 }
 
 export async function pullEngineDataFromStorage() {
@@ -598,6 +631,7 @@ export function triggerEngineImport(event) {
           return migrateCustomProgramToV2(prog);
         });
         saveStateToLocalStorage(true);
+        flushCloudSyncNow();
         if (_onImportSuccess) _onImportSuccess();
         showToast('Data snapshot mounted successfully.');
       } else {

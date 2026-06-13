@@ -1,7 +1,7 @@
 // ==========================================
 // WORKOUT SESSION MODALS (workout-session-modals.js)
 // ==========================================
-import { getProgramById, showToast } from './state.js';
+import { getProgramById, showToast, flushCloudSyncNow } from './state.js';
 import { prescribeSetsForLift } from './engine.js';
 import { dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
 import { deleteMapFromDB } from './db.js';
@@ -134,6 +134,7 @@ export function closeFinishSessionModal() {
   if (runRpeEl) runRpeEl.value = appState.weeks[wk].runs?.[selectedDay]?.rpe || '';
 
   _saveState(true);
+  flushCloudSyncNow();
 
   const sumModalEl = document.getElementById('finishSessionModal');
   if (sumModalEl) sumModalEl.classList.remove('active');
