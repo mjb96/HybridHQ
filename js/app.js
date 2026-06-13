@@ -717,7 +717,9 @@ async function bootstrapApp() {
     console.error("Critical layout generation block runtime defense:", fatalLifecycleError);
   }
 
-  if ('serviceWorker' in navigator) {
+  // Skip SW in the Android APK: WebViewAssetLoader serves assets locally and the
+  // SW's internal fetch calls can't reach the appassets origin from inside the worker.
+  if (!window.HybridHealthBridge && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => reg.update())  // always check for a fresh SW on every load
       .catch(err => {

@@ -11,13 +11,17 @@ import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import androidx.health.connect.client.PermissionController
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
 import java.net.URLDecoder
 
 class MainActivity : AppCompatActivity() {
@@ -45,7 +49,12 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // Edge-to-edge: WebView draws behind status/navigation bars.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
@@ -59,15 +68,36 @@ class MainActivity : AppCompatActivity() {
         registerBackHandler()
     }
 
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        webView.resumeTimers()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+        webView.pauseTimers()
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun configureWebView() {
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView.apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            settings.allowFileAccessFromFileURLs = true
-            settings.allowUniversalAccessFromFileURLs = true
+            // allowFileAccess flags are no longer needed: assets are served over
+            // https://appassets.androidplatform.net via WebViewAssetLoader.
+            settings.allowFileAccessFromFileURLs = false
+            settings.allowUniversalAccessFromFileURLs = false
+            settings.builtInZoomControls = false
+            settings.setSupportZoom(false)
+            overScrollMode = WebView.OVER_SCROLL_NEVER
 
-            webViewClient = AppWebViewClient()
+            webViewClient = AppWebViewClient(assetLoader)
             webChromeClient = AppWebChromeClient()
 
             setDownloadListener { url, _, contentDisposition, mimetype, _ ->
@@ -133,11 +163,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private inner class AppWebViewClient : WebViewClient() {
+    private inner class AppWebViewClient(
+        private val assetLoader: WebViewAssetLoader,
+    ) : WebViewClientCompat() {
+
+        override fun shouldInterceptRequest(
+            view: WebView,
+            request: WebResourceRequest,
+        ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            val appOrigin = BuildConfig.APP_URL.substringBefore("/", BuildConfig.APP_URL)
-            return !url.startsWith("file://") && !url.startsWith(appOrigin)
+            // Keep in-app for the asset origin; open everything else in the browser.
+            return !url.startsWith(APP_ORIGIN)
         }
     }
 
@@ -158,5 +196,9 @@ class MainActivity : AppCompatActivity() {
             openDocumentLauncher.launch(types)
             return true
         }
+    }
+
+    companion object {
+        private const val APP_ORIGIN = "https://appassets.androidplatform.net"
     }
 }

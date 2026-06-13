@@ -14,9 +14,9 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // Change this to your hosted URL for remote loading,
-        // or leave as "file:///android_asset/www/index.html" to use bundled files.
-        buildConfigField("String", "APP_URL", "\"file:///android_asset/www/index.html\"")
+        // WebViewAssetLoader origin. Override in debug with a dev-server URL if needed:
+        // buildConfigField("String", "APP_URL", "\"http://10.0.2.2:8080/index.html\"")
+        buildConfigField("String", "APP_URL", "\"https://appassets.androidplatform.net/assets/www/index.html\"")
     }
 
     buildFeatures {
@@ -26,8 +26,6 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            // Override with dev server URL during development:
-            // buildConfigField("String", "APP_URL", "\"http://10.0.2.2:8080/index.html\"")
         }
         release {
             isMinifyEnabled = true
@@ -48,9 +46,25 @@ android {
     }
 }
 
+// Copy the web app into the bundled assets folder before each build.
+tasks.register<Copy>("copyWebAssets") {
+    from(rootProject.projectDir.parentFile) {
+        include("index.html", "sw.js", "manifest.json", "icon-512.png")
+        include("css/**")
+        include("js/**")
+    }
+    into(layout.projectDirectory.dir("src/main/assets/www"))
+}
+
+tasks.named("preBuild") {
+    dependsOn("copyWebAssets")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.health.connect)
     implementation(libs.kotlinx.coroutines.android)
 }
