@@ -22,6 +22,7 @@ import {
   checkAvailability,
   requestPermissions,
   readRawHealthData,
+  readHealthDataByDay,
   HealthConnectAvailability,
 } from './healthConnect.js';
 import { getLocalDateKey } from '../util.js';
@@ -198,34 +199,57 @@ export const HealthService = Object.freeze({
   },
 
   /**
-   * Back-fill appState.healthLog with data for the last N calendar days.
-   * Each day is fetched individually and upserted — safe to call repeatedly.
-   * Does NOT overwrite appState.health (that is reserved for the live snapshot).
+   * Back-fill appState.healthLog with up to N calendar days of history.
+   * Prefers a single bulk readHealthDataByDay bridge call (Stage B); falls back
+   * to N individual readRawHealthData calls when the bulk method is unavailable.
+   * Does NOT overwrite appState.health (reserved for the live snapshot).
+   *
+   * When the HealthDataHistory permission is granted the full `days` range is
+   * requested; if denied, Health Connect silently omits records older than 30
+   * days — the caller degrades gracefully without an error.
    *
    * @param {Object}   appState
    * @param {Function} saveState
    * @param {Object}   [opts]
-   * @param {number}   [opts.days=30]
+   * @param {number}   [opts.days=90]   Max days to back-fill (capped by HC permission).
    * @returns {Promise<void>}
    */
-  async backfill(appState, saveState, { days = 30 } = {}) {
+  async backfill(appState, saveState, { days = 90 } = {}) {
     if (checkAvailability() !== HealthConnectAvailability.AVAILABLE) return;
     const permissions = await requestPermissions();
     if (!permissions.granted) return;
 
     const windows = buildDayWindows(days);
     let changed = false;
-    for (const { date, startTime, endTime } of windows) {
-      try {
-        const raw = await readRawHealthData(startTime, endTime);
-        if (!raw) continue;
-        const snapshot = buildHealthSnapshot(raw);
-        appendToHealthLog(appState, snapshot, raw, date);
+
+    // ── Bulk path (Stage B): one bridge call for the whole range ──────────────
+    const bulkResult = await readHealthDataByDay(
+      windows[0].startTime,
+      windows[windows.length - 1].endTime,
+    );
+
+    if (bulkResult?.days?.length > 0) {
+      for (const dayData of bulkResult.days) {
+        if (!dayData?.date) continue;
+        const snapshot = buildHealthSnapshot(dayData);
+        appendToHealthLog(appState, snapshot, dayData, dayData.date);
         changed = true;
-      } catch (e) {
-        console.warn('[HealthService] backfill failed for', date, e);
+      }
+    } else {
+      // ── Per-day fallback (Stage A): limit to 30 days without bulk method ───
+      for (const { date, startTime, endTime } of windows.slice(-30)) {
+        try {
+          const raw = await readRawHealthData(startTime, endTime);
+          if (!raw) continue;
+          const snapshot = buildHealthSnapshot(raw);
+          appendToHealthLog(appState, snapshot, raw, date);
+          changed = true;
+        } catch (e) {
+          console.warn('[HealthService] backfill failed for', date, e);
+        }
       }
     }
+
     if (changed && typeof saveState === 'function') saveState();
   },
 

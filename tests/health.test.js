@@ -10,7 +10,7 @@ import {
   normalizeWorkout,
   buildHealthSnapshot,
 } from '../js/health/healthCalculations.js';
-import { checkAvailability, HealthConnectAvailability } from '../js/health/healthConnect.js';
+import { checkAvailability, HealthConnectAvailability, readHealthDataByDay, HEALTH_RECORD_TYPES } from '../js/health/healthConnect.js';
 import { buildDayWindows, appendToHealthLog } from '../js/health/healthService.js';
 
 // ── buildDayWindows ───────────────────────────────────────────────────────────
@@ -211,6 +211,16 @@ test('checkAvailability returns NOT_SUPPORTED when no bridge is present', () => 
   // In Node.js there is no window.HybridHealthBridge, so we always get NOT_SUPPORTED.
   const status = checkAvailability();
   assert.equal(status, HealthConnectAvailability.NOT_SUPPORTED);
+});
+
+test('readHealthDataByDay returns null when bridge is absent', async () => {
+  const result = await readHealthDataByDay('2026-01-01T00:00:00Z', '2026-01-31T00:00:00Z');
+  assert.equal(result, null);
+});
+
+test('HEALTH_RECORD_TYPES includes HealthDataHistory and HeartRateVariabilityRmssd', () => {
+  assert.ok(HEALTH_RECORD_TYPES.includes('HealthDataHistory'));
+  assert.ok(HEALTH_RECORD_TYPES.includes('HeartRateVariabilityRmssd'));
 });
 
 // ── HRV (RMSSD) threading ─────────────────────────────────────────────────────

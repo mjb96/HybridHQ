@@ -710,7 +710,7 @@ async function bootstrapApp() {
     // Guarded by a timestamp so it only runs once per install.
     if (!appState.healthBackfilledAt) {
       appState.healthBackfilledAt = new Date().toISOString();
-      HealthService.backfill(appState, () => saveStateToLocalStorage(true));
+      HealthService.backfill(appState, () => saveStateToLocalStorage(true), { days: 90 });
     }
 
   } catch (fatalLifecycleError) {
