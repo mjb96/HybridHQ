@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.CoroutineScope
@@ -212,13 +213,21 @@ class HybridHealthBridge(
         }.getOrDefault(0.0)
 
         val sleepArr = JSONArray()
-        runCatching {
+        for (s in runCatching {
             client.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range)).records
-        }.getOrDefault(emptyList()).forEach { s ->
+        }.getOrDefault(emptyList())) {
+            val stagesArr = JSONArray()
+            s.stages.forEach { st ->
+                stagesArr.put(JSONObject().apply {
+                    put("stage",      sleepStageName(st.stage))
+                    put("durationMs", st.endTime.toEpochMilli() - st.startTime.toEpochMilli())
+                })
+            }
             sleepArr.put(JSONObject().apply {
                 put("durationMs", s.endTime.toEpochMilli() - s.startTime.toEpochMilli())
                 put("score",      JSONObject.NULL)
                 put("startTime",  s.startTime.toString())
+                put("stages",     stagesArr)
             })
         }
 
@@ -250,15 +259,31 @@ class HybridHealthBridge(
         }.getOrNull()
 
         val exArr = JSONArray()
-        runCatching {
+        for (e in runCatching {
             client.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, range)).records
-        }.getOrDefault(emptyList()).forEach { e ->
+        }.getOrDefault(emptyList())) {
+            val sr = TimeRangeFilter.between(e.startTime, e.endTime)
+            val cals = runCatching {
+                client.aggregate(AggregateRequest(
+                    setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), sr
+                ))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories?.toInt() ?: 0
+            }.getOrDefault(0)
+            val distKm = runCatching {
+                client.aggregate(AggregateRequest(
+                    setOf(DistanceRecord.DISTANCE_TOTAL), sr
+                ))[DistanceRecord.DISTANCE_TOTAL]?.inKilometers
+            }.getOrNull()
+            val avgHR = runCatching {
+                client.aggregate(AggregateRequest(
+                    setOf(HeartRateRecord.BPM_AVG), sr
+                ))[HeartRateRecord.BPM_AVG]
+            }.getOrNull()
             exArr.put(JSONObject().apply {
                 put("exerciseType",  e.exerciseType.toString())
                 put("durationMs",    e.endTime.toEpochMilli() - e.startTime.toEpochMilli())
-                put("totalCalories", 0)
-                put("avgHeartRate",  JSONObject.NULL)
-                put("totalDistance", JSONObject.NULL)
+                put("totalCalories", cals)
+                put("avgHeartRate",  avgHR ?: JSONObject.NULL)
+                put("totalDistance", distKm ?: JSONObject.NULL)
                 put("startTime",     e.startTime.toString())
             })
         }
@@ -309,11 +334,19 @@ class HybridHealthBridge(
                 .sumOf { it.energy.inKilocalories }
 
             val daySleep = JSONArray()
-            sleepRecs.filter { it.startTime >= dayStart && it.startTime < dayEnd }.forEach { s ->
+            for (s in sleepRecs.filter { it.startTime >= dayStart && it.startTime < dayEnd }) {
+                val stagesArr = JSONArray()
+                s.stages.forEach { st ->
+                    stagesArr.put(JSONObject().apply {
+                        put("stage",      sleepStageName(st.stage))
+                        put("durationMs", st.endTime.toEpochMilli() - st.startTime.toEpochMilli())
+                    })
+                }
                 daySleep.put(JSONObject().apply {
                     put("durationMs", s.endTime.toEpochMilli() - s.startTime.toEpochMilli())
                     put("score",      JSONObject.NULL)
                     put("startTime",  s.startTime.toString())
+                    put("stages",     stagesArr)
                 })
             }
 
@@ -336,5 +369,15 @@ class HybridHealthBridge(
         }
 
         return JSONObject().apply { put("days", daysArr) }.toString()
+    }
+
+    private fun sleepStageName(stage: Int): String = when (stage) {
+        SleepSessionRecord.STAGE_TYPE_AWAKE,
+        SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED -> "AWAKE"
+        SleepSessionRecord.STAGE_TYPE_LIGHT         -> "LIGHT"
+        SleepSessionRecord.STAGE_TYPE_DEEP          -> "DEEP"
+        SleepSessionRecord.STAGE_TYPE_REM           -> "REM"
+        SleepSessionRecord.STAGE_TYPE_SLEEPING      -> "SLEEPING"
+        else                                        -> "UNKNOWN"
     }
 }
