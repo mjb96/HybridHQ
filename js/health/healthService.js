@@ -107,6 +107,7 @@ export function appendToHealthLog(appState, snapshot, raw, dateKey = getLocalDat
     sleepAwakeHours,
     restingHeartRate: snapshot.restingHeartRate,
     averageHeartRate: snapshot.averageHeartRate,
+    hrvMs:            snapshot.hrvMs ?? null,
     weightKg:         snapshot.weightKg,
   };
 

@@ -39,6 +39,21 @@ function rhrLabel(bpm, baseline) {
   return 'Normal';
 }
 
+function hrvStatusColor(hrv) {
+  if (!hrv) return 'var(--color-text-muted)';
+  if (hrv < 20) return 'var(--color-red)';
+  if (hrv < 35) return 'var(--color-amber)';
+  if (hrv > 60) return 'var(--color-green)';
+  return 'var(--color-text-inverse)';
+}
+function hrvLabel(hrv) {
+  if (!hrv) return 'No data';
+  if (hrv < 20) return 'Very low';
+  if (hrv < 35) return 'Below normal';
+  if (hrv > 60) return 'High';
+  return 'Normal';
+}
+
 export function renderHealthRhrView(appState, days) {
   const container = document.getElementById('healthRhrContent');
   if (!container) return;
@@ -54,6 +69,7 @@ export function renderHealthRhrView(appState, days) {
 
   const rhr   = health?.restingHeartRate || null;
   const avgHR = health?.averageHeartRate || null;
+  const hrv   = health?.hrvMs || null;
 
   const rhrBaseline = computeBaseline(healthLog, 'restingHeartRate');
   // Lower RHR is better, so flip directional language.
@@ -101,6 +117,9 @@ export function renderHealthRhrView(appState, days) {
   const statusLabel = rhrLabel(rhr, rhrBaseline.baseline);
   const coachNote = generateHealthCoachNote(health, healthLog);
 
+  const hrvColor = hrvStatusColor(hrv);
+  const hrvLbl   = hrvLabel(hrv);
+
   container.innerHTML = `
     <!-- Today -->
     <div class="grid-2-col gap-3 mb-3">
@@ -116,6 +135,16 @@ export function renderHealthRhrView(appState, days) {
         ${avgHR ? `<div class="text-muted mt-1" style="font-size:0.65rem;">bpm</div>` : ''}
       </article>
     </div>
+
+    <!-- HRV tile -->
+    <article class="card-dark p-4 flex-col flex-center mb-3" style="border:1px solid color-mix(in srgb, ${hrvColor} 30%, transparent);">
+      <div class="flex-between w-full mb-2">
+        <span class="text-xs text-muted">HRV (RMSSD)</span>
+        <span class="text-xs font-bold" style="color:${hrvColor};">${hrvLbl}</span>
+      </div>
+      <div class="font-heavy" style="font-size:2rem;line-height:1;color:${hrvColor};">${hrv ?? '--'}</div>
+      ${hrv ? `<div class="text-muted mt-1" style="font-size:0.65rem;">ms · higher = better recovery</div>` : `<div class="text-muted mt-1" style="font-size:0.65rem;">Requires Health Connect HRV permission</div>`}
+    </article>
 
     <!-- Last 7 days -->
     <h2 class="section-header">Last 7 Days</h2>

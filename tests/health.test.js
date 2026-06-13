@@ -213,6 +213,36 @@ test('checkAvailability returns NOT_SUPPORTED when no bridge is present', () => 
   assert.equal(status, HealthConnectAvailability.NOT_SUPPORTED);
 });
 
+// ── HRV (RMSSD) threading ─────────────────────────────────────────────────────
+
+test('buildHealthSnapshot threads hrvMs from raw.hrvRmssd', () => {
+  const snap = buildHealthSnapshot({ steps: 0, activeCalories: 0, sleepSessions: [],
+    heartRateSamples: [], restingHeartRate: null, hrvRmssd: 42, weightKg: null, exerciseSessions: [] });
+  assert.equal(snap.hrvMs, 42);
+});
+
+test('buildHealthSnapshot sets hrvMs to null when hrvRmssd absent or zero', () => {
+  assert.equal(buildHealthSnapshot(null).hrvMs, null);
+  const snap = buildHealthSnapshot({ steps: 0, activeCalories: 0, sleepSessions: [],
+    heartRateSamples: [], restingHeartRate: null, weightKg: null, exerciseSessions: [] });
+  assert.equal(snap.hrvMs, null);
+  const snap0 = buildHealthSnapshot({ ...snap, hrvRmssd: 0 });
+  assert.equal(snap0.hrvMs, null);
+});
+
+test('appendToHealthLog stores hrvMs from snapshot', () => {
+  const appState = { healthLog: [] };
+  const snapWithHrv = { ...MOCK_SNAPSHOT, hrvMs: 55 };
+  appendToHealthLog(appState, snapWithHrv, null, '2026-01-10');
+  assert.equal(appState.healthLog[0].hrvMs, 55);
+});
+
+test('appendToHealthLog stores null hrvMs when absent', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.equal(appState.healthLog[0].hrvMs, null);
+});
+
 // ── briefing integration — health telemetry items ────────────────────────────
 
 import { buildTelemetry, composeBriefing } from '../js/brain/briefing.js';

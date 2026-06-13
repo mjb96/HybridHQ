@@ -23,6 +23,7 @@ export const HEALTH_RECORD_TYPES = Object.freeze([
   'SleepSession',
   'HeartRate',
   'RestingHeartRate',
+  'HeartRateVariabilityRmssd',
   'Weight',
   'ExerciseSession',
 ]);

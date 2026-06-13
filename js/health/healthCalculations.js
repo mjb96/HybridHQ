@@ -126,7 +126,7 @@ export function buildHealthSnapshot(raw) {
   if (!raw) {
     return {
       steps: 0, activeCalories: 0, sleepHours: 0, sleepScore: null,
-      restingHeartRate: null, averageHeartRate: null, weightKg: null,
+      restingHeartRate: null, averageHeartRate: null, hrvMs: null, weightKg: null,
       workouts: [], syncedAt: new Date().toISOString(),
     };
   }
@@ -148,6 +148,7 @@ export function buildHealthSnapshot(raw) {
     sleepScore,
     restingHeartRate: (raw.restingHeartRate > 0) ? Math.round(raw.restingHeartRate) : null,
     averageHeartRate: hrAvg,
+    hrvMs:            (raw.hrvRmssd > 0) ? Math.round(raw.hrvRmssd) : null,
     weightKg:         (raw.weightKg > 0) ? Math.round(raw.weightKg * 10) / 10 : null,
     workouts,
     syncedAt:         new Date().toISOString(),

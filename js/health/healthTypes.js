@@ -50,6 +50,7 @@
  * @property {RawSleepSession[]}    sleepSessions
  * @property {RawHRSample[]}        heartRateSamples
  * @property {number|null}          restingHeartRate  bpm
+ * @property {number|null}          hrvRmssd          ms
  * @property {number|null}          weightKg
  * @property {RawExerciseSession[]} exerciseSessions
  */
@@ -79,6 +80,7 @@
  * @property {number|null}     sleepScore          0–100, null when unavailable.
  * @property {number|null}     restingHeartRate    bpm, null when unavailable.
  * @property {number|null}     averageHeartRate    bpm, null when unavailable.
+ * @property {number|null}     hrvMs               RMSSD in ms, null when unavailable.
  * @property {number|null}     weightKg            null when unavailable.
  * @property {WorkoutSummary[]} workouts
  * @property {string}          syncedAt            ISO 8601 timestamp.
