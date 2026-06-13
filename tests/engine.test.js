@@ -15,6 +15,8 @@ import {
   parseDurationToMinutes,
   paceSecondsPerKm,
   formatPace,
+  initEngine,
+  computeDiagnosticForLift,
 } from '../js/engine.js';
 
 // ---- epley1RM (D1) --------------------------------------------------------
@@ -83,4 +85,57 @@ test('formatPace renders m:ss/km with zero-padded seconds', () => {
 // ---- round-trip ------------------------------------------------------------
 test('pace round-trips: format(paceSecondsPerKm(dist,time)) is stable', () => {
   assert.equal(formatPace(paceSecondsPerKm(5, '25:00')), '5:00/km');
+});
+
+// ---- computeDiagnosticForLift — per-set RPE (D7) --------------------------
+// Helpers: one week of history so history.length===1 (stall check skipped),
+// RPE path reached.
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const makeDiagState = (week1Sets, week1GymRpe = null) => ({
+  currentWeek: '2',
+  weeks: {
+    '1': {
+      lifts: { mon: { Squat: week1Sets } },
+      gymRpe: week1GymRpe != null ? { mon: String(week1GymRpe) } : {},
+      runs: {},
+      gymStats: {},
+      notes: {},
+    },
+    '2': { lifts: { mon: { Squat: [] } }, gymRpe: {}, runs: {}, gymStats: {}, notes: {} },
+  },
+  streakData: {},
+});
+
+test('computeDiagnosticForLift: per-set rpe >= threshold flags fatigue overload', () => {
+  const sets = [
+    { w: '80', r: '5', c: true, rpe: '9' },
+    { w: '80', r: '5', c: true, rpe: '9.5' },
+  ];
+  initEngine(() => makeDiagState(sets), () => DAYS);
+  const r = computeDiagnosticForLift('2', 'mon', 'Squat');
+  assert.equal(r.isFatigueOverload, true);
+});
+
+test('computeDiagnosticForLift: per-set rpe < threshold does not flag fatigue overload', () => {
+  const sets = [
+    { w: '80', r: '5', c: true, rpe: '7' },
+    { w: '80', r: '5', c: true, rpe: '7.5' },
+  ];
+  initEngine(() => makeDiagState(sets), () => DAYS);
+  const r = computeDiagnosticForLift('2', 'mon', 'Squat');
+  assert.equal(r.isFatigueOverload, false);
+});
+
+test('computeDiagnosticForLift: falls back to session-level rpe when no per-set rpe', () => {
+  const sets = [{ w: '80', r: '5', c: true }, { w: '80', r: '5', c: true }];
+  initEngine(() => makeDiagState(sets, 9), () => DAYS);
+  const r = computeDiagnosticForLift('2', 'mon', 'Squat');
+  assert.equal(r.isFatigueOverload, true);
+});
+
+test('computeDiagnosticForLift: no rpe data at all does not flag fatigue overload', () => {
+  const sets = [{ w: '80', r: '5', c: true }];
+  initEngine(() => makeDiagState(sets, null), () => DAYS);
+  const r = computeDiagnosticForLift('2', 'mon', 'Squat');
+  assert.equal(r.isFatigueOverload, false);
 });

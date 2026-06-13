@@ -60,6 +60,9 @@ export function buildSetRow(sData, sIdx, safeLiftName, historicalSetData = null,
     </div>
     <div>
       <input type="number" class="input-reps-node" placeholder="${ghostReps}" value="${sData.r || ''}">
+      <input type="number" class="input-rpe-node" placeholder="RPE" min="1" max="10" step="0.5"
+             value="${sData.rpe != null && sData.rpe !== '' ? sData.rpe : ''}"
+             style="margin-top:2px;opacity:0.6;font-size:0.8em;">
     </div>
     <div class="gym-check-container">
       <label class="gym-check-wrap">

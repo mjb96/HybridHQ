@@ -95,15 +95,26 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
 
   let totalRpeSum = 0, rpeCount = 0;
   const pastWkData = appState.weeks[(cWk - 1).toString()];
-  
+
   if (pastWkData) {
-    DEFAULT_DAYS.forEach(d => {
-      const runRpe = parseInt(pastWkData.runs?.[d]?.rpe, 10) || 0;
-      if (runRpe > 0) { totalRpeSum += runRpe; rpeCount++; }
-      
-      const gymRpe = parseInt(pastWkData.gymRpe?.[d], 10) || 0;
-      if (gymRpe > 0) { totalRpeSum += gymRpe; rpeCount++; }
-    });
+    // Prefer per-set RPE logged on this lift's last session; fall back to
+    // session-level RPE across all days when per-set data is absent.
+    const prevSets = (pastWkData.lifts?.[dayKey]?.[liftName] || [])
+      .filter(s => s && !s.isWarmup && isCompletedSet(s));
+    const perSetRpes = prevSets
+      .map(s => parseFloat(s.rpe))
+      .filter(v => !isNaN(v) && v > 0);
+
+    if (perSetRpes.length > 0) {
+      perSetRpes.forEach(v => { totalRpeSum += v; rpeCount++; });
+    } else {
+      DEFAULT_DAYS.forEach(d => {
+        const runRpe = parseInt(pastWkData.runs?.[d]?.rpe, 10) || 0;
+        if (runRpe > 0) { totalRpeSum += runRpe; rpeCount++; }
+        const gymRpe = parseInt(pastWkData.gymRpe?.[d], 10) || 0;
+        if (gymRpe > 0) { totalRpeSum += gymRpe; rpeCount++; }
+      });
+    }
   }
   
   const pastWeekAvgRpe = rpeCount > 0 ? totalRpeSum / rpeCount : 0;

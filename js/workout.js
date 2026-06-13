@@ -602,6 +602,9 @@ export function updateInputState(inputNode) {
 
   if (inputNode.classList.contains('input-weight-node')) {
     appState.weeks[wk].lifts[selectedDay][liftName][sIdx].w = inputNode.value;
+  } else if (inputNode.classList.contains('input-rpe-node')) {
+    const v = inputNode.value.trim();
+    appState.weeks[wk].lifts[selectedDay][liftName][sIdx].rpe = v !== '' ? v : undefined;
   } else {
     appState.weeks[wk].lifts[selectedDay][liftName][sIdx].r = inputNode.value;
   }
@@ -679,6 +682,11 @@ export function commitWorkoutUIState() {
           if (wIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].w = wIn.value;
           if (rIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].r = rIn.value;
           if (cIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].c = cIn.checked;
+          const rpeIn = row.querySelector('.input-rpe-node');
+          if (rpeIn) {
+            const v = rpeIn.value.trim();
+            appState.weeks[wk].lifts[selectedDay][liftName][idx].rpe = v !== '' ? v : undefined;
+          }
         }
       });
     });
