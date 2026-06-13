@@ -5,7 +5,8 @@ import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
 import { getProgramById, saveStateToLocalStorage } from './state.js';
 import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './templates.js';
-import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, computeBig3Maxes, paceSecondsPerKm, formatPace } from './engine.js';
+import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, paceSecondsPerKm, formatPace, getLiftDisplayName } from './engine.js';
+import { big3Maxes } from './metrics/metrics-strength.js';
 import { getMapFromDB } from './db.js';
 import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
@@ -316,34 +317,6 @@ function renderSupportCards(appState, defaultDays, activeProgram) {
 
   const cards = [];
 
-  // Readiness (ACWR)
-  try {
-    const maxWeek = activeProgram?.totalWeeks || 12;
-    const load = computeWeeklyLoadSeries(appState, defaultDays, maxWeek);
-    const totalByWeek = load.lift.map((v, i) => v + (load.run[i] || 0));
-    const r = computeReadiness(totalByWeek, appState.currentWeek);
-    if (r.hasData) {
-      const color = r.score >= 75 ? '#10b981' : r.score >= 50 ? '#f59e0b' : '#ef4444';
-      const label = r.score >= 75 ? 'Ready to train' : r.score >= 50 ? 'Moderate load' : 'High fatigue — prioritise recovery';
-      const grad  = `conic-gradient(${color} ${r.score}%, rgba(255,255,255,0.08) 0)`;
-      cards.push(`
-        <article class="card-dark flex-between p-3 mb-2" style="align-items:center;cursor:pointer;" data-action="open-analytics" data-context="recovery-score">
-          <div>
-            <div class="text-xs text-muted font-bold uppercase tracking-wider mb-1">Readiness</div>
-            <div class="font-heavy text-inverse" style="font-size:1.4rem;line-height:1;">${r.score}<span class="text-muted" style="font-size:0.85rem;">/100</span></div>
-            <div class="text-xs mt-1" style="color:${color};">${label}</div>
-            <div class="text-xs text-muted mt-1">ACWR ${r.acwr.toFixed(2)} · tap for full report</div>
-          </div>
-          <div style="width:58px;height:58px;border-radius:50%;background:${grad};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <div style="width:44px;height:44px;border-radius:50%;background:var(--bg-card,#0f1929);display:flex;align-items:center;justify-content:center;">
-              <span style="font-size:1rem;font-weight:800;color:${color};">${r.score}</span>
-            </div>
-          </div>
-        </article>
-      `);
-    }
-  } catch {}
-
   // Block Progress
   try {
     const wk        = parseInt(appState.currentWeek, 10) || 1;
@@ -537,11 +510,7 @@ export function renderHome() {
       }
       for (let liftName in todayLifts) {
         const expectedSets = Array.isArray(todayLifts[liftName]) ? todayLifts[liftName].length : 4;
-        let displayLiftName = liftName;
-        if (!isNaN(liftName) && homeBlueprint.lifts && homeBlueprint.lifts[parseInt(liftName, 10)]) {
-          displayLiftName = homeBlueprint.lifts[parseInt(liftName, 10)];
-        }
-        previewContainer.innerHTML += buildLiftPreviewRow(displayLiftName, expectedSets);
+        previewContainer.innerHTML += buildLiftPreviewRow(getLiftDisplayName(appState, liftName), expectedSets);
       }
       if (selectedDay === 'sun' || (Object.keys(todayLifts).length === 0 && selectedDay === 'sat')) {
         previewContainer.innerHTML = buildRestDayPreview();
@@ -606,7 +575,7 @@ export function renderHome() {
   setTxt('focusStrengthBlock', phase);
   setTxt('focusStrengthSub', `Week ${wkNum} of ${totalWeeks} · ${formatMinutesToHoursMins(currentWeekGymTimeSum)} trained`);
   setW('focusStrengthBar', Math.min(100, Math.round((wkNum / totalWeeks) * 100)));
-  const b3 = computeBig3Maxes(appState);
+  const b3 = big3Maxes(appState);
   const top = [['Squat', b3.squat], ['Bench', b3.bench], ['Deadlift', b3.deadlift]].sort((a, b) => b[1] - a[1])[0];
   setHTML('focusStrengthMilestone', top && top[1] > 0
     ? `<span>Top lift</span><b>${top[0]} ${Math.round(top[1])} kg</b>`
@@ -1093,7 +1062,6 @@ function buildHomeTelemetry(appState, days, selectedDay, energy, recovery, readi
   void todayDone; // session status lives in the briefing/Today summary, not the strip
   const A = (s) => s; // readability for the raw data-action strings
   const items = [];
-  if (recovery?.hasData)  items.push({ label: 'Recovery',  value: `${recovery.score}%`, action: A('data-action="open-analytics" data-context="recovery-score"') });
   items.push({ label: 'Streak', value: `${streak.current || 0}d`, action: A('data-action="open-analytics" data-context="streak"') });
 
   if (energy.hasProfile) {

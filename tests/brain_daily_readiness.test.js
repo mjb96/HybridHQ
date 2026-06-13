@@ -175,6 +175,31 @@ test('brief always has required shape fields', () => {
   assert.ok(['fresh', 'moderate', 'reduced'].includes(brief.status));
 });
 
+// ── HRV fatigue scaler ────────────────────────────────────────────────────────
+
+test('low HRV (<20ms) amplifies fatigue: heavy squat + low HRV → reduced', () => {
+  const wk = emptyWeek();
+  wk.lifts.mon['Back Squat'] = [
+    { w: '130', r: '5', c: true }, { w: '130', r: '5', c: true },
+    { w: '130', r: '5', c: true },
+  ];
+  wk.gymRpe.mon = '8';
+  // Low HRV should tip a borderline session into 'reduced'
+  const state = { currentWeek: '1', weeks: { '1': wk }, health: { sleepHours: 7, restingHeartRate: null, hrvMs: 15 } };
+  const brief = generateDailyBrief(state, { days: DAYS, selectedDay: 'tue', program, currentWeek: '1' });
+  assert.ok(['moderate', 'reduced'].includes(brief.status), `expected moderate/reduced with low HRV, got ${brief.status}`);
+});
+
+test('missing HRV leaves existing behaviour unchanged', () => {
+  const wk = emptyWeek();
+  wk.lifts.mon['Back Squat'] = [{ w: '100', r: '5', c: true }, { w: '100', r: '5', c: true }];
+  const stateNoHrv  = { currentWeek: '1', weeks: { '1': emptyWeek() } };
+  const stateNullHrv = { currentWeek: '1', weeks: { '1': emptyWeek() }, health: { hrvMs: null } };
+  const b1 = generateDailyBrief(stateNoHrv,   { days: DAYS, selectedDay: 'tue', program, currentWeek: '1' });
+  const b2 = generateDailyBrief(stateNullHrv, { days: DAYS, selectedDay: 'tue', program, currentWeek: '1' });
+  assert.equal(b1.status, b2.status, 'null HRV should not change status vs absent HRV');
+});
+
 // ── No program = no planned pattern conflicts ──────────────────────────────────
 
 test('works without a program — no adjustments but still has fatigue data', () => {

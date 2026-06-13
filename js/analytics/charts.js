@@ -14,6 +14,7 @@
 //   • adding a chart never requires changing module-level state
 // ==========================================
 import { rpeColour, smooth } from './utils.js';
+import { computeGAP } from '../engine.js';
 
 // ---- SHARED SVG CONSTANTS -------------------------------------------
 // Standard padding used by all fixed-size charts (400×H viewport).
@@ -751,6 +752,7 @@ export function renderHistoryBars(container, labels, values, opts = {}) {
 // ==========================================
 export function renderStreamCharts(stream) {
   const paceEl = document.getElementById('runPaceDistContainer');
+  const gapEl  = document.getElementById('runGapDistContainer');
   const hrEl   = document.getElementById('runHrCurveContainer');
   const elevEl = document.getElementById('runElevProfileContainer');
   const wrap   = document.getElementById('runStreamSection');
@@ -776,6 +778,23 @@ export function renderStreamCharts(stream) {
       xFmt: v => v.toFixed(1),
       emptyMsg: 'No pace stream in this run.',
     });
+  }
+
+  if (gapEl) {
+    const hasAltitude = (stream.altitude || []).some(a => isFinite(a) && a !== 0);
+    if (hasAltitude && hasDist) {
+      const gap = smooth(computeGAP(stream.distKm || [], stream.t || [], stream.altitude || []));
+      const pts = [];
+      gap.forEach((g, i) => { if (g > 0) pts.push({ x: xOf(i), y: g }); });
+      renderXYChart(gapEl, pts, {
+        color: '#f59e0b', xLabel,
+        yFmt: secs => { const m = Math.floor(secs / 60), s = Math.round(secs % 60).toString().padStart(2, '0'); return `${m}:${s}`; },
+        xFmt: v => v.toFixed(1),
+        emptyMsg: 'No elevation data for GAP in this run.',
+      });
+    } else {
+      gapEl.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.85rem;padding:10px 0;">GAP requires elevation data. Import a .FIT with altitude to see grade-adjusted pace.</p>';
+    }
   }
 
   if (hrEl) {

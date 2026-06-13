@@ -5,9 +5,25 @@
 // JavaScript bridge object: window.HybridHealthBridge.
 //
 // Bridge contract (Android WebView JavascriptInterface):
-//   getAvailabilityStatus()                       → 'AVAILABLE' | 'NOT_INSTALLED'
-//   requestPermissions(typesJson: string)         → Promise<string> (JSON)
-//   readHealthData(startTime: string, endTime: string) → Promise<string> (JSON)
+//   getAvailabilityStatus()                                       → 'AVAILABLE' | 'NOT_INSTALLED'
+//   requestPermissions(typesJson: string)                         → Promise<string> (JSON)
+//   readHealthData(startTime: string, endTime: string)            → Promise<string> (JSON)
+//   readHealthDataByDay(startTime: string, endTime: string)       → Promise<string> (JSON)
+//
+// readHealthDataByDay response shape:
+//   {
+//     days: [{
+//       date: "YYYY-MM-DD",          // local calendar date (device timezone)
+//       steps: number,
+//       activeCalories: number,      // kcal
+//       sleepSessions: [{ durationMs, score, startTime }],
+//       restingHeartRate: number|null,
+//       hrvRmssd: number|null,       // ms
+//     }]
+//   }
+//   Data older than 30 days requires the 'HealthDataHistory' permission.
+//   If that permission is denied, records older than 30 days are absent —
+//   the caller degrades gracefully to a 30-day backfill.
 //
 // When the bridge is absent (desktop browser, iOS, plain Chrome) every
 // function returns a graceful default — no throws, no crashes.
@@ -23,8 +39,10 @@ export const HEALTH_RECORD_TYPES = Object.freeze([
   'SleepSession',
   'HeartRate',
   'RestingHeartRate',
+  'HeartRateVariabilityRmssd',
   'Weight',
   'ExerciseSession',
+  'HealthDataHistory',   // allows reading records older than 30 days
 ]);
 
 /** @type {Record<string, string>} */
@@ -126,6 +144,32 @@ export async function readRawHealthData(startTime, endTime) {
     return safeParse(raw);
   } catch (e) {
     console.warn('[HealthConnect] Read failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Read per-calendar-day health summaries for a date range in a single bridge
+ * call. Returns null when the bridge is absent or does not support this method
+ * (older app versions). Callers should fall back to readRawHealthData per day.
+ *
+ * Data older than 30 days is only returned when the 'HealthDataHistory'
+ * permission was granted; older records are silently absent otherwise.
+ *
+ * @param {string} startTime  ISO 8601 (start of oldest day, local midnight)
+ * @param {string} endTime    ISO 8601 (end of newest day, local midnight+1day)
+ * @returns {Promise<{ days: Array<{ date: string, steps: number, activeCalories: number,
+ *   sleepSessions: Array, restingHeartRate: number|null, hrvRmssd: number|null }> }|null>}
+ */
+export async function readHealthDataByDay(startTime, endTime) {
+  const bridge = getBridge();
+  if (!bridge?.readHealthDataByDay) return null;
+
+  try {
+    const raw = await bridgeAsync('readHealthDataByDay', startTime, endTime);
+    return safeParse(raw);
+  } catch (e) {
+    console.warn('[HealthConnect] readHealthDataByDay failed:', e);
     return null;
   }
 }

@@ -1,12 +1,12 @@
 // ==========================================
 // ANALYTICS VIEW — STRENGTH (view-strength.js)
 // ==========================================
-import { computeBig3Progression, isCompletedSet } from '../../engine.js';
+import { isCompletedSet } from '../../engine.js';
 import { getProgramById } from '../../state.js';
-import { allLiftsStats, weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
+import { allLiftsStats, weeklyTonnageSeries, big3Progression, weeklyVolumeByMuscle } from '../../metrics/metrics-strength.js';
 import { weeklyDistanceSeries } from '../../metrics/metrics-running.js';
 import { setText } from '../utils.js';
-import { renderVolumeChart, renderBig3ProgressionChart } from '../charts.js';
+import { renderVolumeChart, renderBig3ProgressionChart, renderWeeklyLinesChart } from '../charts.js';
 import { computeBaseline } from '../../health/healthBaselines.js';
 import { escapeHtml } from '../../util.js';
 
@@ -96,7 +96,7 @@ export function renderStrengthPrView(appState, days) {
   if (prContainer) _render1RMList(prContainer, allLiftsStats(appState, days));
 
   const big3El = document.getElementById('big3ProgressionContainer');
-  if (big3El) renderBig3ProgressionChart(big3El, computeBig3Progression(appState), weekLabels);
+  if (big3El) renderBig3ProgressionChart(big3El, big3Progression(appState), weekLabels);
 }
 
 // ---- Weekly volume detail (current-week breakdown + volume chart) ----------
@@ -140,6 +140,9 @@ export function renderWeeklyVolumeView(appState, days) {
 
   const chartEl = document.getElementById('weekVolChartContainer');
   if (chartEl) renderVolumeChart(chartEl, weekLabels, volData, runData);
+
+  const muscleEl = document.getElementById('muscleSetsContainer');
+  if (muscleEl) _renderMuscleSetsChart(muscleEl, weeklyVolumeByMuscle(appState, days, maxWeek), weekLabels);
 }
 
 // ---- Private: gym all-time totals (sets, avg HR, cals) --------------------
@@ -219,4 +222,38 @@ function _render1RMList(container, liftStats) {
     : '';
 
   container.innerHTML = summaryBar + rows;
+}
+
+// ---- Private: per-muscle set-credit chart ----------------------------------
+
+const MUSCLE_COLORS = {
+  quads: '#3b82f6', glutes: '#8b5cf6', hamstrings: '#ec4899',
+  chest: '#f59e0b', lats: '#10b981', upper_back: '#22d3ee',
+  front_delts: '#f97316', side_delts: '#a78bfa', triceps: '#fb923c',
+  biceps: '#34d399', erectors: '#e879f9', core: '#94a3b8',
+};
+
+function _renderMuscleSetsChart(container, muscleData, weekLabels) {
+  const entries = Object.entries(muscleData)
+    .map(([m, vals]) => ({ muscle: m, total: vals.reduce((a, b) => a + b, 0), values: vals }))
+    .filter(e => e.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6); // top 6 muscles to avoid chart clutter
+
+  if (entries.length === 0) {
+    container.innerHTML = '<p style="color:rgba(255,255,255,0.6);font-size:0.85rem;padding:8px 0;">Log sets with recognised exercises to see muscle group volume.</p>';
+    return;
+  }
+
+  const DEFAULT_COLORS = ['#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+  const series = entries.map((e, i) => ({
+    values: e.values,
+    color: MUSCLE_COLORS[e.muscle] || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+    label: e.muscle.replace(/_/g, ' '),
+  }));
+
+  renderWeeklyLinesChart(container, weekLabels, series, {
+    yFmt: v => Math.round(v * 2) / 2,
+    emptyMsg: 'Log sets to see muscle group volume.',
+  });
 }

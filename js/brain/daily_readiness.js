@@ -177,6 +177,17 @@ function rhrFatigueScale(healthData) {
   return 1.0;
 }
 
+// HRV-RMSSD is a parasympathetic recovery proxy. Low HRV signals incomplete
+// autonomic recovery; high HRV signals readiness. Missing data → no effect.
+function hrvFatigueScale(healthData) {
+  const hrv = healthData?.hrvMs || 0;
+  if (hrv <= 0)  return 1.0;  // no data — leave existing scales unchanged
+  if (hrv < 20)  return 1.15; // very suppressed: amplify fatigue
+  if (hrv < 35)  return 1.07; // below-normal range
+  if (hrv > 60)  return 0.95; // elevated: attenuate fatigue
+  return 1.0;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function generateDailyBrief(appState, opts = {}) {
@@ -220,7 +231,7 @@ export function generateDailyBrief(appState, opts = {}) {
   // Health Connect modifiers: short sleep and elevated RHR raise the effective
   // fatigue so the conflict threshold is reached at lower raw volumes.
   const healthData  = appState?.health;
-  const healthScale = sleepFatigueScale(healthData) * rhrFatigueScale(healthData);
+  const healthScale = sleepFatigueScale(healthData) * rhrFatigueScale(healthData) * hrvFatigueScale(healthData);
   const combinedScale = rpeScale * healthScale;
 
   const scaledByPattern = Object.fromEntries(

@@ -10,7 +10,73 @@ import {
   normalizeWorkout,
   buildHealthSnapshot,
 } from '../js/health/healthCalculations.js';
-import { checkAvailability, HealthConnectAvailability } from '../js/health/healthConnect.js';
+import { checkAvailability, HealthConnectAvailability, readHealthDataByDay, HEALTH_RECORD_TYPES } from '../js/health/healthConnect.js';
+import { buildDayWindows, appendToHealthLog } from '../js/health/healthService.js';
+
+// ── buildDayWindows ───────────────────────────────────────────────────────────
+
+test('buildDayWindows returns exactly N entries', () => {
+  assert.equal(buildDayWindows(7).length, 7);
+  assert.equal(buildDayWindows(30).length, 30);
+  assert.equal(buildDayWindows(1).length, 1);
+});
+
+test('buildDayWindows last entry is today in local time', () => {
+  const wins = buildDayWindows(5);
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const expectedToday = `${y}-${m}-${d}`;
+  assert.equal(wins[wins.length - 1].date, expectedToday);
+});
+
+test('buildDayWindows windows are 24 h wide', () => {
+  for (const w of buildDayWindows(3)) {
+    const delta = new Date(w.endTime) - new Date(w.startTime);
+    assert.equal(delta, 24 * 60 * 60 * 1000);
+  }
+});
+
+test('buildDayWindows is chronological oldest-first', () => {
+  const wins = buildDayWindows(5);
+  for (let i = 1; i < wins.length; i++) {
+    assert.ok(wins[i].date > wins[i - 1].date, 'entries should be ascending by date');
+  }
+});
+
+// ── appendToHealthLog idempotency ────────────────────────────────────────────
+
+const MOCK_SNAPSHOT = { steps: 5000, activeCalories: 300, sleepHours: 7, sleepScore: 80,
+  restingHeartRate: 58, averageHeartRate: null, weightKg: null, workouts: [], syncedAt: '' };
+
+test('appendToHealthLog upserts: writing same date twice keeps one entry', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  appendToHealthLog(appState, { ...MOCK_SNAPSHOT, steps: 9000 }, null, '2026-01-10');
+  assert.equal(appState.healthLog.length, 1);
+  assert.equal(appState.healthLog[0].steps, 9000, 'second write should replace first');
+});
+
+test('appendToHealthLog adds distinct entries for different dates', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-09');
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.equal(appState.healthLog.length, 2);
+});
+
+test('appendToHealthLog stores the provided dateKey, not today', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2025-06-15');
+  assert.equal(appState.healthLog[0].date, '2025-06-15');
+});
+
+test('appendToHealthLog initialises healthLog when absent', () => {
+  const appState = {};
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.ok(Array.isArray(appState.healthLog));
+  assert.equal(appState.healthLog.length, 1);
+});
 
 // ── healthCalculations ────────────────────────────────────────────────────────
 
@@ -145,6 +211,46 @@ test('checkAvailability returns NOT_SUPPORTED when no bridge is present', () => 
   // In Node.js there is no window.HybridHealthBridge, so we always get NOT_SUPPORTED.
   const status = checkAvailability();
   assert.equal(status, HealthConnectAvailability.NOT_SUPPORTED);
+});
+
+test('readHealthDataByDay returns null when bridge is absent', async () => {
+  const result = await readHealthDataByDay('2026-01-01T00:00:00Z', '2026-01-31T00:00:00Z');
+  assert.equal(result, null);
+});
+
+test('HEALTH_RECORD_TYPES includes HealthDataHistory and HeartRateVariabilityRmssd', () => {
+  assert.ok(HEALTH_RECORD_TYPES.includes('HealthDataHistory'));
+  assert.ok(HEALTH_RECORD_TYPES.includes('HeartRateVariabilityRmssd'));
+});
+
+// ── HRV (RMSSD) threading ─────────────────────────────────────────────────────
+
+test('buildHealthSnapshot threads hrvMs from raw.hrvRmssd', () => {
+  const snap = buildHealthSnapshot({ steps: 0, activeCalories: 0, sleepSessions: [],
+    heartRateSamples: [], restingHeartRate: null, hrvRmssd: 42, weightKg: null, exerciseSessions: [] });
+  assert.equal(snap.hrvMs, 42);
+});
+
+test('buildHealthSnapshot sets hrvMs to null when hrvRmssd absent or zero', () => {
+  assert.equal(buildHealthSnapshot(null).hrvMs, null);
+  const snap = buildHealthSnapshot({ steps: 0, activeCalories: 0, sleepSessions: [],
+    heartRateSamples: [], restingHeartRate: null, weightKg: null, exerciseSessions: [] });
+  assert.equal(snap.hrvMs, null);
+  const snap0 = buildHealthSnapshot({ ...snap, hrvRmssd: 0 });
+  assert.equal(snap0.hrvMs, null);
+});
+
+test('appendToHealthLog stores hrvMs from snapshot', () => {
+  const appState = { healthLog: [] };
+  const snapWithHrv = { ...MOCK_SNAPSHOT, hrvMs: 55 };
+  appendToHealthLog(appState, snapWithHrv, null, '2026-01-10');
+  assert.equal(appState.healthLog[0].hrvMs, 55);
+});
+
+test('appendToHealthLog stores null hrvMs when absent', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.equal(appState.healthLog[0].hrvMs, null);
 });
 
 // ── briefing integration — health telemetry items ────────────────────────────

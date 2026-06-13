@@ -6,7 +6,7 @@ import { getDisplayBlueprint } from './schema.js';
 import { logActivityForStreak } from './state.js';
 import { getSessionSourceDay, loadSessionIntoDay, resetSessionForDay } from './state.js';
 import { CONFIG } from './constants.js';
-import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog, epley1RM } from './engine.js';
+import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog, epley1RM, getLiftDisplayName } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast } from './state.js'; 
@@ -46,8 +46,9 @@ export function openExerciseHistoryModal(liftName) {
 
   const appState = _getState();
   const historyData = getExerciseHistoryLog(appState, liftName);
+  const displayName = getLiftDisplayName(appState, liftName);
 
-  titleEl.textContent = liftName;
+  titleEl.textContent = displayName;
   bestVolEl.textContent = historyData.bestVolume > 0 ? `${historyData.bestVolume} kg` : '--';
   bestE1RMEl.textContent = historyData.bestE1RM > 0 ? `${Math.round(historyData.bestE1RM)} kg` : '--';
 
@@ -369,10 +370,7 @@ export function renderWorkout() {
     exCard.setAttribute('data-liftname', liftName);
     exCard.setAttribute('draggable', 'true');
 
-    let displayLiftName = liftName;
-    if (!isNaN(liftName) && homeBlueprint.lifts && homeBlueprint.lifts[parseInt(liftName, 10)]) {
-      displayLiftName = homeBlueprint.lifts[parseInt(liftName, 10)];
-    }
+    const displayLiftName = getLiftDisplayName(appState, liftName);
 
     let blueprintLabel = `Target: Working Sets`;
     try {
@@ -481,9 +479,10 @@ export function checkAndTriggerPR(appState, liftName, weight, reps) {
   const w = parseFloat(weight);
   const r = parseInt(reps, 10);
   if (w <= 0 || r <= 0) return;
-  
+
   const currentE1RM = epley1RM(w, r);
-  const stats = appState.exerciseStats && appState.exerciseStats[liftName];
+  const statsKey = getLiftDisplayName(appState, liftName);
+  const stats = appState.exerciseStats?.[statsKey];
   const historicalMax = stats ? (stats.allTimeMax || 0) : 0;
   
   if (historicalMax > 0 && currentE1RM > historicalMax) {
@@ -602,6 +601,9 @@ export function updateInputState(inputNode) {
 
   if (inputNode.classList.contains('input-weight-node')) {
     appState.weeks[wk].lifts[selectedDay][liftName][sIdx].w = inputNode.value;
+  } else if (inputNode.classList.contains('input-rpe-node')) {
+    const v = inputNode.value.trim();
+    appState.weeks[wk].lifts[selectedDay][liftName][sIdx].rpe = v !== '' ? v : undefined;
   } else {
     appState.weeks[wk].lifts[selectedDay][liftName][sIdx].r = inputNode.value;
   }
@@ -679,6 +681,11 @@ export function commitWorkoutUIState() {
           if (wIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].w = wIn.value;
           if (rIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].r = rIn.value;
           if (cIn) appState.weeks[wk].lifts[selectedDay][liftName][idx].c = cIn.checked;
+          const rpeIn = row.querySelector('.input-rpe-node');
+          if (rpeIn) {
+            const v = rpeIn.value.trim();
+            appState.weeks[wk].lifts[selectedDay][liftName][idx].rpe = v !== '' ? v : undefined;
+          }
         }
       });
     });

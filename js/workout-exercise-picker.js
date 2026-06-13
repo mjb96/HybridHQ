@@ -3,6 +3,7 @@
 // ==========================================
 import { EXERCISE_LIBRARY } from './constants.js';
 import { showToast, saveNewCustomExerciseToLibrary } from './state.js';
+import { getLiftId, getLiftDisplayName } from './engine.js';
 
 let _getState, _getSelectedDay, _saveState, _rerender;
 
@@ -33,21 +34,22 @@ export function populateExerciseDropdown() {
         if (!wData || !wData.lifts) continue;
         
         for (const d in wData.lifts) {
-          for (const liftName in wData.lifts[d]) {
-            if (!recentMap[liftName]) {
-              recentMap[liftName] = { name: liftName, count: 0, lastSeenWeek: w };
+          for (const liftId in wData.lifts[d]) {
+            const displayName = getLiftDisplayName(appState, liftId);
+            if (!recentMap[displayName]) {
+              recentMap[displayName] = { name: displayName, count: 0, lastSeenWeek: w };
             }
-            recentMap[liftName].count += 1;
-            if (w > recentMap[liftName].lastSeenWeek) {
-              recentMap[liftName].lastSeenWeek = w;
+            recentMap[displayName].count += 1;
+            if (w > recentMap[displayName].lastSeenWeek) {
+              recentMap[displayName].lastSeenWeek = w;
             }
           }
         }
       }
-      
+
       const todaysLifts = appState.weeks[currentWk.toString()]?.lifts?.[selectedDay] || {};
-      for (const activeLift in todaysLifts) {
-        delete recentMap[activeLift];
+      for (const activeLiftId in todaysLifts) {
+        delete recentMap[getLiftDisplayName(appState, activeLiftId)];
       }
       
       recentExercises = Object.values(recentMap).sort((a, b) => {
@@ -168,20 +170,21 @@ export function confirmAddExercise() {
   const sourceLift = isSuperset ? modal.getAttribute('data-source-lift') : null;
 
   // 1. REBUILD DICTIONARY: Force DOM contiguity by injecting immediately after the source lift
+  const liftId = getLiftId(appState, liftName);
   const currentLifts = appState.weeks[wk].lifts[selectedDay];
-  if (!currentLifts[liftName]) {
-    if (isSuperset && currentLifts[sourceLift]) {
+  if (!currentLifts[liftId]) {
+    if (isSuperset && sourceLift && currentLifts[sourceLift]) {
       const reorderedLifts = {};
       for (const key in currentLifts) {
         reorderedLifts[key] = currentLifts[key];
         // Inject the new lift immediately after its superset partner
         if (key === sourceLift) {
-          reorderedLifts[liftName] = [{ w: '', r: '10', c: false }];
+          reorderedLifts[liftId] = [{ w: '', r: '10', c: false }];
         }
       }
       appState.weeks[wk].lifts[selectedDay] = reorderedLifts;
     } else {
-      currentLifts[liftName] = [{ w: '', r: '10', c: false }];
+      currentLifts[liftId] = [{ w: '', r: '10', c: false }];
     }
   }
 
@@ -197,8 +200,8 @@ export function confirmAddExercise() {
       groupId = 'group_' + Date.now();
       supersetsMap[sourceLift] = groupId;
     }
-    supersetsMap[liftName] = groupId;
-    modal.removeAttribute('data-source-lift'); 
+    supersetsMap[liftId] = groupId;
+    modal.removeAttribute('data-source-lift');
   }
 
   _saveState(true);

@@ -43,6 +43,9 @@ export let appState = {
   athleteProfile: emptyAthleteProfile(),
   health: null,
   healthLog: [],
+  liftIdMap: {},
+  liftNames: {},
+  _liftIdVersion: 0,
 };
 
 export let activeTab = 'home';
@@ -85,8 +88,70 @@ function supersetsFromBlockEntries(entries) {
   const groupMap = {}, counts = {};
   entries.forEach(en => { if (en.group) { groupMap[en.name] = en.group; counts[en.group] = (counts[en.group] || 0) + 1; } });
   const ss = {};
-  for (const name in groupMap) if (counts[groupMap[name]] >= 2) ss[name] = groupMap[name];
+  for (const name in groupMap) {
+    if (counts[groupMap[name]] >= 2) ss[_getLiftIdOrCreate(name)] = groupMap[name];
+  }
   return ss;
+}
+
+// Private: get-or-create a stable ID for a display name, mutating appState maps.
+function _getLiftIdOrCreate(displayName) {
+  const key = String(displayName || '').trim();
+  if (!key) return key;
+  if (!appState.liftIdMap) appState.liftIdMap = {};
+  if (!appState.liftNames) appState.liftNames = {};
+  if (appState.liftIdMap[key]) return appState.liftIdMap[key];
+  const id = 'lift_' + Math.random().toString(36).slice(2, 10);
+  appState.liftIdMap[key] = id;
+  appState.liftNames[id] = key;
+  return id;
+}
+
+// Rekey all lifts[day] entries from display names to stable IDs.
+// Idempotent: skips any key already starting with 'lift_'.
+// Called once during pullEngineDataFromStorage when _liftIdVersion < 1.
+export function migrateLiftIdsInState() {
+  if ((appState._liftIdVersion || 0) >= 1) return;
+  if (!appState.liftIdMap) appState.liftIdMap = {};
+  if (!appState.liftNames) appState.liftNames = {};
+
+  for (const wk in appState.weeks) {
+    const wkData = appState.weeks[wk];
+    if (!wkData) continue;
+
+    if (wkData.lifts) {
+      for (const day in wkData.lifts) {
+        const dayLifts = wkData.lifts[day];
+        if (!dayLifts || typeof dayLifts !== 'object') continue;
+        const rekeyed = {};
+        for (const name in dayLifts) {
+          const id = name.startsWith('lift_') ? name : _getLiftIdOrCreate(name);
+          rekeyed[id] = dayLifts[name];
+          // Ensure reverse map exists for pre-existing IDs
+          if (name.startsWith('lift_') && !appState.liftNames[name]) {
+            appState.liftNames[name] = name; // fallback display = id
+          }
+        }
+        wkData.lifts[day] = rekeyed;
+      }
+    }
+
+    if (wkData.supersets) {
+      for (const day in wkData.supersets) {
+        const ssMap = wkData.supersets[day];
+        if (!ssMap || typeof ssMap !== 'object') continue;
+        const rekeyed = {};
+        for (const name in ssMap) {
+          const id = name.startsWith('lift_') ? name : _getLiftIdOrCreate(name);
+          rekeyed[id] = ssMap[name];
+        }
+        wkData.supersets[day] = rekeyed;
+      }
+    }
+  }
+
+  appState._liftIdVersion = 1;
+  saveStateToLocalStorage(true);
 }
 
 export function listSeededPrograms() {
@@ -223,7 +288,7 @@ export function verifyWeekStorageSchema(wk) {
       if (entries.length > 0) {
         const weekContext = { label: dayV2?.label || '' };
         entries.forEach(entry => {
-          appState.weeks[wk].lifts[d][entry.name] =
+          appState.weeks[wk].lifts[d][_getLiftIdOrCreate(entry.name)] =
             prescribeSetsForLift(wk, d, entry, weekContext);
         });
         // SUPERSET CONVERGENCE: carry authored block.group -> cockpit supersets[d]
@@ -290,12 +355,13 @@ export function loadSessionIntoDay(targetDay, sourceDay, { force = false } = {})
     // SUPERSET CONVERGENCE: authored groups form the base; live source-day edits overlay.
     Object.assign(weekData.supersets[targetDay], supersetsFromBlockEntries(entries));
     entries.forEach(entry => {
-      weekData.lifts[targetDay][entry.name] =
+      const liftId = _getLiftIdOrCreate(entry.name);
+      weekData.lifts[targetDay][liftId] =
         prescribeSetsForLift(wk, sourceDay, entry, weekContext);
-        
+
       // PHASE 1 SUPERSETS: Copy superset relationships if they exist in source
-      if (weekData.supersets[sourceDay] && weekData.supersets[sourceDay][entry.name]) {
-         weekData.supersets[targetDay][entry.name] = weekData.supersets[sourceDay][entry.name];
+      if (weekData.supersets[sourceDay]?.[liftId]) {
+        weekData.supersets[targetDay][liftId] = weekData.supersets[sourceDay][liftId];
       }
     });
   }
@@ -310,33 +376,66 @@ export function resetSessionForDay(targetDay) {
 // ==========================================
 // CLOUD PERSISTENCE
 // ==========================================
-export async function saveStateToLocalStorage(suppressToast = false) {
+export const CLOUD_SYNC_DEBOUNCE_MS = 2000;
+
+// Debounce state — module-scoped so all callers share a single timer.
+let _syncTimer = null;
+let _pendingToast = false;
+
+// Perform the actual Supabase upsert. Called by the timer and by flushCloudSyncNow.
+async function _flushCloudSync() {
+  _syncTimer = null;
+  const wantToast = _pendingToast;
+  _pendingToast = false;
+
+  if (!supabaseClient) return;
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    if (!sessionData?.session) {
+      if (wantToast) showToast('Session Saved Locally ✓');
+      return;
+    }
+    const { error } = await supabaseClient
+      .from('user_data')
+      .upsert({ user_id: sessionData.session.user.id, state_data: appState }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (wantToast) showToast('Session Saved to Cloud ✓');
+  } catch (err) {
+    console.error('Supabase Save Error:', err);
+    showToast('DB Reject: ' + (err.message || 'Unknown error').substring(0, 40), true);
+  }
+}
+
+function scheduleCloudSync(wantToast) {
+  clearTimeout(_syncTimer);
+  if (wantToast) _pendingToast = true;
+  _syncTimer = setTimeout(_flushCloudSync, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+// localStorage write is always synchronous and immediate.
+// Cloud upsert is coalesced: rapid saves share one network write 2 s after the last call.
+export function saveStateToLocalStorage(suppressToast = false) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (e) {
     console.error('Failed to save state locally:', e);
   }
 
-  if (supabaseClient) {
-    try {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      if (!sessionData?.session) {
-        if (!suppressToast) showToast('Session Saved Locally ✓');
-        return;
-      }
-      const { error } = await supabaseClient
-        .from('user_data')
-        .upsert({ user_id: sessionData.session.user.id, state_data: appState }, { onConflict: 'user_id' });
-
-      if (error) throw error;
-      if (!suppressToast) showToast('Session Saved to Cloud ✓');
-    } catch (err) {
-      console.error('Supabase Save Error:', err);
-      if (!suppressToast) showToast('DB Reject: ' + (err.message || 'Unknown error').substring(0, 40), true);
-    }
-  } else {
-     if (!suppressToast) showToast('Session Saved Locally ✓');
+  if (!supabaseClient) {
+    if (!suppressToast) showToast('Session Saved Locally ✓');
+    return;
   }
+
+  scheduleCloudSync(!suppressToast);
+}
+
+// Bypass the debounce and upsert immediately — call before tab switches,
+// session close, page unload, or any other "commit" moment.
+export async function flushCloudSyncNow() {
+  clearTimeout(_syncTimer);
+  _syncTimer = null;
+  if (!supabaseClient) return;
+  await _flushCloudSync();
 }
 
 export async function pullEngineDataFromStorage() {
@@ -359,6 +458,9 @@ export async function pullEngineDataFromStorage() {
     athleteProfile: emptyAthleteProfile(),
     health: null,
     healthLog: [],
+    liftIdMap: {},
+    liftNames: {},
+    _liftIdVersion: 0,
   };
 
   if (localData) {
@@ -409,6 +511,9 @@ export async function pullEngineDataFromStorage() {
   if (!appState.athleteProfile) appState.athleteProfile = emptyAthleteProfile();
   if (!('health' in appState)) appState.health = null;
   if (!appState.healthLog) appState.healthLog = [];
+  if (!appState.liftIdMap) appState.liftIdMap = {};
+  if (!appState.liftNames) appState.liftNames = {};
+  if (appState._liftIdVersion === undefined) appState._liftIdVersion = 0;
 
   let _migratedAnyProgram = false;
   appState.customPrograms = (appState.customPrograms || []).map(prog => {
@@ -434,6 +539,8 @@ export async function pullEngineDataFromStorage() {
     if (hasLegacySchema) weeksToDelete.push(wk);
   }
   weeksToDelete.forEach(wk => { delete appState.weeks[wk]; });
+
+  migrateLiftIdsInState();
 
   verifyWeekStorageSchema(appState.currentWeek);
 
@@ -524,6 +631,7 @@ export function triggerEngineImport(event) {
           return migrateCustomProgramToV2(prog);
         });
         saveStateToLocalStorage(true);
+        flushCloudSyncNow();
         if (_onImportSuccess) _onImportSuccess();
         showToast('Data snapshot mounted successfully.');
       } else {

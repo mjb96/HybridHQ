@@ -13,6 +13,38 @@ export function initEngine(getStateFn, getDaysFn) {
 }
 
 // ==========================================
+// STABLE EXERCISE ID HELPERS
+// ------------------------------------------
+// Storage keys in lifts[day] are opaque IDs (lift_xxxxxxxx) after migration.
+// These three functions are the single translation layer between display names
+// and storage keys. Every module that reads or writes lifts[day] must use them.
+// ==========================================
+export function getLiftId(state, displayName) {
+  const key = String(displayName || '').trim();
+  if (!key) return key;
+  if (!state.liftIdMap) state.liftIdMap = {};
+  if (!state.liftNames) state.liftNames = {};
+  if (state.liftIdMap[key]) return state.liftIdMap[key];
+  const id = 'lift_' + Math.random().toString(36).slice(2, 10);
+  state.liftIdMap[key] = id;
+  state.liftNames[id] = key;
+  return id;
+}
+
+export function getLiftDisplayName(state, idOrName) {
+  if (!idOrName) return String(idOrName ?? '');
+  return state?.liftNames?.[String(idOrName)] || String(idOrName);
+}
+
+export function resolveLiftKey(state, nameOrId) {
+  if (!nameOrId) return String(nameOrId ?? '');
+  const key = String(nameOrId).trim();
+  // If it's a display name that has a registered ID, return the ID.
+  // If it's already an ID (or an unregistered name), return as-is.
+  return state?.liftIdMap?.[key] || key;
+}
+
+// ==========================================
 // TEXT DESCRIPTION PARSER ENGINE
 // ==========================================
 export function parseTargetFromDescription(descString, liftName) {
@@ -60,12 +92,13 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
   const cWk = parseInt(currentWeekString, 10);
   if (isNaN(cWk) || cWk <= 1 || !appState.weeks) return result;
 
+  const storageKey = resolveLiftKey(appState, liftName);
   const history = [];
   for (let w = cWk - 1; w >= 1; w--) {
     const wData = appState.weeks[w.toString()];
-    if (wData && wData.lifts && wData.lifts[dayKey]?.[liftName]) {
+    if (wData && wData.lifts && wData.lifts[dayKey]?.[storageKey]) {
       // INCREMENT WARMUP: Exclude warmups from diagnostics and suggestions
-      const finishedSets = wData.lifts[dayKey][liftName].filter(s => s && s.c && s.w && s.r && !s.isWarmup);
+      const finishedSets = wData.lifts[dayKey][storageKey].filter(s => s && s.c && s.w && s.r && !s.isWarmup);
       if (finishedSets.length > 0) {
         let bestE1rm = 0, bestWeight = 0, bestReps = 0;
         finishedSets.forEach(s => {
@@ -95,15 +128,26 @@ export function computeDiagnosticForLift(currentWeekString, dayKey, liftName) {
 
   let totalRpeSum = 0, rpeCount = 0;
   const pastWkData = appState.weeks[(cWk - 1).toString()];
-  
+
   if (pastWkData) {
-    DEFAULT_DAYS.forEach(d => {
-      const runRpe = parseInt(pastWkData.runs?.[d]?.rpe, 10) || 0;
-      if (runRpe > 0) { totalRpeSum += runRpe; rpeCount++; }
-      
-      const gymRpe = parseInt(pastWkData.gymRpe?.[d], 10) || 0;
-      if (gymRpe > 0) { totalRpeSum += gymRpe; rpeCount++; }
-    });
+    // Prefer per-set RPE logged on this lift's last session; fall back to
+    // session-level RPE across all days when per-set data is absent.
+    const prevSets = (pastWkData.lifts?.[dayKey]?.[storageKey] || [])
+      .filter(s => s && !s.isWarmup && isCompletedSet(s));
+    const perSetRpes = prevSets
+      .map(s => parseFloat(s.rpe))
+      .filter(v => !isNaN(v) && v > 0);
+
+    if (perSetRpes.length > 0) {
+      perSetRpes.forEach(v => { totalRpeSum += v; rpeCount++; });
+    } else {
+      DEFAULT_DAYS.forEach(d => {
+        const runRpe = parseInt(pastWkData.runs?.[d]?.rpe, 10) || 0;
+        if (runRpe > 0) { totalRpeSum += runRpe; rpeCount++; }
+        const gymRpe = parseInt(pastWkData.gymRpe?.[d], 10) || 0;
+        if (gymRpe > 0) { totalRpeSum += gymRpe; rpeCount++; }
+      });
+    }
   }
   
   const pastWeekAvgRpe = rpeCount > 0 ? totalRpeSum / rpeCount : 0;
@@ -230,21 +274,22 @@ export function computeEstimated1RMs() {
         const setsArr = dayLifts[lKey];
         if (!Array.isArray(setsArr)) continue;
         
+        const lName = getLiftDisplayName(appState, lKey);
         setsArr.forEach(s => {
           // INCREMENT WARMUP: Exclude warmups from global max
           if (s && s.c && !s.isWarmup) {
             const weight = parseFloat(s.w) || 0;
             const reps = parseInt(s.r, 10) || 0;
             const e1rm = epley1RM(weight, reps);
-            
+
             if (wKey === wk) {
-              if (lKey === 'Back Squat' && e1rm > result.currentSq) result.currentSq = e1rm;
-              if (lKey === 'Bench Press' && e1rm > result.currentBp) result.currentBp = e1rm;
-              if (lKey === 'Deadlift' && e1rm > result.currentDl) result.currentDl = e1rm;
+              if (lName === 'Back Squat' && e1rm > result.currentSq) result.currentSq = e1rm;
+              if (lName === 'Bench Press' && e1rm > result.currentBp) result.currentBp = e1rm;
+              if (lName === 'Deadlift' && e1rm > result.currentDl) result.currentDl = e1rm;
             }
-            if (lKey === 'Back Squat' && e1rm > result.globalMaxSq) result.globalMaxSq = e1rm;
-            if (lKey === 'Bench Press' && e1rm > result.globalMaxBp) result.globalMaxBp = e1rm;
-            if (lKey === 'Deadlift' && e1rm > result.globalMaxDl) result.globalMaxDl = e1rm;
+            if (lName === 'Back Squat' && e1rm > result.globalMaxSq) result.globalMaxSq = e1rm;
+            if (lName === 'Bench Press' && e1rm > result.globalMaxBp) result.globalMaxBp = e1rm;
+            if (lName === 'Deadlift' && e1rm > result.globalMaxDl) result.globalMaxDl = e1rm;
           }
         });
       }
@@ -278,15 +323,16 @@ export function computeExercisePRs(state, stats = {}) {
         });
 
         if (maxEstimated1RM > 0) {
-          if (!stats[lift]) {
-            stats[lift] = { allTimeMax: 0, currentEstimatedMax: 0 };
+          const liftKey = getLiftDisplayName(state, lift);
+          if (!stats[liftKey]) {
+            stats[liftKey] = { allTimeMax: 0, currentEstimatedMax: 0 };
           }
-          if (maxEstimated1RM > stats[lift].allTimeMax) {
-            stats[lift].allTimeMax = maxEstimated1RM;
+          if (maxEstimated1RM > stats[liftKey].allTimeMax) {
+            stats[liftKey].allTimeMax = maxEstimated1RM;
           }
           if (wKey === state.currentWeek) {
-            if (maxEstimated1RM > (stats[lift].currentEstimatedMax || 0)) {
-              stats[lift].currentEstimatedMax = maxEstimated1RM;
+            if (maxEstimated1RM > (stats[liftKey].currentEstimatedMax || 0)) {
+              stats[liftKey].currentEstimatedMax = maxEstimated1RM;
             }
           }
         }
@@ -319,51 +365,6 @@ export function classifyBig3Lift(name) {
   return null;
 }
 
-export function computeBig3Progression(state) {
-  const cats = ['squat', 'bench', 'deadlift'];
-  const out = {};
-  cats.forEach(c => { out[c] = { current: 0, allTime: 0, byWeek: {} }; });
-  if (!state || !state.weeks) return out;
-
-  const currentWeek = state.currentWeek;
-
-  for (const wKey in state.weeks) {
-    const weekObj = state.weeks[wKey];
-    if (!weekObj || !weekObj.lifts) continue;
-
-    for (const dKey in weekObj.lifts) {
-      const dayLifts = weekObj.lifts[dKey];
-      if (!dayLifts) continue;
-
-      for (const lift in dayLifts) {
-        const cat = classifyBig3Lift(lift);
-        if (!cat) continue;
-        const setsArr = dayLifts[lift];
-        if (!Array.isArray(setsArr)) continue;
-
-        setsArr.forEach(s => {
-          // INCREMENT WARMUP: Exclude warmups from Big 3 Charts
-          if (!isCompletedSet(s) || s.isWarmup) return;
-          const e = epley1RM(s.w, s.r);
-          if (e <= 0) return;
-          if (e > (out[cat].byWeek[wKey] || 0)) out[cat].byWeek[wKey] = e;
-          if (e > out[cat].allTime) out[cat].allTime = e;
-          if (wKey === currentWeek && e > out[cat].current) out[cat].current = e;
-        });
-      }
-    }
-  }
-  return out;
-}
-
-export function computeBig3Maxes(state) {
-  const prog = computeBig3Progression(state);
-  return {
-    squat:    prog.squat.allTime,
-    bench:    prog.bench.allTime,
-    deadlift: prog.deadlift.allTime,
-  };
-}
 
 export function downsampleStream(stream, maxPoints = 500) {
   if (!stream || typeof stream !== 'object') return stream;
@@ -382,6 +383,41 @@ export function downsampleStream(stream, maxPoints = 500) {
     out[k] = Array.isArray(stream[k]) ? idx.map(i => stream[k][i]) : stream[k];
   }
   out.n = idx.length;
+  return out;
+}
+
+/**
+ * Compute grade-adjusted pace (s/km) for each stream point.
+ * Uses the Minetti et al. (2002) 5th-order metabolic cost polynomial normalised
+ * at grade=0 (flat). Grade is clamped to ±40% to suppress GPS noise spikes.
+ * Returns an array of the same length as the shortest input; missing altitude
+ * or distance data yields an empty array.
+ *
+ * @param {number[]} distKm      Cumulative distance in km per point.
+ * @param {number[]} elapsedSec  Cumulative elapsed seconds per point.
+ * @param {number[]} altitude    Altitude in metres per point.
+ * @returns {number[]}           GAP values in s/km (0 where pace/data is absent).
+ */
+export function computeGAP(distKm, elapsedSec, altitude) {
+  const n = Math.min(distKm?.length || 0, elapsedSec?.length || 0, altitude?.length || 0);
+  if (n < 2) return new Array(n).fill(0);
+
+  const out = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const dDistKm = (parseFloat(distKm[i])   || 0) - (parseFloat(distKm[i - 1])   || 0);
+    const dTime   = (parseFloat(elapsedSec[i]) || 0) - (parseFloat(elapsedSec[i - 1]) || 0);
+    const dElev   = (parseFloat(altitude[i])  || 0) - (parseFloat(altitude[i - 1])  || 0);
+    if (dDistKm <= 0 || dTime <= 0) continue;
+
+    const paceSec  = dTime / dDistKm;
+    const grade    = Math.max(-0.4, Math.min(0.4, dElev / (dDistKm * 1000)));
+    const g2 = grade * grade, g3 = g2 * grade, g4 = g2 * g2, g5 = g4 * grade;
+    // Minetti metabolic cost (J/kg/m): c(g) = 155.4g⁵ − 30.4g⁴ − 43.3g³ + 46.3g² + 19.5g + 3.6
+    const costGrade = 155.4*g5 - 30.4*g4 - 43.3*g3 + 46.3*g2 + 19.5*grade + 3.6;
+    const factor = Math.max(0.5, Math.min(3.0, costGrade / 3.6)); // 3.6 = cost at grade 0
+    out[i] = paceSec / factor;
+  }
+  out[0] = out[1];
   return out;
 }
 
@@ -437,7 +473,7 @@ export function findLastPerformance(state, liftName, opts = {}) {
     for (let i = dayList.length - 1; i >= 0; i--) {
       const d = dayList[i];
       if (excludeWeek != null && String(w) === String(excludeWeek) && d === excludeDay) continue;
-      const arr = wkData.lifts[d]?.[liftName];
+      const arr = wkData.lifts[d]?.[resolveLiftKey(state, liftName)];
       if (!Array.isArray(arr)) continue;
 
       const workingSets = arr.filter(s => !s.isWarmup);
@@ -611,33 +647,6 @@ export function computeWeeklyLoadSeries(state, days, maxWeek) {
   return { lift, run };
 }
 
-// Weekly strength volume (tonnage) series — sum of weight·reps over completed
-// working sets (warmups excluded), per week 1..maxWeek. The shared "Strength
-// Load" descriptive series; mirrors the other computeWeekly* signatures.
-export function weeklyStrengthVolumeSeries(state, days, maxWeek) {
-  const out = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let vol = 0;
-    if (wkData) {
-      dayList.forEach(d => {
-        const dayLifts = wkData.lifts?.[d] || {};
-        for (const lift in dayLifts) {
-          const arr = dayLifts[lift];
-          if (!Array.isArray(arr)) continue;
-          arr.forEach(s => {
-            if (isCompletedSet(s) && !s.isWarmup) {
-              vol += (parseFloat(s.w) || 0) * (parseInt(s.r, 10) || 0);
-            }
-          });
-        }
-      });
-    }
-    out.push(Math.round(vol));
-  }
-  return out;
-}
 
 export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   const cw = parseInt(currentWeek, 10) || 1;
@@ -697,38 +706,6 @@ export function computeDynamicMilestones(totalWeeks) {
   ];
 }
 
-export function computeWeeklyHrSeries(state, days, maxWeek) {
-  const avgHr = [], maxHr = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let sum = 0, cnt = 0, mx = 0;
-    if (wkData) dayList.forEach(d => {
-      const a = parseFloat(wkData.runs?.[d]?.avgHR) || 0;
-      const m = parseFloat(wkData.runs?.[d]?.maxHR) || 0;
-      if (a > 0) { sum += a; cnt++; }
-      if (m > mx) mx = m;
-    });
-    avgHr.push(cnt > 0 ? Math.round(sum / cnt) : 0);
-    maxHr.push(Math.round(mx));
-  }
-  return { avgHr, maxHr };
-}
-
-export function computeWeeklyTrainingEffectSeries(state, days, maxWeek) {
-  const out = [];
-  const dayList = Array.isArray(days) ? days : [];
-  for (let w = 1; w <= maxWeek; w++) {
-    const wkData = state?.weeks?.[String(w)];
-    let sum = 0, cnt = 0;
-    if (wkData) dayList.forEach(d => {
-      const te = parseFloat(wkData.runs?.[d]?.trainingEffect) || 0;
-      if (te > 0) { sum += te; cnt++; }
-    });
-    out.push(cnt > 0 ? Math.round((sum / cnt) * 10) / 10 : 0);
-  }
-  return out;
-}
 
 export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
   const out = [];
@@ -780,7 +757,7 @@ export function getExerciseHistoryLog(state, liftName) {
     if(!wData || !wData.lifts) continue;
     
     for(let d in wData.lifts) {
-      const sets = wData.lifts[d][liftName];
+      const sets = wData.lifts[d][resolveLiftKey(state, liftName)];
       if(!sets || !Array.isArray(sets)) continue;
       
       // INCREMENT WARMUP: History Modal only displays working volume/sets

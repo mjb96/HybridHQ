@@ -12,13 +12,13 @@
 // ==========================================
 import {
   computeWeeklyLoadSeries,
-  weeklyStrengthVolumeSeries,
   computeReadiness,
 } from '../engine.js';
+import { weeklyTonnageSeries } from '../metrics/metrics-strength.js';
 
 // Strength Load per week (descriptive): tonnage of completed working sets.
 export function strengthLoadSeries(state, days, maxWeek) {
-  return weeklyStrengthVolumeSeries(state, days, maxWeek);
+  return weeklyTonnageSeries(state, days, maxWeek);
 }
 
 // Endurance Load per week (descriptive): running distance (km). Pace / HR /
