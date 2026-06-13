@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main, claude/android-health-connect-4pd8bt]
+    branches: [main, claude/android-health-connect-4pd8bt, claude/android-webview-wrapper-n4kp6d]
   workflow_dispatch:
 
 jobs:
