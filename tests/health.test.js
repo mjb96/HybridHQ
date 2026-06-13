@@ -11,6 +11,72 @@ import {
   buildHealthSnapshot,
 } from '../js/health/healthCalculations.js';
 import { checkAvailability, HealthConnectAvailability } from '../js/health/healthConnect.js';
+import { buildDayWindows, appendToHealthLog } from '../js/health/healthService.js';
+
+// ── buildDayWindows ───────────────────────────────────────────────────────────
+
+test('buildDayWindows returns exactly N entries', () => {
+  assert.equal(buildDayWindows(7).length, 7);
+  assert.equal(buildDayWindows(30).length, 30);
+  assert.equal(buildDayWindows(1).length, 1);
+});
+
+test('buildDayWindows last entry is today in local time', () => {
+  const wins = buildDayWindows(5);
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const expectedToday = `${y}-${m}-${d}`;
+  assert.equal(wins[wins.length - 1].date, expectedToday);
+});
+
+test('buildDayWindows windows are 24 h wide', () => {
+  for (const w of buildDayWindows(3)) {
+    const delta = new Date(w.endTime) - new Date(w.startTime);
+    assert.equal(delta, 24 * 60 * 60 * 1000);
+  }
+});
+
+test('buildDayWindows is chronological oldest-first', () => {
+  const wins = buildDayWindows(5);
+  for (let i = 1; i < wins.length; i++) {
+    assert.ok(wins[i].date > wins[i - 1].date, 'entries should be ascending by date');
+  }
+});
+
+// ── appendToHealthLog idempotency ────────────────────────────────────────────
+
+const MOCK_SNAPSHOT = { steps: 5000, activeCalories: 300, sleepHours: 7, sleepScore: 80,
+  restingHeartRate: 58, averageHeartRate: null, weightKg: null, workouts: [], syncedAt: '' };
+
+test('appendToHealthLog upserts: writing same date twice keeps one entry', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  appendToHealthLog(appState, { ...MOCK_SNAPSHOT, steps: 9000 }, null, '2026-01-10');
+  assert.equal(appState.healthLog.length, 1);
+  assert.equal(appState.healthLog[0].steps, 9000, 'second write should replace first');
+});
+
+test('appendToHealthLog adds distinct entries for different dates', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-09');
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.equal(appState.healthLog.length, 2);
+});
+
+test('appendToHealthLog stores the provided dateKey, not today', () => {
+  const appState = { healthLog: [] };
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2025-06-15');
+  assert.equal(appState.healthLog[0].date, '2025-06-15');
+});
+
+test('appendToHealthLog initialises healthLog when absent', () => {
+  const appState = {};
+  appendToHealthLog(appState, MOCK_SNAPSHOT, null, '2026-01-10');
+  assert.ok(Array.isArray(appState.healthLog));
+  assert.equal(appState.healthLog.length, 1);
+});
 
 // ── healthCalculations ────────────────────────────────────────────────────────
 

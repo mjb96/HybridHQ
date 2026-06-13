@@ -706,6 +706,13 @@ async function bootstrapApp() {
     // missing bridge (desktop, iOS) never blocks or notifies the user.
     syncHealthData(true);
 
+    // One-time historical backfill: populate healthLog for the last 30 days.
+    // Guarded by a timestamp so it only runs once per install.
+    if (!appState.healthBackfilledAt) {
+      appState.healthBackfilledAt = new Date().toISOString();
+      HealthService.backfill(appState, () => saveStateToLocalStorage(true));
+    }
+
   } catch (fatalLifecycleError) {
     console.error("Critical layout generation block runtime defense:", fatalLifecycleError);
   }
