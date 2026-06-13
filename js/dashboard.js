@@ -153,28 +153,26 @@ export const TILE_REGISTRY = [
       try {
         const wk = appState.currentWeek || '1';
         const weekData = appState.weeks?.[wk];
-        if (!weekData) return { done: 0, total: 0, sub: 'Weekly tasks ticked', state: 'empty' };
+        if (!weekData) return { done: 0, total: 0, sub: 'Sessions done this week', state: 'empty' };
 
         let total = 0, done = 0;
         defaultDays.forEach(dKey => {
           const bp = activeProgram?.days?.[dKey];
-          const isRunScheduled = bp?.runs && !bp.runs.toLowerCase().includes('no structured') && bp.runs.toLowerCase() !== 'rest';
-          if (isRunScheduled) total++;
-          const rDist = parseFloat(weekData.runs?.[dKey]?.dist) || 0;
-          if (isRunScheduled && rDist > 0) done++;
-
           const dayLifts = weekData.lifts?.[dKey] || {};
-          for (const lift in dayLifts) {
-            if (Array.isArray(dayLifts[lift])) {
-              dayLifts[lift].forEach(s => {
-                total++;
-                if (isCompletedSet(s)) done++;
-              });
-            }
-          }
+          const hasLiftsScheduled = Object.keys(dayLifts).length > 0;
+          const isRunScheduled = bp?.runs && !bp.runs.toLowerCase().includes('no structured') && bp.runs.toLowerCase() !== 'rest';
+          if (!hasLiftsScheduled && !isRunScheduled) return;
+
+          total++;
+
+          const rDist = parseFloat(weekData.runs?.[dKey]?.dist) || 0;
+          const hasCompletedSet = Object.values(dayLifts).some(
+            sets => Array.isArray(sets) && sets.some(s => isCompletedSet(s))
+          );
+          if (hasCompletedSet || rDist > 0) done++;
         });
 
-        return { done, total, sub: 'Weekly tasks ticked', state: done > 0 ? 'loaded' : 'empty' };
+        return { done, total, sub: 'Sessions done this week', state: done > 0 ? 'loaded' : 'empty' };
       } catch {
         return { done: 0, total: 0, sub: 'Unavailable', state: 'error' };
       }

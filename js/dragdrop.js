@@ -297,11 +297,10 @@ function onTileTouchEnd() {
 const TILE_HIDDEN_KEY = 'dashboardTilesHidden';
 
 // Tiles hidden when the user has never customised the grid.
-// Only the 5 default-visible tiles (daily-brief, today, goal-progress,
-// top-mover, streak) are shown on a fresh install.
+// Default-visible (7): today, top-mover, streak, consistency, top-lifts, avg-pace, weekly-volume.
 const DEFAULT_HIDDEN_TILES = new Set([
-  'consistency', 'bodyweight', 'top-lifts', 'active-fuel', 'avg-pace',
-  'recovery-score', 'weekly-volume', 'hc-steps', 'hc-sleep', 'hc-rhr',
+  'daily-brief', 'goal-progress', 'bodyweight', 'active-fuel',
+  'recovery-score', 'hc-steps', 'hc-sleep', 'hc-rhr',
 ]);
 
 export function loadHiddenTiles() {
