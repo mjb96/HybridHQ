@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v93';
+const CACHE_NAME = 'hybrid-training-v94';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -82,13 +82,29 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Activate this worker as soon as it's parsed — do NOT gate takeover on the
+  // precache. cache.addAll() is all-or-nothing: a single missing/renamed asset
+  // or one transient network blip during install would reject the whole thing,
+  // leaving the new SW stuck in "waiting" while the OLD worker keeps serving
+  // stale code indefinitely. That deadlock is exactly how the PWA gets pinned
+  // to a broken build (the APK is immune — it never registers a SW). Calling
+  // skipWaiting() here, before the precache, guarantees the new SW always takes
+  // over on the next load regardless of precache outcome.
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Pre-caching offline assets');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] Pre-caching offline assets');
+      // Non-atomic precache: cache each asset independently so one failure
+      // can't abort the rest. `cache: 'reload'` bypasses the HTTP cache so the
+      // precache always pulls fresh bytes, not a stale browser-cached copy.
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) =>
+          cache.add(new Request(url, { cache: 'reload' })).catch((err) => {
+            console.warn('[Service Worker] Skipped precaching', url, err);
+          })
+        )
+      );
+    })
   );
 });
 
@@ -128,8 +144,12 @@ self.addEventListener('fetch', (event) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            return networkResponse;
           }
-          return networkResponse;
+          // Non-200 (404 mid-deploy, 5xx, opaque): a broken response for an ES
+          // module aborts the whole import graph and white-screens the app.
+          // Prefer the last known-good cached copy if we have one.
+          return caches.match(event.request).then((cached) => cached || networkResponse);
         })
         .catch(() => caches.match(event.request))
     );
