@@ -1,5 +1,10 @@
 // ==========================================
-// FULLY REFACTORED HOME DASHBOARD (home.js)
+// HOME DASHBOARD — VIEW RENDERER (home.js)
+// ------------------------------------------
+// Owns the DOM rendering of the home view. The tile catalogue (what tiles
+// exist, their config and per-tile data) lives in dashboard-tiles.js; this
+// file consumes TILE_REGISTRY and paints it. Keep render logic here, tile
+// definitions there.
 // ==========================================
 import { PROGRAMS, WEEK_PHASE_NAMES, DAY_NAMES_FULL } from './constants.js';
 import { getDisplayBlueprint } from './schema.js';
@@ -8,9 +13,9 @@ import { buildRunPreviewRow, buildLiftPreviewRow, buildRestDayPreview } from './
 import { computeDiagnosticForLift, computeEstimated1RMs, shouldSuggestDeload, isCompletedSet, parseDurationToMinutes, computeRecoveryScore, computeReadiness, computeWeeklyLoadSeries, computeStreakView, paceSecondsPerKm, formatPace, getLiftDisplayName } from './engine.js';
 import { big3Maxes } from './metrics/metrics-strength.js';
 import { getMapFromDB } from './db.js';
-import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard.js';
+import { TILE_REGISTRY, DashboardTileType, resolveTileNavigation } from './dashboard-tiles.js';
 import { loadTileOrder, mountTileDragAndDrop, loadHiddenTiles, saveHiddenTiles, resetTileOrder, resetHiddenTiles, applyFocusOrder, mountFocusDragAndDrop } from './dragdrop.js';
-import { CATEGORY_META } from './brain/brain_dashboard.js';
+import { CATEGORY_META } from './brain/insight_cards.js';
 import { generateInsights, contextVerdict } from './brain/core.js';
 import { composeBriefing, trainingStatus } from './brain/briefing.js';
 import { generateWeekBrief, PHASES, PHASE_TONES } from './brain/weekly_brief.js';

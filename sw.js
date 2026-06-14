@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v88';
+const CACHE_NAME = 'hybrid-training-v89';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -12,7 +12,7 @@ const ASSETS_TO_CACHE = [
   './js/app.js',
   './js/constants.js',
   './js/analytics.js',
-  './js/dashboard.js',
+  './js/dashboard-tiles.js',
   './js/db.js',
   './js/dragdrop.js',
   './js/engine.js',
@@ -65,6 +65,7 @@ const ASSETS_TO_CACHE = [
 
   // Hybrid Brain — intelligence layer
   './js/brain/constants_brain.js',
+  './js/brain/insight_cards.js',
   './js/brain/load_models.js',
   './js/brain/analysis.js',
   './js/brain/attribution.js',

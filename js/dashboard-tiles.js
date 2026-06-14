@@ -1,5 +1,5 @@
 // ==========================================
-// DASHBOARD TILE REGISTRY (dashboard.js)
+// DASHBOARD TILE REGISTRY (dashboard-tiles.js)
 // ==========================================
 // Architecture: add a new tile by adding one entry to TILE_REGISTRY.
 // Each entry is a DashboardTileConfig object — no other files need touching

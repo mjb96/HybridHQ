@@ -7,16 +7,7 @@
 // ==========================================
 import { contextVerdict } from './core.js';
 import { escapeHtml } from '../util.js';
-
-export const CATEGORY_META = {
-  progress:    { icon: '📈', label: 'Progress',    color: 'var(--accent-green, #10b981)' },
-  recovery:    { icon: '🛌', label: 'Recovery',    color: 'var(--accent-blue, #3b82f6)' },
-  risk:        { icon: '⚠️', label: 'Risk',        color: 'var(--accent-red, #ef4444)' },
-  opportunity: { icon: '💡', label: 'Opportunity', color: 'var(--accent-amber, #f59e0b)' },
-  goal:        { icon: '🎯', label: 'Goal',        color: 'var(--accent-blue, #3b82f6)' },
-};
-const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;
-const CONF_LABEL = { high: 'High confidence', med: 'Moderate confidence', low: 'Low confidence' };
+import { CONF_LABEL, insightMeta as meta } from './insight_cards.js';
 
 // ---- Full detail view (analytics 'coach' context) ---------------------
 export function renderCoachDetail(report) {
