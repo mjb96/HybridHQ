@@ -519,7 +519,9 @@ export function computeStreakView(streakData, now = new Date()) {
   const today = new Date(now); today.setHours(0, 0, 0, 0);
   const last = new Date(sd.lastActivityDate); last.setHours(0, 0, 0, 0);
   const diffDays = Math.round((today - last) / 86400000);
-  const live = diffDays <= 1;
+  // A future lastActivityDate (corrupt/imported clock skew) yields diffDays < 0;
+  // treat that as broken rather than an eternally-"live" streak.
+  const live = diffDays >= 0 && diffDays <= 1;
   return {
     current: live ? (sd.current || 0) : 0,
     longest,
@@ -673,7 +675,17 @@ export function computeReadiness(loadByWeek, currentWeek, chronicWeeks = 4) {
   };
 }
 
-export function computeGoalAdherence(state, program, days, currentWeek) {
+// Legacy v1 fallback: derive run scheduling from the flat days{} blueprint.
+// v2-shaped programs carry no `days{}`, so schedule lookups there always missed
+// and run adherence silently read 0. Schema-aware callers now pass an
+// `isRunScheduledFn(week, day) => bool` resolver (built on schema.getDayV2 /
+// dayRunWorkout); engine.js stays free of any schema.js import (no cycle).
+function isRunScheduledLegacy(program, day) {
+  const runsStr = (program?.days?.[day]?.runs || '').toLowerCase();
+  return !!runsStr && !runsStr.includes('no structured') && runsStr !== 'rest';
+}
+
+export function computeGoalAdherence(state, program, days, currentWeek, isRunScheduledFn) {
   const cw = parseInt(currentWeek, 10) || 1;
   const dayList = Array.isArray(days) ? days : [];
   let total = 0, done = 0;
@@ -681,9 +693,9 @@ export function computeGoalAdherence(state, program, days, currentWeek) {
     const wkData = state?.weeks?.[String(w)];
     if (!wkData) continue;
     dayList.forEach(d => {
-      const bp = program?.days?.[d];
-      const runsStr = (bp?.runs || '').toLowerCase();
-      const isRunScheduled = runsStr && !runsStr.includes('no structured') && runsStr !== 'rest';
+      const isRunScheduled = typeof isRunScheduledFn === 'function'
+        ? isRunScheduledFn(w, d)
+        : isRunScheduledLegacy(program, d);
       if (isRunScheduled) { total++; if ((parseFloat(wkData.runs?.[d]?.dist) || 0) > 0) done++; }
       const dayLifts = wkData.lifts?.[d] || {};
       for (const l in dayLifts) {
@@ -707,7 +719,7 @@ export function computeDynamicMilestones(totalWeeks) {
 }
 
 
-export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
+export function computeWeeklyCompletionSeries(state, program, days, maxWeek, isRunScheduledFn) {
   const out = [];
   const dayList = Array.isArray(days) ? days : [];
   for (let w = 1; w <= maxWeek; w++) {
@@ -715,9 +727,9 @@ export function computeWeeklyCompletionSeries(state, program, days, maxWeek) {
     let total = 0, done = 0;
     if (wkData) {
       dayList.forEach(d => {
-        const bp = program?.days?.[d];
-        const runsStr = (bp?.runs || '').toLowerCase();
-        const isRunScheduled = runsStr && !runsStr.includes('no structured') && runsStr !== 'rest';
+        const isRunScheduled = typeof isRunScheduledFn === 'function'
+          ? isRunScheduledFn(w, d)
+          : isRunScheduledLegacy(program, d);
         if (isRunScheduled) { total++; if ((parseFloat(wkData.runs?.[d]?.dist) || 0) > 0) done++; }
 
         const dayLifts = wkData.lifts?.[d] || {};

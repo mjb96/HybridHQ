@@ -204,7 +204,7 @@ function _render1RMList(container, liftStats) {
 
     return `<div class="mb-4">
       <div class="flex-between font-bold mb-1">
-        <span class="text-inverse text-sm">${name}${badge}</span>
+        <span class="text-inverse text-sm">${escapeHtml(name)}${badge}</span>
         <span style="color:#3b82f6;" class="text-base">${Math.round(s.allTimeMax)} kg</span>
       </div>
       ${deltaHtml ? `<div class="mb-2">${deltaHtml}</div>` : ''}

@@ -1,5 +1,5 @@
 // ==========================================
-// DASHBOARD TILE REGISTRY (dashboard.js)
+// DASHBOARD TILE REGISTRY (dashboard-tiles.js)
 // ==========================================
 // Architecture: add a new tile by adding one entry to TILE_REGISTRY.
 // Each entry is a DashboardTileConfig object — no other files need touching
@@ -30,6 +30,7 @@
 import { computeStreakView, computeRecoveryScore,
          computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence,
          isCompletedSet, parseDurationToMinutes } from './engine.js';
+import { isRunScheduledResolver, getDisplayBlueprint } from './schema.js';
 import { big3Progression } from './metrics/metrics-strength.js';
 import { generateInsights, summarizeReport } from './brain/core.js';
 import { generateDailyBrief } from './brain/daily_readiness.js';
@@ -104,8 +105,10 @@ export const TILE_REGISTRY = [
         const weekData = appState.weeks?.[wk];
         if (!weekData) return { hero: 'Rest', sub: 'No session planned.', state: 'empty' };
 
-        const prog = activeProgram;
-        const bp   = prog?.days?.[selectedDay] || {};
+        // Schema-aware blueprint: v2 programs have no flat days{}, so read via
+        // getDisplayBlueprint (same source the home renderer uses) instead of
+        // prog.days[d], which silently returned undefined → always "Rest Day".
+        const bp = getDisplayBlueprint(activeProgram, wk, selectedDay) || {};
 
         const todayLifts = weekData.lifts?.[selectedDay] || {};
         const todayRun   = weekData.runs?.[selectedDay]  || {};
@@ -158,7 +161,7 @@ export const TILE_REGISTRY = [
 
         let total = 0, done = 0;
         defaultDays.forEach(dKey => {
-          const bp = activeProgram?.days?.[dKey];
+          const bp = getDisplayBlueprint(activeProgram, wk, dKey);
           const dayLifts = weekData.lifts?.[dKey] || {};
           const hasLiftsScheduled = Object.keys(dayLifts).length > 0;
           const isRunScheduled = bp?.runs && !bp.runs.toLowerCase().includes('no structured') && bp.runs.toLowerCase() !== 'rest';
@@ -520,7 +523,7 @@ export const TILE_REGISTRY = [
         const total = activeProgram?.totalWeeks || 12;
         // Hero = real adherence (work actually done vs scheduled, through now),
         // not raw calendar position. Calendar week is shown as context.
-        const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk);
+        const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk, isRunScheduledResolver(activeProgram));
         return {
           hero:  `${a.pct}%`,
           sub:   `Wk ${wk}/${total} · ${a.done}/${a.total} done`,

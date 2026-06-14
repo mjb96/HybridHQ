@@ -9,8 +9,9 @@ import { CONFIG } from './constants.js';
 import { computeDiagnosticForLift, parseTargetFromDescription, computeExercisePRs, findLastPerformance, getExerciseHistoryLog, epley1RM, getLiftDisplayName } from './engine.js';
 import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.js';
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
-import { showToast } from './state.js'; 
+import { showToast } from './toast.js';
 import { buildEmptyWorkoutCard, buildSetRow, buildExerciseCard } from './templates.js';
+import { escapeHtml } from './util.js';
 import { renderRunMap } from './workout-map.js';
 import { initExercisePicker, openAddExerciseModal, closeAddExerciseModal, confirmAddExercise, handleExerciseDropdownSelectionChange } from './workout-exercise-picker.js';
 import { initSessionModals, openConfirmResetModal, closeConfirmResetModal, executeResetActiveDayMetrics, openFinishSessionModal, closeFinishSessionModal } from './workout-session-modals.js';
@@ -63,7 +64,7 @@ export function openExerciseHistoryModal(liftName) {
             <span class="text-sm font-heavy text-inverse">Week ${sess.week}</span>
             <span class="text-xs text-muted uppercase">${sess.day}</span>
           </div>
-          <div class="text-sm text-muted mb-2">${setsStr}</div>
+          <div class="text-sm text-muted mb-2">${escapeHtml(setsStr)}</div>
           <div class="flex-between" style="border-top: 1px dashed var(--overlay-sm); padding-top: 6px; margin-top: 4px;">
             <span class="text-xs text-muted">Vol: <strong class="text-main">${sess.volume} kg</strong></span>
             <span class="text-xs text-muted">e1RM: <strong class="text-accent-blue">${Math.round(sess.e1rm)} kg</strong></span>
@@ -200,7 +201,7 @@ export function renderWorkout() {
                           <span>Lap ${s.lap}</span>
                           <span>${s.dist.toFixed(2)} km</span>
                           <span>${min}:${sec}</span>
-                          <span style="color:var(--accent-pink);">❤️ ${s.avgHR || '--'}</span>
+                          <span style="color:var(--accent-pink);">❤️ ${escapeHtml(s.avgHR || '--')}</span>
                        </div>`;
           });
           html += '</div>';
@@ -220,9 +221,9 @@ export function renderWorkout() {
           gStats.gymSets.forEach(s => {
               html += `<div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
                           <span>Set ${s.set}</span>
-                          <span>${s.reps} reps</span>
-                          <span>${s.weight} kg</span>
-                          <span style="color:var(--accent-blue);">${s.category || ''}</span>
+                          <span>${escapeHtml(s.reps)} reps</span>
+                          <span>${escapeHtml(s.weight)} kg</span>
+                          <span style="color:var(--accent-blue);">${escapeHtml(s.category || '')}</span>
                        </div>`;
           });
           html += '</div>';
@@ -399,8 +400,8 @@ export function renderWorkout() {
         + (lastPerf.e1rm ? ` · e1RM ${lastPerf.e1rm}kg` : '');
     }
 
-    const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-    const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeLiftName = escapeHtml(liftName);
+    const displaySafeName = escapeHtml(displayLiftName);
 
     let warmupIndex = 0;
     let workingIndex = 0;

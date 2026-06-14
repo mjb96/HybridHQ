@@ -13,6 +13,7 @@ import { weeklyTonnageSeries } from '../../metrics/metrics-strength.js';
 import { weeklyDistanceSeries, weeklyPaceSeries } from '../../metrics/metrics-running.js';
 import { weeklyRpeSeries } from '../../metrics/metrics-load.js';
 import { getProgramById } from '../../state.js';
+import { isRunScheduledResolver } from '../../schema.js';
 import { setText, rpeColour, paceZoneColour } from '../utils.js';
 import { renderWeeklyBarChart, renderCompletionVsTargetChart } from '../charts.js';
 
@@ -109,7 +110,7 @@ export function renderGoalProgressView(appState, days) {
   const goalEl = document.getElementById('analytics-goal-detail');
   if (!goalEl) return;
 
-  const adherence    = computeGoalAdherence(appState, activeProgram, days, wk);
+  const adherence    = computeGoalAdherence(appState, activeProgram, days, wk, isRunScheduledResolver(activeProgram));
   const remaining    = Math.max(0, total - wk);
   const milestones   = computeDynamicMilestones(total);
   const nextMilestone = milestones.find(m => m.week >= wk) || milestones[milestones.length - 1];
@@ -150,7 +151,7 @@ export function renderGoalProgressView(appState, days) {
 
   const chartEl = document.getElementById('goalCompletionChartContainer');
   if (chartEl) {
-    const series = computeWeeklyCompletionSeries(appState, activeProgram, days, total);
+    const series = computeWeeklyCompletionSeries(appState, activeProgram, days, total, isRunScheduledResolver(activeProgram));
     renderCompletionVsTargetChart(chartEl, series, wk);
   }
 }

@@ -20,6 +20,7 @@ import {
   isCompletedSet,
 } from '../engine.js';
 import { strengthLoadSeries, enduranceLoadSeries } from './load_models.js';
+import { isRunScheduledResolver } from '../schema.js';
 import { weeklyPaceSeries } from '../metrics/metrics-running.js';
 import { weeklyE1rmByLift } from '../metrics/metrics-strength.js';
 import { DOMAINS, ENGINES, FINDING_TYPES, THRESHOLDS } from './constants_brain.js';
@@ -267,7 +268,8 @@ export function analyzeRunning(state, days, maxWeek, currentWeek) {
 export function analyzeAdherence(state, program, days, currentWeek, maxWeek) {
   const findings = [];
 
-  const a = computeGoalAdherence(state, program, days, currentWeek);
+  const runScheduled = isRunScheduledResolver(program);
+  const a = computeGoalAdherence(state, program, days, currentWeek, runScheduled);
   if (a.total > 0) {
     findings.push(makeFinding({
       engine: ENGINES.ADHERENCE, domain: DOMAINS.ADHERENCE, type: FINDING_TYPES.CONSISTENCY,
@@ -278,7 +280,7 @@ export function analyzeAdherence(state, program, days, currentWeek, maxWeek) {
     }));
   }
 
-  const ct = trend(computeWeeklyCompletionSeries(state, program, days, maxWeek));
+  const ct = trend(computeWeeklyCompletionSeries(state, program, days, maxWeek, runScheduled));
   if (ct.points >= THRESHOLDS.MIN_POINTS_LOW && ct.direction && ct.direction !== 'flat') {
     findings.push(makeFinding({
       engine: ENGINES.ADHERENCE, domain: DOMAINS.ADHERENCE, type: FINDING_TYPES.CONSISTENCY,

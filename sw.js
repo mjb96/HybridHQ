@@ -1,7 +1,7 @@
 // ==========================================
 // SERVICE WORKER (sw.js)
 // ==========================================
-const CACHE_NAME = 'hybrid-training-v85';
+const CACHE_NAME = 'hybrid-training-v90';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -12,7 +12,7 @@ const ASSETS_TO_CACHE = [
   './js/app.js',
   './js/constants.js',
   './js/analytics.js',
-  './js/dashboard.js',
+  './js/dashboard-tiles.js',
   './js/db.js',
   './js/dragdrop.js',
   './js/engine.js',
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
   './js/garmin.js',
   './js/home.js',
   './js/state.js',
+  './js/toast.js',
   './js/templates.js',
   './js/timers.js',
   './js/workout.js',
@@ -36,8 +37,35 @@ const ASSETS_TO_CACHE = [
   './js/builder-progression.js',
   './js/builder-preview.js',
 
+  // Analytics — coordinator, charts, shared utils and per-tab views
+  './js/analytics/charts.js',
+  './js/analytics/utils.js',
+  './js/analytics/views/_healthTrend.js',
+  './js/analytics/views/view-strength.js',
+  './js/analytics/views/view-running.js',
+  './js/analytics/views/view-bodyweight.js',
+  './js/analytics/views/view-recovery.js',
+  './js/analytics/views/view-progress.js',
+  './js/analytics/views/view-health-sleep.js',
+  './js/analytics/views/view-health-steps.js',
+  './js/analytics/views/view-health-rhr.js',
+
+  // Metrics — aggregation helpers
+  './js/metrics/metrics-load.js',
+  './js/metrics/metrics-running.js',
+  './js/metrics/metrics-strength.js',
+
+  // Health — ingestion, calculations and settings
+  './js/health/healthTypes.js',
+  './js/health/healthService.js',
+  './js/health/healthCalculations.js',
+  './js/health/healthConnect.js',
+  './js/health/healthSettings.js',
+  './js/health/healthBaselines.js',
+
   // Hybrid Brain — intelligence layer
   './js/brain/constants_brain.js',
+  './js/brain/insight_cards.js',
   './js/brain/load_models.js',
   './js/brain/analysis.js',
   './js/brain/attribution.js',
@@ -47,7 +75,10 @@ const ASSETS_TO_CACHE = [
   './js/brain/analytics_brain.js',
   './js/brain/exercise_metadata.js',
   './js/brain/session_fatigue.js',
-  './js/brain/briefing.js'
+  './js/brain/briefing.js',
+  './js/brain/weekly_brief.js',
+  './js/brain/daily_readiness.js',
+  './js/brain/tradeoffs.js'
 ];
 
 self.addEventListener('install', (event) => {

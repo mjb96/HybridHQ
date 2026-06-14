@@ -7,7 +7,7 @@
 // when there's nothing to say. The report is computed once by the caller.
 // ==========================================
 import { insightsForContext, contextVerdict } from './core.js';
-import { CATEGORY_META } from './brain_dashboard.js';
+import { insightMeta as meta } from './insight_cards.js';
 import { escapeHtml } from '../util.js';
 
 const CONTEXT_SECTION = {
@@ -25,8 +25,6 @@ const CONTEXT_SECTION = {
   'health-sleep':   'analytics-health-sleep',
   'health-rhr':     'analytics-health-rhr',
 };
-
-const meta = (cat) => CATEGORY_META[cat] || CATEGORY_META.progress;
 
 // Inject (or refresh / remove) the Brain banner for an analytics context.
 export function renderContextBanner(context, report) {
