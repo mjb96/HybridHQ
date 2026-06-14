@@ -1217,5 +1217,24 @@
   </div>
 
   <script type="module" src="./js/app.js"></script>
+
+  <!-- DEBUG: catch module/runtime errors visibly — remove once issue is diagnosed -->
+  <div id="_dbgOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#0a0a0a;color:#ff4444;padding:20px;overflow:auto;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;"></div>
+  <script>
+    (function() {
+      function show(msg) {
+        var el = document.getElementById('_dbgOverlay');
+        if (!el) return;
+        el.style.display = 'block';
+        el.textContent = (el.textContent ? el.textContent + '\n\n' : '') + msg;
+      }
+      window.onerror = function(msg, src, line, col, err) {
+        show('[ERROR] ' + (err ? err.stack : msg) + '\n' + src + ':' + line);
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        show('[UNHANDLED] ' + String(e.reason && e.reason.stack ? e.reason.stack : e.reason || e));
+      });
+    })();
+  </script>
 </body>
 </html>
