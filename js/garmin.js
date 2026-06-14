@@ -2,7 +2,7 @@
 // actually parsed — never at app load. A static top-level import from esm.sh
 // would otherwise blank the entire app if the CDN is unreachable (offline,
 // network policy, outage), since app.js statically imports this module.
-import { showToast } from './state.js';
+import { showToast } from './toast.js';
 import { downsampleStream, derivePaceSeries } from './engine.js';
 
 let _fitDeps = null;

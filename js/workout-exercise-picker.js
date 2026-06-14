@@ -2,7 +2,8 @@
 // WORKOUT EXERCISE PICKER (workout-exercise-picker.js)
 // ==========================================
 import { EXERCISE_LIBRARY } from './constants.js';
-import { showToast, saveNewCustomExerciseToLibrary } from './state.js';
+import { saveNewCustomExerciseToLibrary } from './state.js';
+import { showToast } from './toast.js';
 import { getLiftId, getLiftDisplayName } from './engine.js';
 
 let _getState, _getSelectedDay, _saveState, _rerender;

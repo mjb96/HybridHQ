@@ -1,7 +1,8 @@
 // ==========================================
 // WORKOUT SESSION MODALS (workout-session-modals.js)
 // ==========================================
-import { getProgramById, showToast, flushCloudSyncNow } from './state.js';
+import { getProgramById, flushCloudSyncNow } from './state.js';
+import { showToast } from './toast.js';
 import { prescribeSetsForLift } from './engine.js';
 import { dismissRestTimer, stopAndResetWorkoutTimer } from './timers.js';
 import { deleteMapFromDB } from './db.js';

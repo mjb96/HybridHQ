@@ -7,20 +7,30 @@ import { prescribeSetsForLift, isCompletedSet } from './engine.js';
 import { getDayV2, dayLiftEntries, createEmptyV2Program, migrateCustomProgramToV2, migrateProgramToV2 } from './schema.js';
 import { estimateWeekStart } from './dates.js';
 import { emptyAthleteProfile } from './profile.js';
+import { showToast } from './toast.js';
 
 const supabaseUrl = 'https://uzxvufzlaipdwuffxqyo.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6eHZ1ZnpsYWlwZHd1ZmZ4cXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDE1MTYsImV4cCI6MjA5NjE3NzUxNn0.G26YRJzt4ndScofQvp4fi-G8MP-Fs2Ovn0e6Y9t4Dxg';
 
-let supabaseClient = null;
-
-try {
-  if (window.supabase && supabaseUrl.startsWith('http')) {
-    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-  } else {
-    console.warn("Supabase global not found. App will run in offline mode.");
+// Lazily create (and memoise) the Supabase client on first use. Deferring the
+// `window.supabase` lookup out of module-load is what lets state.js be imported
+// in a DOM-less context (unit tests) without throwing. Returns null offline.
+let _sbClient;
+let _sbInitDone = false;
+function getSupabaseClient() {
+  if (_sbInitDone) return _sbClient;
+  _sbInitDone = true;
+  _sbClient = null;
+  try {
+    if (typeof window !== 'undefined' && window.supabase && supabaseUrl.startsWith('http')) {
+      _sbClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    } else {
+      console.warn("Supabase global not found. App will run in offline mode.");
+    }
+  } catch (e) {
+    console.error("Critical Supabase initialization failure:", e);
   }
-} catch (e) {
-  console.error("Critical Supabase initialization failure:", e);
+  return _sbClient;
 }
 
 const STORAGE_KEY = 'hybrid_engine_v2_state';
@@ -216,16 +226,18 @@ export function deleteCustomProgram(id) {
 // ==========================================
 // AUTHENTICATION
 // ==========================================
-export async function loginToSupabase() {
-  const email = document.getElementById('loginEmail').value;
-  const pass = document.getElementById('loginPassword').value;
-  
-  if (!supabaseClient) {
+export async function loginToSupabase(email, pass) {
+  // Credentials may be passed in (testable) or read from the auth form (the
+  // app's data-action dispatcher calls this with no args).
+  if (email === undefined) email = document.getElementById('loginEmail')?.value || '';
+  if (pass === undefined) pass = document.getElementById('loginPassword')?.value || '';
+
+  if (!getSupabaseClient()) {
       showToast("Offline mode — cannot sign in.", true);
       return;
   }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: pass });
+  const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email: email, password: pass });
 
   if (error) {
     showToast("Login failed: " + error.message.substring(0, 50), true);
@@ -240,9 +252,9 @@ export async function loginToSupabase() {
 }
 
 export async function checkActiveSession() {
-  if (!supabaseClient) return; 
+  if (!getSupabaseClient()) return; 
   try {
-    const sessionPromise = supabaseClient.auth.getSession();
+    const sessionPromise = getSupabaseClient().auth.getSession();
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
     const response = await Promise.race([sessionPromise, timeoutPromise]);
     
@@ -389,14 +401,14 @@ async function _flushCloudSync() {
   const wantToast = _pendingToast;
   _pendingToast = false;
 
-  if (!supabaseClient) return;
+  if (!getSupabaseClient()) return;
   try {
-    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const { data: sessionData } = await getSupabaseClient().auth.getSession();
     if (!sessionData?.session) {
       if (wantToast) showToast('Session Saved Locally ✓');
       return;
     }
-    const { error } = await supabaseClient
+    const { error } = await getSupabaseClient()
       .from('user_data')
       .upsert({ user_id: sessionData.session.user.id, state_data: appState }, { onConflict: 'user_id' });
     if (error) throw error;
@@ -422,7 +434,7 @@ export function saveStateToLocalStorage(suppressToast = false) {
     console.error('Failed to save state locally:', e);
   }
 
-  if (!supabaseClient) {
+  if (!getSupabaseClient()) {
     if (!suppressToast) showToast('Session Saved Locally ✓');
     return;
   }
@@ -435,7 +447,7 @@ export function saveStateToLocalStorage(suppressToast = false) {
 export async function flushCloudSyncNow() {
   clearTimeout(_syncTimer);
   _syncTimer = null;
-  if (!supabaseClient) return;
+  if (!getSupabaseClient()) return;
   await _flushCloudSync();
 }
 
@@ -468,12 +480,12 @@ export async function pullEngineDataFromStorage() {
     appState = { ...baseDefaults, ...localData };
   }
 
-  if (supabaseClient) {
+  if (getSupabaseClient()) {
     try {
       const fetchCloud = async () => {
-        const { data: userData, error: authError } = await supabaseClient.auth.getUser();
+        const { data: userData, error: authError } = await getSupabaseClient().auth.getUser();
         if (!authError && userData?.user) {
-            const { data, error } = await supabaseClient
+            const { data, error } = await getSupabaseClient()
               .from('user_data')
               .select('state_data')
               .eq('user_id', userData.user.id)
@@ -657,17 +669,6 @@ export function triggerEngineImport(event) {
     }
   };
   reader.readAsText(file);
-}
-
-export function showToast(msg, isError = false) {
-  const toast = document.getElementById('sysToast');
-  if (!toast) return;
-  toast.textContent = msg;
-  toast.style.background = isError ? 'var(--accent-red)' : 'var(--accent-green)';
-  toast.classList.remove('show');
-  void toast.offsetWidth;
-  toast.classList.add('show');
-  setTimeout(() => { toast.classList.remove('show'); }, 2500);
 }
 
 export function saveNewCustomExerciseToLibrary(exerciseName) {

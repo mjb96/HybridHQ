@@ -19,11 +19,11 @@ import {
   triggerCSVExport,
   triggerEngineImport,
   setImportSuccessCallback,
-  showToast,
   checkActiveSession,
   loginToSupabase,
   logActivityForStreak
 } from './state.js';
+import { showToast } from './toast.js';
 
 import { initEngine, shouldSuggestDeload } from './engine.js';
 import { initHome, renderHome, closeTileCustomiser, resetTileCustomiser } from './home.js';

@@ -3,7 +3,8 @@
 // Reads + writes the unified weeks[] → days{mon..sun} → block[] tree the
 // engine reads natively. Row markup lives in builder-exercise-row.js.
 // ==========================================
-import { saveStateToLocalStorage, getProgramById, appState, showToast } from './state.js';
+import { saveStateToLocalStorage, getProgramById, appState } from './state.js';
+import { showToast } from './toast.js';
 import { escapeHtml } from './util.js';
 import { DAY_NAMES_FULL } from './constants.js';
 import {
