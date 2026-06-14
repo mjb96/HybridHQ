@@ -11,6 +11,7 @@ import { triggerRestTimerEngine, moveRestTimerToActiveExercise } from './timers.
 import { mountExerciseDragAndDropSystems } from './dragdrop.js';
 import { showToast } from './state.js'; 
 import { buildEmptyWorkoutCard, buildSetRow, buildExerciseCard } from './templates.js';
+import { escapeHtml } from './util.js';
 import { renderRunMap } from './workout-map.js';
 import { initExercisePicker, openAddExerciseModal, closeAddExerciseModal, confirmAddExercise, handleExerciseDropdownSelectionChange } from './workout-exercise-picker.js';
 import { initSessionModals, openConfirmResetModal, closeConfirmResetModal, executeResetActiveDayMetrics, openFinishSessionModal, closeFinishSessionModal } from './workout-session-modals.js';
@@ -399,8 +400,8 @@ export function renderWorkout() {
         + (lastPerf.e1rm ? ` · e1RM ${lastPerf.e1rm}kg` : '');
     }
 
-    const safeLiftName = liftName.replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-    const displaySafeName = displayLiftName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeLiftName = escapeHtml(liftName);
+    const displaySafeName = escapeHtml(displayLiftName);
 
     let warmupIndex = 0;
     let workingIndex = 0;

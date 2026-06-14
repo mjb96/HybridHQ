@@ -288,6 +288,16 @@ export function dayRunWorkout(dayV2) {
   return r ? r.run : null;
 }
 
+// Predicate factory: (week, dayKey) => bool — is a non-rest run scheduled?
+// Bridges the schema layer to engine.js's adherence/completion calculators,
+// which must stay schema-agnostic (no schema.js import → no import cycle).
+export function isRunScheduledResolver(prog) {
+  return (week, dayKey) => {
+    const run = dayRunWorkout(getDayV2(prog, week, dayKey)?.day);
+    return !!run && run.type !== 'rest';
+  };
+}
+
 // Render a structured RunWorkout to a human display string (for legacy-shaped
 // display consumers that expect a `runs` string).
 export function formatRunDisplay(run) {

@@ -233,7 +233,8 @@ export async function loginToSupabase() {
     const authOverlay = document.getElementById('authOverlay');
     if(authOverlay) authOverlay.style.display = 'none';
     showToast('Securely Logged In ✓');
-    await pullEngineDataFromStorage(); 
+    // Reload re-runs full init, which pulls cloud data as the now-authenticated
+    // user; pulling here first would just be discarded (and flash stale state).
     window.location.reload();
   }
 }

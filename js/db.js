@@ -5,27 +5,43 @@ const DB_VERSION = 2;
 const STORE_NAME = 'runMaps';
 const STREAM_STORE = 'fitStreams';
 
+// Single shared connection, cached as a promise. Re-opening per operation (the
+// old behaviour) churned connections during bursty work like a .FIT import.
+// The cache is invalidated whenever the connection drops (close, version-change
+// from another tab, or open error) so the next call transparently re-opens.
+let _dbPromise = null;
+
 function openDB() {
-  return new Promise((resolve, reject) => {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
     let request;
     try {
       request = indexedDB.open(DB_NAME, DB_VERSION);
     } catch (e) {
+      _dbPromise = null;
       reject(e);
       return;
     }
-    request.onerror = (e) => reject(e.target.error || new Error('IndexedDB open failed'));
+    request.onerror = (e) => {
+      _dbPromise = null;
+      reject(e.target.error || new Error('IndexedDB open failed'));
+    };
     request.onsuccess = (e) => {
       const db = e.target.result;
       // If another tab later triggers a version change, close this connection
       // so we never block that tab's upgrade (and vice-versa).
-      db.onversionchange = () => { try { db.close(); } catch {} };
+      db.onversionchange = () => { try { db.close(); } catch {} _dbPromise = null; };
+      // Drop the cache if the connection closes unexpectedly so we re-open.
+      db.onclose = () => { _dbPromise = null; };
       resolve(db);
     };
     // Fires when this open is blocked by an existing connection (e.g. another
     // tab still on the old DB version). Reject instead of hanging forever so
     // callers fail fast and the UI is never wedged waiting on a dead promise.
-    request.onblocked = () => reject(new Error('IndexedDB upgrade blocked by another open tab'));
+    request.onblocked = () => {
+      _dbPromise = null;
+      reject(new Error('IndexedDB upgrade blocked by another open tab'));
+    };
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -36,6 +52,7 @@ function openDB() {
       }
     };
   });
+  return _dbPromise;
 }
 
 // ---- GPS route maps (key: "week_day", e.g. "1_mon") ----------------------

@@ -114,7 +114,7 @@ export function buildExerciseCard({ displaySafeName, safeLiftName, isCompleted, 
   </div>
   <div class="cockpit-body">
     <div class="local-timer-placeholder"></div>
-    <span class="cockpit-history-line">⚡ ${historicalLineText}</span>
+    <span class="cockpit-history-line">⚡ ${escapeHtml(historicalLineText)}</span>
     <div class="set-rows-list">${setsMarkup}</div>
     <div class="flex gap-2" style="flex-wrap: wrap;">
       <button class="btn-pad-append tactile-scale" data-action="repeat-last" data-liftname="${safeLiftName}" style="flex:1; min-width: calc(50% - 0.5rem);">⟲ Repeat Last</button>

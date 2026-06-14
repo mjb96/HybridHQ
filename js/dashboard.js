@@ -30,6 +30,7 @@
 import { computeStreakView, computeRecoveryScore,
          computeReadiness, computeWeeklyLoadSeries, computeGoalAdherence,
          isCompletedSet, parseDurationToMinutes } from './engine.js';
+import { isRunScheduledResolver } from './schema.js';
 import { big3Progression } from './metrics/metrics-strength.js';
 import { generateInsights, summarizeReport } from './brain/core.js';
 import { generateDailyBrief } from './brain/daily_readiness.js';
@@ -520,7 +521,7 @@ export const TILE_REGISTRY = [
         const total = activeProgram?.totalWeeks || 12;
         // Hero = real adherence (work actually done vs scheduled, through now),
         // not raw calendar position. Calendar week is shown as context.
-        const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk);
+        const a = computeGoalAdherence(appState, activeProgram, defaultDays, wk, isRunScheduledResolver(activeProgram));
         return {
           hero:  `${a.pct}%`,
           sub:   `Wk ${wk}/${total} · ${a.done}/${a.total} done`,
