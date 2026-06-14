@@ -64,7 +64,7 @@ export function openExerciseHistoryModal(liftName) {
             <span class="text-sm font-heavy text-inverse">Week ${sess.week}</span>
             <span class="text-xs text-muted uppercase">${sess.day}</span>
           </div>
-          <div class="text-sm text-muted mb-2">${setsStr}</div>
+          <div class="text-sm text-muted mb-2">${escapeHtml(setsStr)}</div>
           <div class="flex-between" style="border-top: 1px dashed var(--overlay-sm); padding-top: 6px; margin-top: 4px;">
             <span class="text-xs text-muted">Vol: <strong class="text-main">${sess.volume} kg</strong></span>
             <span class="text-xs text-muted">e1RM: <strong class="text-accent-blue">${Math.round(sess.e1rm)} kg</strong></span>
@@ -201,7 +201,7 @@ export function renderWorkout() {
                           <span>Lap ${s.lap}</span>
                           <span>${s.dist.toFixed(2)} km</span>
                           <span>${min}:${sec}</span>
-                          <span style="color:var(--accent-pink);">❤️ ${s.avgHR || '--'}</span>
+                          <span style="color:var(--accent-pink);">❤️ ${escapeHtml(s.avgHR || '--')}</span>
                        </div>`;
           });
           html += '</div>';
@@ -221,9 +221,9 @@ export function renderWorkout() {
           gStats.gymSets.forEach(s => {
               html += `<div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
                           <span>Set ${s.set}</span>
-                          <span>${s.reps} reps</span>
-                          <span>${s.weight} kg</span>
-                          <span style="color:var(--accent-blue);">${s.category || ''}</span>
+                          <span>${escapeHtml(s.reps)} reps</span>
+                          <span>${escapeHtml(s.weight)} kg</span>
+                          <span style="color:var(--accent-blue);">${escapeHtml(s.category || '')}</span>
                        </div>`;
           });
           html += '</div>';

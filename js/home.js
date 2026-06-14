@@ -68,15 +68,15 @@ function renderTileError(label) {
 function renderMetricTile(config, data) {
   const accentColor = `var(${config.accentVar})`;
   const tagHTML = data.tag
-    ? `<div class="tile-tag font-bold mb-1" style="font-size:0.75rem;color:${data.tagColor || accentColor};">${data.tag}</div>`
+    ? `<div class="tile-tag font-bold mb-1" style="font-size:0.75rem;color:${data.tagColor || accentColor};">${escapeHtml(data.tag)}</div>`
     : '';
   const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
   return `
     <div class="card-icon-title" style="color:${accentColor};"><span>${config.icon}</span> ${config.label}</div>
     <div>
       ${tagHTML}
-      <div class="font-heavy tile-hero" style="font-size:1.3rem;line-height:1.1;color:${heroColor};">${data.hero || '--'}</div>
-      <div class="text-muted tile-sub" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
+      <div class="font-heavy tile-hero" style="font-size:1.3rem;line-height:1.1;color:${heroColor};">${escapeHtml(data.hero || '--')}</div>
+      <div class="text-muted tile-sub" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(data.sub || '')}</div>
     </div>
   `;
 }
@@ -90,11 +90,11 @@ function renderRingTile(config, data) {
     <div class="readiness-ring-container">
       <div class="readiness-ring green" style="background:${grad};">
         <div class="readiness-ring-inner">
-          <span class="font-heavy text-inverse" style="font-size:0.75rem;">${data.hero || '--'}</span>
+          <span class="font-heavy text-inverse" style="font-size:0.75rem;">${escapeHtml(data.hero || '--')}</span>
         </div>
       </div>
     </div>
-    <div class="text-muted text-center" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${data.sub || ''}</div>
+    <div class="text-muted text-center" style="font-size:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(data.sub || '')}</div>
   `;
 }
 
@@ -102,8 +102,8 @@ function renderSplit3Tile(config, data) {
   const accentColor = `var(${config.accentVar})`;
   const rows = (data.rows || []).map(r => `
     <div class="flex-between mb-1" style="font-size:0.75rem;">
-      <span class="text-muted">${r.label}</span>
-      <strong class="text-inverse">${r.value}</strong>
+      <span class="text-muted">${escapeHtml(r.label)}</span>
+      <strong class="text-inverse">${escapeHtml(r.value)}</strong>
     </div>
   `).join('');
   return `
@@ -116,12 +116,12 @@ function renderRatioBarTile(config, data) {
   return `
     <div class="card-icon-title" style="color:var(${config.accentVar});"><span>${config.icon}</span> ${config.label}</div>
     <div>
-      <div class="font-heavy text-inverse mb-1" style="font-size:0.95rem;">${data.label || '0% / 0%'}</div>
+      <div class="font-heavy text-inverse mb-1" style="font-size:0.95rem;">${escapeHtml(data.label || '0% / 0%')}</div>
       <div class="ratio-bar-track mb-1" style="height:5px;border-radius:3px;">
         <div class="ratio-fill-blue" id="tileRatioLiftBar" style="width:${data.liftPct || 50}%;background:#3b82f6;"></div>
         <div class="ratio-fill-pink" id="tileRatioRunBar" style="width:${data.runPct || 50}%;background:#ec4899;"></div>
       </div>
-      <div class="text-muted" style="font-size:0.6rem;">${data.advice || 'Lift / Run bias'}</div>
+      <div class="text-muted" style="font-size:0.6rem;">${escapeHtml(data.advice || 'Lift / Run bias')}</div>
     </div>
   `;
 }
@@ -129,7 +129,7 @@ function renderRatioBarTile(config, data) {
 function renderBriefTile(config, data) {
   const accent = `var(${config.accentVar})`;
   const tagHTML = data.tag
-    ? `<span style="font-size:0.6rem;font-weight:700;padding:1px 8px;border-radius:999px;color:${data.tagColor || accent};background:color-mix(in srgb, ${data.tagColor || accent} 15%, transparent);">${data.tag}</span>`
+    ? `<span style="font-size:0.6rem;font-weight:700;padding:1px 8px;border-radius:999px;color:${data.tagColor || accent};background:color-mix(in srgb, ${data.tagColor || accent} 15%, transparent);">${escapeHtml(data.tag)}</span>`
     : '';
   const heroColor = data.state === 'empty' ? 'var(--text-secondary)' : 'var(--text-primary)';
   return `
@@ -137,8 +137,8 @@ function renderBriefTile(config, data) {
       <span>${config.icon}</span> ${config.label}
       ${tagHTML ? `<span style="margin-left:auto;">${tagHTML}</span>` : ''}
     </div>
-    <div class="font-heavy" style="font-size:0.78rem;line-height:1.3;color:${heroColor};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${data.hero || '–'}</div>
-    ${data.sub ? `<div class="text-muted mt-1" style="font-size:0.6rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${data.sub}</div>` : ''}
+    <div class="font-heavy" style="font-size:0.78rem;line-height:1.3;color:${heroColor};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(data.hero || '–')}</div>
+    ${data.sub ? `<div class="text-muted mt-1" style="font-size:0.6rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escapeHtml(data.sub)}</div>` : ''}
   `;
 }
 
@@ -150,7 +150,7 @@ function renderProgressTile(config, data) {
       <div class="font-heavy text-inverse mb-1" style="font-size:1.3rem;line-height:1.1;">
         ${data.done || 0} <span class="text-muted" style="font-size:0.9rem;">/ ${data.total || 0}</span>
       </div>
-      <div class="text-muted" style="font-size:0.6rem;">${data.sub || ''}</div>
+      <div class="text-muted" style="font-size:0.6rem;">${escapeHtml(data.sub || '')}</div>
     </div>
   `;
 }
