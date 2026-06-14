@@ -627,7 +627,7 @@ export function triggerEngineImport(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const parsedData = JSON.parse(e.target.result);
       if (parsedData.currentWeek && parsedData.weeks && Object.keys(parsedData.weeks).length > 0) {
@@ -641,7 +641,11 @@ export function triggerEngineImport(event) {
           return migrateCustomProgramToV2(prog);
         });
         saveStateToLocalStorage(true);
-        flushCloudSyncNow();
+        // Await the cloud upsert before signalling success: _onImportSuccess
+        // typically reloads the page, and an un-awaited upsert would be
+        // abandoned mid-flight — the next load would then pull the stale
+        // pre-import cloud state and clobber the freshly imported data.
+        await flushCloudSyncNow();
         if (_onImportSuccess) _onImportSuccess();
         showToast('Data snapshot mounted successfully.');
       } else {
