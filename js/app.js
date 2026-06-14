@@ -720,6 +720,18 @@ async function bootstrapApp() {
   // Skip SW in the Android APK: WebViewAssetLoader serves assets locally and the
   // SW's internal fetch calls can't reach the appassets origin from inside the worker.
   if (!window.HybridHealthBridge && 'serviceWorker' in navigator) {
+    // When a freshly-installed SW takes control mid-session (skipWaiting +
+    // clients.claim), the page is still showing the OLD cached resources it
+    // loaded with. Reload once so the now-active SW can serve fresh code —
+    // this is what auto-unsticks a PWA pinned to a stale/broken build. The
+    // guard prevents a reload loop.
+    let _swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swReloading) return;
+      _swReloading = true;
+      window.location.reload();
+    });
+
     navigator.serviceWorker.register('./sw.js')
       .then(reg => reg.update())  // always check for a fresh SW on every load
       .catch(err => {

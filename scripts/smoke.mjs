@@ -35,7 +35,7 @@ globalThis.document = { addEventListener: noop, removeEventListener: noop,
 globalThis.window = { addEventListener: noop, removeEventListener: noop, supabase: undefined,
   location: { reload: noop, href: '' }, scrollTo: noop, matchMedia: () => ({ matches: false, addEventListener: noop }) };
 globalThis.localStorage = { s: {}, getItem(k){ return this.s[k] ?? null; }, setItem(k,v){ this.s[k] = String(v); }, removeItem(k){ delete this.s[k]; } };
-Object.defineProperty(globalThis, 'navigator', { value: { serviceWorker: { register: () => Promise.reject(new Error('no sw')) }, vibrate: noop }, configurable: true });
+Object.defineProperty(globalThis, 'navigator', { value: { serviceWorker: { register: () => Promise.reject(new Error('no sw')), addEventListener: noop, removeEventListener: noop }, vibrate: noop }, configurable: true });
 globalThis.CustomEvent = class { constructor(t, o) { this.type = t; this.detail = o && o.detail; } };
 globalThis.L = { map: () => ({ remove: noop, fitBounds: noop }), tileLayer: () => ({ addTo: () => ({}) }), polyline: () => ({ addTo: () => ({ getBounds: noop }) }) };
 
