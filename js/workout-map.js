@@ -18,6 +18,7 @@ export function renderRunMap(wk, selectedDay, hasDistance) {
       if (coords && coords.length > 0) {
         runMapContainer.style.display = 'block';
         setTimeout(() => {
+          if (typeof L === 'undefined') return;
           if (activeWorkoutMapInstance) { activeWorkoutMapInstance.remove(); activeWorkoutMapInstance = null; }
           runMapContainer.innerHTML = '';
           activeWorkoutMapInstance = L.map('runMapContainer');

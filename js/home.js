@@ -496,6 +496,7 @@ export function renderHome() {
             if (mapEl) {
               mapEl.style.display = 'block';
               setTimeout(() => {
+                if (typeof L === 'undefined') return;
                 if (activeHomeMapInstance) activeHomeMapInstance.remove();
                 activeHomeMapInstance = L.map('homeMiniMapContainer', {
                   zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false

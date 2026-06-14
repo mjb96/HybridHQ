@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="./icon-512.png">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
@@ -335,7 +335,7 @@
 </head>
 <body>
 
-  <div id="authOverlay" class="modal-overlay" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-dark); z-index: 9999;">
+  <div id="authOverlay" class="modal-overlay" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-app); z-index: 9999;">
     <h2 class="text-2xl font-heavy text-main mb-4">Hybrid Engine Login</h2>
     <input type="email" id="loginEmail" placeholder="Email" class="mb-3 p-3 w-4/5 max-w-xs" style="color: black; border-radius: 8px;">
     <input type="password" id="loginPassword" placeholder="Password" class="mb-5 p-3 w-4/5 max-w-xs" style="color: black; border-radius: 8px;">

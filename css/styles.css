@@ -85,7 +85,7 @@
   /* --- Z-index scale --- */
   --z-nav:   100;
   --z-modal: 200;
-  --z-toast: 300;
+  --z-toast: 10000;
 
   /* --- Accent aliases (referenced app-wide; previously undefined) ---
      'pink' maps to cyan to match the existing .text-accent-pink utility. */
